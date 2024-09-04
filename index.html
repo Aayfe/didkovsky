@@ -38,10 +38,26 @@
         <div class="imgholder">
           <img src="" id="image"alt="">  
         </div>
-        
+        <p class="pravidla">Slouží pouze k interaktivním účelům, majitel ani zřizovatel nenese zodpovědnost za chyby a případné odeslané peněžní prostředky. Uživatel po zaslání peněžních prostředků jako daru strácí nárok odvolat svoje rozhodnutí. Jakékoliv peněžní prostředky odeslané skrze QR kód náleží majiteli bankovního účtu uloženého v naskenovaném QR kódu. </p>
       </div>
       <div class="bs2 blankspace blank-light">
-        <p class="pravidla">Slouží pouze k interaktivním účelům, majitel ani zřizovatel nenese zodpovědnost za chyby a případné odeslané peníze. Uživatel po zaslání peněžních prostředků jako daru strácí nárok odvolat svoje rozhodnutí. Jakékoliv peněžní prostředky odeslané skrze QR kód náleží majiteli bankovního účtu uloženého v QR kódu. </p>
+
+            <div class="soc-links">
+                <a href="https://instagram.com/jakubdidkovsky">
+                    <i class="fa-brands fa-instagram"></i>
+                </a>
+                <a href="mailto:jakub@didkovsky.cz">
+                    <i class="fa-regular fa-envelope"></i>
+                </a>
+                <a href="https://snapchat.com/t/6HDXXGYs">
+                    <i class="fa-brands fa-snapchat"></i>
+                </a>
+
+                
+            </div>
+                        
+        <p>&#169 2024 Didkovský Jakub </p>
+        
       </div>
 
 
@@ -152,6 +168,7 @@ updatePrice();
         const themeBlank2 = document.querySelector('.bs2');
         const imageqr = document.querySelector('#image');
         const slider = document.querySelector('#mySlider');
+        const socialLinks = document.querySelector(".soc-links");
 
         // Načti preference z localStorage
         const savedTheme = localStorage.getItem('theme');
@@ -167,6 +184,8 @@ updatePrice();
                 themeBlank2.classList.remove('blank-light');
                 logo.classList.add('dark-logo-needmoney');
                 needmoney.classList.add('dark-logo-needmoney');
+                socialLinks.classList.add('set-text-light');
+                
                 
             } else {
                 document.body.classList.remove('dark-mode');
@@ -178,6 +197,7 @@ updatePrice();
                 themeBlank2.classList.add('blank-light');
                 logo.classList.remove('dark-logo-needmoney');
                 needmoney.classList.remove('dark-logo-needmoney');
+                socialLinks.classList.remove('set-text-light');
             }
 
             // Přepni téma při kliknutí na tlačítko
@@ -192,6 +212,7 @@ updatePrice();
                     themeBlank2.classList.add('blank-light');
                     logo.classList.remove('dark-logo-needmoney');
                     needmoney.classList.remove('dark-logo-needmoney');
+                    socialLinks.classList.remove('set-text-light');
 
                     localStorage.setItem('theme', 'light');
                 } else {
@@ -204,6 +225,7 @@ updatePrice();
                     themeBlank2.classList.remove('blank-light');
                     logo.classList.add('dark-logo-needmoney');
                     needmoney.classList.add('dark-logo-needmoney');
+                    socialLinks.classList.add('set-text-light');
 
                     localStorage.setItem('theme', 'dark');
                 }
