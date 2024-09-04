@@ -1,0 +1,246 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&display=swap');
+
+body{
+    background-color: white;
+    margin: 0;
+    padding: 0;
+    transition: background-color 0.5s, color 0.5s;
+}
+
+
+/* Styl pro obsah stránky */
+.content {
+    padding: 20px;
+}
+
+/* Styl pro přepínač témat */
+
+/* Styl pro přepínač témat */
+.theme-switch {
+    
+    background: transparent;
+    border: none;
+    font-size: 35px;
+    cursor: pointer;
+
+    color: #333; /* Barva ikony ve světlém režimu */
+    transition: color 0.3s;
+}
+
+
+/* Styl pro tmavý režim */
+body.dark-mode{
+    background-color: #1E2227;
+    color: white;
+    
+}
+
+
+body.dark-mode .theme-switch {
+    color: #f1c40f; /* Barva ikony ve tmavém režimu */
+}
+
+/* Skrytí a zobrazení ikon podle aktuálního režimu */
+body.dark-mode .fa-moon {
+    display: none;
+}
+
+body.dark-mode .fa-sun {
+    display: inline;
+}
+
+body:not(.dark-mode) .fa-sun {
+    display: none;
+}
+
+body:not(.dark-mode) .fa-moon {
+    display: inline;
+}
+
+
+.blankspace.blank-dark{
+
+    background: linear-gradient(90deg, #2e6f83 0%, #0d1827 100%);
+    
+}
+.blankspace.blank-light{
+    background: linear-gradient(90deg, #FDBB2D 0%, #22C1C3 100%);
+}
+
+.logo-container {
+    
+    width: auto;
+
+    font-size: 2.5rem; /* Velikost písma pro logo */
+    font-weight: bold;
+    color: rgb(24, 24, 24);
+    height: 2.5rem;
+
+    white-space: nowrap;
+    overflow: hidden;
+    padding-right: 5px;
+
+    font-family: "Archivo", sans-serif;
+    font-weight: 900;
+    font-style: italic;
+    text-transform: uppercase;
+   
+            
+               }
+               
+        /* Typing animation */
+        @keyframes typing {
+            from { width: 0; }
+            to { width: 100%; }
+        }
+
+    .needmoney{
+        padding: 0;
+        margin: 0;
+        font-family: "Archivo", sans-serif;
+        font-size: 20px;
+        font-optical-sizing: auto;
+        font-weight: 600;
+        font-style: italic;
+        color: black;
+    }
+   
+    .dark-logo-needmoney{
+        color: #E0E0E0;
+    }
+
+
+.blankspace{
+    padding: 0;
+
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0;
+    padding: 0 20%;
+
+    
+}
+
+
+.slidecontainer{
+    margin: 0 ;
+    display: flex;
+    flex-direction: column;
+    padding:  100px 0;
+    margin: auto;
+    width: 100%;
+    text-align: center;
+}
+.imgholder{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+#price{
+    font-family: "Archivo Black", sans-serif;
+    font-weight: 900;
+    font-size: 30px;
+
+}
+#mySlider {
+
+    width: 100%;
+    max-width: 500px ;
+    margin: 20px 0;
+    accent-color: rgb(248, 182, 0);
+}
+@media (max-width: 768px) {
+    #mySlider {
+        width: 70%; /* Zmenší obrázek na 50 % rodičovského prvku */
+    }
+} 
+@media (max-width: 510px) {
+    #mySlider {
+        width: 50%; /* Zmenší obrázek na 50 % rodičovského prvku */
+    }
+} 
+
+#image {
+
+    display: block;
+    margin-top: 20px;
+    max-width: 100%;
+    height: auto;
+   
+}
+
+@media (max-width: 768px) {
+    #image {
+        width: 70%; /* Zmenší obrázek na 50 % rodičovského prvku */
+    }
+} 
+@media (max-width: 510px) {
+    #mySlider {
+        width: 50%; /* Zmenší obrázek na 50 % rodičovského prvku */
+    }
+} 
+.pravidla{
+    font-family: "Archivo Black", sans-serif;
+    font-weight: 100;
+    font-size: 12px;
+    margin: 0;
+    padding: 0;
+}
+.bfrblank{
+    width: 100%;
+}
+.bs2.blankspace{
+    padding: 100px 5% 0 40%;
+    text-align: end;
+    justify-content: end;
+}
+
+
+
+@media (max-width: 510px) {
+
+    .bs1.blankspace{
+        flex-direction: column;
+        align-items: start;
+        justify-content: center;
+        gap: 15%;
+    }
+    .needmoney {
+        font-size: 18px; 
+    }
+    #price{
+        font-size: 25px;
+    }
+    .theme-switch {
+        font-size: 30px; 
+        
+    }
+    .theme{
+        align-self: center;
+    }
+} 
+@media (max-width: 380px) {
+    .logo-container{
+        font-size: 2rem;
+        height: 2rem;
+    }
+    .needmoney {
+        font-size: 12px; 
+    }
+
+}
+@media (max-width: 300px) {
+    .logo-container{
+        font-size: 1.5rem;
+        height: 1.5rem;
+    }
+    .bs1.blankspace{
+        padding: 0 10%;
+    }
+  
+
+}
+

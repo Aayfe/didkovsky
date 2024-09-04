@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Přispěj do kasičky Jakuba💕</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://kit.fontawesome.com/da4657a244.js" crossorigin="anonymous"></script>
+</head>
+<body>
+    <div class="bfrblank">
+        <div class="bs1 blankspace blank-light">
+            <div class="logowrap">
+                <div class="logo-container" id="logoText">
+                    
+                </div>
+                
+                    <p id="needmoney" class="needmoney">Přispěj do kasičky</p>
+            </div>
+            
+            <div class="theme">
+                <button id="theme-toggle" class="theme-switch">
+                    <i id="theme-icon" class="fas fa-moon"></i> <!-- Výchozí ikona pro světlý režim -->
+                </button>
+            
+            </div>
+        
+        </div>
+    </div>
+    
+    <div class="slidecontainer">
+        <div class="slider">
+            <input type="range" min="50" max="1000" value="250"  step="50" class="slider" id="mySlider">
+        </div>
+        
+        
+        <h2 id="price"></h2>
+        <div class="imgholder">
+          <img src="" id="image"alt="">  
+        </div>
+        
+      </div>
+      <div class="bs2 blankspace blank-light">
+        <p class="pravidla">Slouží pouze k interaktivním účelům, majitel ani zřizovatel nenese zodpovědnost za chyby a případné odeslané peníze. Uživatel po zaslání peněžních prostředků jako daru strácí nárok odvolat svoje rozhodnutí. Jakékoliv peněžní prostředky odeslané skrze QR kód náleží majiteli bankovního účtu uloženého v QR kódu. </p>
+      </div>
+
+
+<script>
+        // Vyber slider a obrázek podle jejich ID
+    const slider = document.getElementById('mySlider');
+    const h2 = document.getElementById('price');
+    const image = document.getElementById('image');
+    const date = getNewDate();
+
+console.log(date);
+
+
+function updateImage() {
+    const value = slider.value; 
+    const imageUrl = `https://api.paylibo.com/paylibo/generator/czech/image?compress=false&size=440&accountNumber=4611090023&bankCode=0800&amount=${value}&currency=CZK&vs=${date}&message=str%C3%A1nka`; // 
+    image.src = imageUrl; 
+}
+function updatePrice() {
+    const value = slider.value;
+    h2.textContent = value + " Kč";
+}
+
+
+function getNewDate() {
+    // Získání aktuálního data
+    const today = new Date();
+
+    // Získání dne, měsíce a roku
+    let day = today.getDate();
+    let month = today.getMonth() + 1; // Měsíce jsou v JavaScriptu indexovány od 0, takže musíme přidat 1
+    const year = today.getFullYear();
+
+    // Přidání nuly před jednociferný den a měsíc
+    if (day < 10) {
+        day = '0' + day;
+    }
+    if (month < 10) {
+        month = '0' + month;
+    }
+
+    // Spojení ve formátu ddmmyyyy
+    const formattedDate = day + '' + month + '' + year;
+    return formattedDate;
+}
+
+// Přidání event listeneru na změnu slideru
+slider.addEventListener('input', updateImage);
+slider.addEventListener('input', updatePrice);
+
+
+// Načtení prvního obrázku při načtení stránky
+updateImage();
+updatePrice();
+
+</script>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+            const logoText = document.getElementById('logoText');
+            const texts = ['Didkovský', 'Jakub'];
+            let currentTextIndex = 0;
+            let isTyping = true;
+            let index = 0;
+            let typingSpeed = 500; // Rychlost psaní (v milisekundách)
+            let deleteSpeed = 150;
+            let pauseTime = 100; // Doba pauzy mezi texty (v milisekundách)
+            
+            function type() {
+                if (isTyping) {
+                    // Typování aktuálního textu
+                    if (index < texts[currentTextIndex].length) {
+                        logoText.textContent += texts[currentTextIndex].charAt(index);
+                        index++;
+                        setTimeout(type, typingSpeed);
+                    } else {
+                        isTyping = false;
+                        setTimeout(deleteText, pauseTime);
+                    }
+                }
+            }
+
+            function deleteText() {
+                // Mazání aktuálního textu
+                if (index > 0) {
+                    logoText.textContent = texts[currentTextIndex].substring(0, index - 1);
+                    index--;
+                    setTimeout(deleteText, deleteSpeed);
+                } else {
+                    isTyping = true;
+                    currentTextIndex = (currentTextIndex + 1) % texts.length; // Přejdi na další text
+                    setTimeout(type, pauseTime); // Pauza před začátkem psaní nového textu
+                }
+            }
+
+            type(); // Zahájení animace
+        });
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const themeToggleButton = document.getElementById('theme-toggle');
+        const themeIcon = document.getElementById('theme-icon');
+        const logo = document.querySelector('#logoText');    
+        const needmoney = document.querySelector('#needmoney');   
+        const themeBlank1 = document.querySelector('.bs1');
+        const themeBlank2 = document.querySelector('.bs2');
+        const imageqr = document.querySelector('#image');
+        const slider = document.querySelector('#mySlider');
+
+        // Načti preference z localStorage
+        const savedTheme = localStorage.getItem('theme');
+
+
+        if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+                themeIcon.classList.remove('fa-moon');
+                themeIcon.classList.add('fa-sun');
+                themeBlank1.classList.add('blank-dark');
+                themeBlank1.classList.remove('blank-light');
+                themeBlank2.classList.add('blank-dark');
+                themeBlank2.classList.remove('blank-light');
+                logo.classList.add('dark-logo-needmoney');
+                needmoney.classList.add('dark-logo-needmoney');
+                
+            } else {
+                document.body.classList.remove('dark-mode');
+                themeIcon.classList.remove('fa-sun');
+                themeIcon.classList.add('fa-moon');
+                themeBlank1.classList.remove('blank-dark');
+                themeBlank1.classList.add('blank-light');
+                themeBlank2.classList.remove('blank-dark');
+                themeBlank2.classList.add('blank-light');
+                logo.classList.remove('dark-logo-needmoney');
+                needmoney.classList.remove('dark-logo-needmoney');
+            }
+
+            // Přepni téma při kliknutí na tlačítko
+            themeToggleButton.addEventListener('click', () => {
+                if (document.body.classList.contains('dark-mode')) {
+                    document.body.classList.remove('dark-mode');
+                    themeIcon.classList.remove('fa-sun');
+                    themeIcon.classList.add('fa-moon');
+                    themeBlank1.classList.remove('blank-dark');
+                    themeBlank1.classList.add('blank-light');
+                    themeBlank2.classList.remove('blank-dark');
+                    themeBlank2.classList.add('blank-light');
+                    logo.classList.remove('dark-logo-needmoney');
+                    needmoney.classList.remove('dark-logo-needmoney');
+
+                    localStorage.setItem('theme', 'light');
+                } else {
+                    document.body.classList.add('dark-mode');
+                    themeIcon.classList.remove('fa-moon');
+                    themeIcon.classList.add('fa-sun');
+                    themeBlank1.classList.add('blank-dark');
+                    themeBlank1.classList.remove('blank-light');
+                    themeBlank2.classList.add('blank-dark');
+                    themeBlank2.classList.remove('blank-light');
+                    logo.classList.add('dark-logo-needmoney');
+                    needmoney.classList.add('dark-logo-needmoney');
+
+                    localStorage.setItem('theme', 'dark');
+                }
+               
+        });
+    });
+</script>
+
+
+
+
+</script>
+</body>
+</html>
