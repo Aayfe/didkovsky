@@ -214,13 +214,13 @@ body:not(.dark-mode) .fa-moon {
     color: #181818;
     cursor: pointer;
     padding:  0;
-    margin: 0 10px;
+    margin: 0 15px;
 }
 
 
 .soc-links i{
     transition: transform 0.3s ease;
-    font-size: 40px;
+    font-size: 55px;
 
 }.soc-links i:hover {
     transform: scale(1.25); 
@@ -239,7 +239,7 @@ body:not(.dark-mode) .fa-moon {
     font-family: "Archivo Black", sans-serif;
 
     font-weight: 400;
-    font-size: 15px;
+    font-size: 17px;
     margin: 0;
     padding-bottom: 15px;
     
@@ -267,16 +267,16 @@ body:not(.dark-mode) .fa-moon {
         align-self: center;
     }
     .soc-links i{
-        font-size: 25px;
+        font-size: 50px;
     }
     .bs2 p{
-        font-size: 12px;
+        font-size: 15px;
     }
     .soc-links a{
-        margin: 0 5px;
+        margin: 0 10px;
     }
     .soc-links{
-        margin: 45px 0 20px; 
+        margin: 45px 0 30px; 
         
     }
 } 
@@ -287,6 +287,19 @@ body:not(.dark-mode) .fa-moon {
     }
     .needmoney {
         font-size: 12px; 
+    }
+    .soc-links i{
+        font-size: 30px;
+    }
+    .bs2 p{
+        font-size: 15px;
+    }
+    .soc-links a{
+        margin: 0 10px;
+    }
+    .soc-links{
+        margin: 45px 0 20px; 
+        
     }
 
 }
