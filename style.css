@@ -260,20 +260,23 @@ body:not(.dark-mode) .fa-moon {
     
 }
 .bs2 .bs2-text{
+    display: flex;
     padding-top:20px;
-    height: 75px;
+    min-height: 75px;
     gap: 0;
     flex-wrap: wrap;
-    display: flex;
+    
     flex-direction: column;
     justify-content: flex-start; 
     align-items: left;
 }
 .bs2-text h3, .bs2-text p{
-    margin: 2px 0;
-    padding:0;
+    margin: 0;
+    padding: 5px 0;
 }
-
+.bs2-text h3{
+    font-size: 40px;
+}
 
 
 @media (max-width: 510px) {
@@ -328,11 +331,9 @@ body:not(.dark-mode) .fa-moon {
     .soc-links a{
         margin: 0 10px;
     }
-    .soc-links{
-        margin: 45px 0 20px; 
-        
+    .bs2-text h3{
+        font-size: 30px;
     }
-
 }
 @media (max-width: 300px) {
     .logo-container{
