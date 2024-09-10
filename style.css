@@ -260,7 +260,12 @@ body:not(.dark-mode) .fa-moon {
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    transition: transform 0.3s;
     
+}
+.bs2 .footerbox:hover{
+
+    transform: scale(1.1);
 }
 .bs2 .bs2-text{
     display: flex;
