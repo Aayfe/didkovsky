@@ -40,7 +40,9 @@
           <img src="" id="image"alt="">  
         </div>
         <div class="button-container">
-            <div id="button-rules">?</div>
+            <div id="button-terms">
+                <i class="fa-solid fa-question"></i>
+            </div>
             <div id="tooltip" class="tooltip">Slouží pouze k interaktivním účelům, majitel ani zřizovatel nenese zodpovědnost za chyby a případné odeslané peněžní prostředky. Uživatel po zaslání peněžních prostředků jako daru strácí nárok odvolat svoje rozhodnutí. Jakékoliv peněžní prostředky odeslané skrze QR kód náleží majiteli bankovního účtu uloženého v naskenovaném QR kódu.</div>
         </div>
       </div>
@@ -49,8 +51,9 @@
 
         <div class="bs2 blankspace blank-light">
             <div class="bs2-text">
-                <h3>Kde mě najdeš?</h3>
-                <p>Sleduj mě na sockách! Nebo mi můžeš písnout mail...</p>
+                <h3><span>Kde mě</span> najdeš?</h3>
+                <p>I když nevíš kdo jsem, tak mě sleduj na Instagramu! Nebo mi rovnou napiš e-mail, ať si můžeme pokecat o čemkoliv. Tak na co ještě čekáš? Dej o sobě vědět, ať nepromeškáš žádnou srandu!
+                </p>
             </div>
             <div class="footerbox-container">
                 <div id="bs2-box1-links" class="footerbox">
@@ -133,57 +136,72 @@ updatePrice();
 </script>
 
 <script>
-    document.getElementById('button-rules').addEventListener('mouseover', function() {
+    document.getElementById('button-terms').addEventListener('mouseover', function() {
     document.getElementById('tooltip').style.visibility = 'visible';
     document.getElementById('tooltip').style.opacity = '1';
 });
 
-document.getElementById('button-rules').addEventListener('mouseout', function() {
+document.getElementById('button-terms').addEventListener('mouseout', function() {
     document.getElementById('tooltip').style.visibility = 'hidden';
     document.getElementById('tooltip').style.opacity = '0';
 });
 
+// Přidání události click na tooltip
+    document.getElementById('tooltip').addEventListener('click', function() {
+        this.style.visibility = 'hidden';
+        this.style.opacity = '0';
+    });
+
+
 </script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-            const logoText = document.getElementById('logoText');
-            const texts = ['Didkovský', 'Jakub'];
-            let currentTextIndex = 0;
-            let isTyping = true;
-            let index = 0;
-            let typingSpeed = 500; // Rychlost psaní (v milisekundách)
-            let deleteSpeed = 150;
-            let pauseTime = 100; // Doba pauzy mezi texty (v milisekundách)
-            
-            function type() {
-                if (isTyping) {
-                    // Typování aktuálního textu
-                    if (index < texts[currentTextIndex].length) {
-                        logoText.textContent += texts[currentTextIndex].charAt(index);
-                        index++;
-                        setTimeout(type, typingSpeed);
-                    } else {
-                        isTyping = false;
-                        setTimeout(deleteText, pauseTime);
-                    }
-                }
-            }
+    const logoText = document.getElementById('logoText');
+    const texts = ['Didkovský', 'Jakub'];
+    let currentTextIndex = 0;
+    let isTyping = false; // Změna na false, aby začalo mazání
+    let index = 0;
+    let typingSpeed = 700; // Rychlost psaní (v milisekundách)
+    let deleteSpeed = 150; // Rychlost mazání (v milisekundách)
+    let pauseTime = 500; // Doba pauzy mezi texty (v milisekundách)
 
-            function deleteText() {
-                // Mazání aktuálního textu
-                if (index > 0) {
-                    logoText.textContent = texts[currentTextIndex].substring(0, index - 1);
-                    index--;
-                    setTimeout(deleteText, deleteSpeed);
-                } else {
-                    isTyping = true;
-                    currentTextIndex = (currentTextIndex + 1) % texts.length; // Přejdi na další text
-                    setTimeout(type, pauseTime); // Pauza před začátkem psaní nového textu
-                }
-            }
+    // Nastavíme počáteční text
+    logoText.textContent = texts[currentTextIndex]; // Nastav počáteční text
 
-            type(); // Zahájení animace
-        });
+    function deleteText() {
+        // Mazání aktuálního textu
+        if (index > 0) {
+            logoText.textContent = texts[currentTextIndex].substring(0, index - 1);
+            index--;
+            setTimeout(deleteText, deleteSpeed);
+        } else {
+            isTyping = true;
+            currentTextIndex = (currentTextIndex + 1) % texts.length; // Přejdi na další text
+            setTimeout(type, pauseTime); // Pauza před začátkem psaní nového textu
+        }
+    }
+
+    function type() {
+        if (isTyping) {
+            // Typování aktuálního textu
+            if (index < texts[currentTextIndex].length) {
+                logoText.textContent += texts[currentTextIndex].charAt(index);
+                index++;
+                setTimeout(type, typingSpeed);
+            } else {
+                isTyping = false;
+                setTimeout(deleteText, pauseTime);
+            }
+        }
+    }
+
+    // Zahájení mazání počátečního textu po 5 sekundách
+    setTimeout(function() {
+        index = texts[currentTextIndex].length; // Nastav index na délku aktuálního textu pro mazání
+        deleteText(); // Zahájení mazání
+    }, 5000); // 5000 milisekund = 5 sekund
+});
+
 </script>
 
 <script>
@@ -198,7 +216,7 @@ document.getElementById('button-rules').addEventListener('mouseout', function() 
         const slider = document.querySelector('#mySlider');
         const footerbox1 = document.querySelector("#bs2-box1-links");
         const footerbox2 = document.querySelector("#bs2-box2-links");
-        
+        const buttonTerms = document.querySelector("#button-terms");
 
         // Načti preference z localStorage
         const savedTheme = localStorage.getItem('theme');
@@ -216,7 +234,8 @@ document.getElementById('button-rules').addEventListener('mouseout', function() 
                 needmoney.classList.add('dark-logo-needmoney');
                 footerbox1.classList.add('set-text-light');
                 footerbox2.classList.add('set-text-light');
-               
+                buttonTerms.classList.add('terms-dark');
+                slider.classList.add('slider-dark');
                 
             } else {
                 document.body.classList.remove('dark-mode');
@@ -230,6 +249,8 @@ document.getElementById('button-rules').addEventListener('mouseout', function() 
                 needmoney.classList.remove('dark-logo-needmoney');
                 footerbox1.classList.remove('set-text-light');
                 footerbox2.classList.remove('set-text-light');
+                buttonTerms.classList.remove('terms-dark');
+                slider.classList.remove('slider-dark');
                
             }
 
@@ -247,7 +268,8 @@ document.getElementById('button-rules').addEventListener('mouseout', function() 
                     needmoney.classList.remove('dark-logo-needmoney');
                     footerbox1.classList.remove('set-text-light');
                     footerbox2.classList.remove('set-text-light');
-                   
+                    buttonTerms.classList.remove('terms-dark');
+                    slider.classList.remove('slider-dark');
 
                     localStorage.setItem('theme', 'light');
                 } else {
@@ -262,7 +284,11 @@ document.getElementById('button-rules').addEventListener('mouseout', function() 
                     needmoney.classList.add('dark-logo-needmoney');
                     footerbox1.classList.add('set-text-light');
                     footerbox2.classList.add('set-text-light');
-                   
+                    buttonTerms.classList.add('terms-dark');
+                    slider.classList.add('slider-dark');
+
+
+
                     localStorage.setItem('theme', 'dark');
                 }
                

@@ -1,8 +1,11 @@
 
+
 @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&display=swap');
 *{
     font-family: "Archivo Black", sans-serif;
 }
+
+
 body{
     background-color: white;
     margin: 0;
@@ -73,20 +76,17 @@ body:not(.dark-mode) .fa-moon {
 
 .blankspace.blank-dark .footerbox{
 
-    background: rgb(0, 71, 104);
+    background: rgb(1, 102, 150);
     
 }
 .blankspace.blank-light .footerbox{
-    background: rgb(244, 255, 88);
+    background: #FFC831;
 }
-/*
-.blank-light #button-rules{
-    background: rgb(196, 210, 2);
-}
-.blank-dark #button-rules{
-    background: rgb(0, 71, 104);
-}
-*/
+
+
+    
+
+
 
 
 
@@ -172,8 +172,12 @@ body:not(.dark-mode) .fa-moon {
     width: 100%;
     max-width: 500px ;
     margin: 20px 0;
-    accent-color: rgb(248, 182, 0);
+    accent-color: #FFC831;
 }
+#mySlider.slider-dark{
+    accent-color: rgb(1, 102, 150);
+}
+
 @media (max-width: 768px) {
     #mySlider {
         width: 70%; /* Zmenší obrázek na 50 % rodičovského prvku */
@@ -226,11 +230,9 @@ body:not(.dark-mode) .fa-moon {
 
 
 .bs2 i{
-    transition: transform 0.3s ease;
+   
     font-size: 45px;
 
-}.bs2 i:hover {
-    transform: scale(1.25); 
 }
 .fa-brands.fa-instagram, .fa-brands.fa-snapchat{
     font-weight: 600;
@@ -249,20 +251,23 @@ body:not(.dark-mode) .fa-moon {
     align-items: center;
     flex-wrap: wrap;
     gap: 20px;
-    padding: 20px;
+    padding: 50px 5%;
 }
 .bs2 .footerbox{
+    font-size: 20px;
     display: flex;
     border-radius: 20px;
-    box-shadow: 10px 10px #333;
-    width: 175px;
-    height: 175px;
+    box-shadow: 7px 7px black;
+    width: 200px;
+    height: 200px;
+
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    transition: transform 0.3s;
+    transition: transform 0.3s ease;
     
 }
+
 .bs2 .footerbox:hover{
 
     transform: scale(1.1);
@@ -270,9 +275,8 @@ body:not(.dark-mode) .fa-moon {
 .bs2 .bs2-text{
     display: flex;
     margin: 0;
-    margin-top:25px;
-
-    height: 100%;
+    margin-top: 50px;
+    max-width: 500px;
     gap: 0;
     flex-wrap: wrap;
     flex-direction: column;
@@ -280,39 +284,50 @@ body:not(.dark-mode) .fa-moon {
     justify-content: flex-start; 
     align-self: flex-start;
 }
-.bs2-text h3, .bs2-text p{
-    margin: 0;
-    padding: 5px 0;
+.bs2-text p{
+    font-size: 20px;
 }
 .bs2-text h3{
+    margin: 0;
+    padding: 5px 0;
     font-size: 40px;
 }
+.bs2-text h3>span{
+    text-decoration: underline ;
+}
+
+
+/*RULES-PRAVIDLA-TERMS*/
+
 .button-container 
 {
     margin: 20px;
     display: flex;
     justify-content: center;
     position: relative;
+ 
     
 }
 
-#button-rules {
+#button-terms {
+    
     padding: 10px 20px;
-    font-size: 16px;
+    font-size: 25px;
+    font-weight: 800;
     border-radius: 10px;
-background: rgb(196, 210, 2);
+    background: #FFC831;
     cursor: pointer;
     transition: transform 0.3s;
-
+    box-shadow: 7px 7px black;
 }
 
-#button-rules:hover {
+#button-terms:hover {
     transform: scale(1.1);
 }
 
 .tooltip {
     position: absolute;
-    top: 120%; 
+    bottom: 120%; 
     left: 50%;
     transform: translateX(-50%);
     background-color: #333;
@@ -322,8 +337,12 @@ background: rgb(196, 210, 2);
     visibility: hidden;
     opacity: 0;
     transition: opacity 0.3s, visibility 0.3s;
-    white-space: pre-wrap; /* Allows text to wrap */
-    max-width: 500px; /* Sets a max width for the tooltip */
+    white-space: pre-wrap; 
+    max-width: 500px; 
+}
+
+#button-terms.terms-dark {
+    background: rgb(1, 102, 150);
 }
 
 
@@ -362,15 +381,24 @@ background: rgb(196, 210, 2);
         margin: 45px 0 30px; 
         
     }
-    #button-rules{
+    #button-terms{
         font-size:12px;
-        width: 5px;
+        padding: 10px 15px;
+        margin: 0px;
+        box-shadow: 5px 5px black;
+
     }
     .tooltip{
         font-size: 14px;
         min-width: 70%;
     }
+    .bs2 .footerbox{
+        width: 100%;
+        height: 150px;
+    }
 } 
+
+
 @media (max-width: 380px) {
     .logo-container{
         font-size: 2rem;
@@ -379,18 +407,13 @@ background: rgb(196, 210, 2);
     .needmoney {
         font-size: 12px; 
     }
-    .soc-links i{
-        font-size: 30px;
-    }
     .bs2 p{
         font-size: 15px;
-    }
-    .soc-links a{
-        margin: 0 10px;
     }
     .bs2-text h3{
         font-size: 30px;
     }
+   
 }
 @media (max-width: 300px) {
     .logo-container{
@@ -400,7 +423,10 @@ background: rgb(196, 210, 2);
     .bs1.blankspace{
         padding: 0 10%;
     }
+    .bs2 .footerbox{
+        width:150px;
+        height: 150px;
+    }
   
 
 }
-
