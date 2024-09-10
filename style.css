@@ -79,6 +79,16 @@ body:not(.dark-mode) .fa-moon {
 .blankspace.blank-light .footerbox{
     background: rgb(244, 255, 88);
 }
+/*
+.blank-light #button-rules{
+    background: rgb(196, 210, 2);
+}
+.blank-dark #button-rules{
+    background: rgb(0, 71, 104);
+}
+*/
+
+
 
 .logo-container {
     
@@ -194,14 +204,7 @@ body:not(.dark-mode) .fa-moon {
         width: 50%; /* Zmenší obrázek na 50 % rodičovského prvku */
     }
 } 
-.pravidla{
-    font-family: "Archivo Black", sans-serif;
-    font-weight: 100;
-    font-size: 12px;
-    margin: 0;
-    padding: 0;
-    padding: 75px 20% 3% 20%;
-}
+
 .bfrblank{
     width: 100%;
 }
@@ -240,7 +243,7 @@ body:not(.dark-mode) .fa-moon {
     font-weight: 400;
 }
 
-.bs2{
+.bs2, .footerbox-container{
     display: flex;
     justify-content: center;
     align-items: center;
@@ -251,7 +254,7 @@ body:not(.dark-mode) .fa-moon {
 .bs2 .footerbox{
     display: flex;
     border-radius: 20px;
-    box-shadow: 5px 5px #333;
+    box-shadow: 10px 10px #333;
     width: 175px;
     height: 175px;
     flex-direction: column;
@@ -261,14 +264,16 @@ body:not(.dark-mode) .fa-moon {
 }
 .bs2 .bs2-text{
     display: flex;
-    padding-top:20px;
-    min-height: 75px;
+    margin: 0;
+    margin-top:25px;
+
+    height: 100%;
     gap: 0;
     flex-wrap: wrap;
-    
     flex-direction: column;
+
     justify-content: flex-start; 
-    align-items: left;
+    align-self: flex-start;
 }
 .bs2-text h3, .bs2-text p{
     margin: 0;
@@ -277,6 +282,45 @@ body:not(.dark-mode) .fa-moon {
 .bs2-text h3{
     font-size: 40px;
 }
+.button-container 
+{
+    margin: 20px;
+    display: flex;
+    justify-content: center;
+    position: relative;
+    
+}
+
+#button-rules {
+    padding: 10px 20px;
+    font-size: 16px;
+    border-radius: 10px;
+background: rgb(196, 210, 2);
+    cursor: pointer;
+    transition: transform 0.3s;
+
+}
+
+#button-rules:hover {
+    transform: scale(1.1);
+}
+
+.tooltip {
+    position: absolute;
+    top: 120%; 
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #333;
+    color: #fff;
+    padding: 15px;
+    border-radius: 5px;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.3s, visibility 0.3s;
+    white-space: pre-wrap; /* Allows text to wrap */
+    max-width: 500px; /* Sets a max width for the tooltip */
+}
+
 
 
 @media (max-width: 510px) {
@@ -312,6 +356,14 @@ body:not(.dark-mode) .fa-moon {
     .soc-links{
         margin: 45px 0 30px; 
         
+    }
+    #button-rules{
+        font-size:12px;
+        width: 5px;
+    }
+    .tooltip{
+        font-size: 14px;
+        min-width: 70%;
     }
 } 
 @media (max-width: 380px) {

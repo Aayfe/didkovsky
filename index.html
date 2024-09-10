@@ -39,7 +39,10 @@
         <div class="imgholder">
           <img src="" id="image"alt="">  
         </div>
-        <p class="pravidla">Slouží pouze k interaktivním účelům, majitel ani zřizovatel nenese zodpovědnost za chyby a případné odeslané peněžní prostředky. Uživatel po zaslání peněžních prostředků jako daru strácí nárok odvolat svoje rozhodnutí. Jakékoliv peněžní prostředky odeslané skrze QR kód náleží majiteli bankovního účtu uloženého v naskenovaném QR kódu. </p>
+        <div class="button-container">
+            <div id="button-rules">?</div>
+            <div id="tooltip" class="tooltip">Slouží pouze k interaktivním účelům, majitel ani zřizovatel nenese zodpovědnost za chyby a případné odeslané peněžní prostředky. Uživatel po zaslání peněžních prostředků jako daru strácí nárok odvolat svoje rozhodnutí. Jakékoliv peněžní prostředky odeslané skrze QR kód náleží majiteli bankovního účtu uloženého v naskenovaném QR kódu.</div>
+        </div>
       </div>
 
 
@@ -49,29 +52,33 @@
                 <h3>Kde mě najdeš?</h3>
                 <p>Sleduj mě na sockách! Nebo mi můžeš písnout mail...</p>
             </div>
-            <div id="bs2-box1-links" class="footerbox">
+            <div class="footerbox-container">
+                <div id="bs2-box1-links" class="footerbox">
                 <a href="https://instagram.com/jakubdidkovsky">
                 <i class="fa-brands fa-square-instagram"></i>
-            </a>
-            <a href="https://instagram.com/jakubdidkovsky">
-                <p>@jakubdidkovsky</p>
-            </a>   
-            </div>
-            <div id="bs2-box2-links" class="footerbox">
-                <a href="mailto:jakub@didkovsky.cz">
+                </a>
+                <a href="https://instagram.com/jakubdidkovsky">
+                    <p>@jakubdidkovsky</p>
+                </a>   
+                </div>
+                <div id="bs2-box2-links" class="footerbox">
+                    <a href="mailto:jakub@didkovsky.cz">
 
-                <i class="fa-solid fa-envelope"></i>
-            </a>
-            <a href="mailto:jakub@didkovsky.cz">
-                <p>jakub@didkovsky.cz</p>
-            </a>   
+                    <i class="fa-solid fa-envelope"></i>
+                </a>
+                <a href="mailto:jakub@didkovsky.cz">
+                    <p>jakub@didkovsky.cz</p>
+                </a>   
+                </div>
             </div>
+            
             
         </div>
 
       
 
 <script>
+    
         // Vyber slider a obrázek podle jejich ID
     const slider = document.getElementById('mySlider');
     const h2 = document.getElementById('price');
@@ -125,7 +132,18 @@ updatePrice();
 
 </script>
 
+<script>
+    document.getElementById('button-rules').addEventListener('mouseover', function() {
+    document.getElementById('tooltip').style.visibility = 'visible';
+    document.getElementById('tooltip').style.opacity = '1';
+});
 
+document.getElementById('button-rules').addEventListener('mouseout', function() {
+    document.getElementById('tooltip').style.visibility = 'hidden';
+    document.getElementById('tooltip').style.opacity = '0';
+});
+
+</script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
             const logoText = document.getElementById('logoText');
@@ -180,6 +198,7 @@ updatePrice();
         const slider = document.querySelector('#mySlider');
         const footerbox1 = document.querySelector("#bs2-box1-links");
         const footerbox2 = document.querySelector("#bs2-box2-links");
+        
 
         // Načti preference z localStorage
         const savedTheme = localStorage.getItem('theme');
@@ -197,6 +216,7 @@ updatePrice();
                 needmoney.classList.add('dark-logo-needmoney');
                 footerbox1.classList.add('set-text-light');
                 footerbox2.classList.add('set-text-light');
+               
                 
             } else {
                 document.body.classList.remove('dark-mode');
@@ -210,6 +230,7 @@ updatePrice();
                 needmoney.classList.remove('dark-logo-needmoney');
                 footerbox1.classList.remove('set-text-light');
                 footerbox2.classList.remove('set-text-light');
+               
             }
 
             // Přepni téma při kliknutí na tlačítko
@@ -226,6 +247,7 @@ updatePrice();
                     needmoney.classList.remove('dark-logo-needmoney');
                     footerbox1.classList.remove('set-text-light');
                     footerbox2.classList.remove('set-text-light');
+                   
 
                     localStorage.setItem('theme', 'light');
                 } else {
@@ -240,7 +262,7 @@ updatePrice();
                     needmoney.classList.add('dark-logo-needmoney');
                     footerbox1.classList.add('set-text-light');
                     footerbox2.classList.add('set-text-light');
-
+                   
                     localStorage.setItem('theme', 'dark');
                 }
                
