@@ -1,52 +1,41 @@
-
-
 @import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&display=swap');
-*{
+
+* {
     font-family: "Archivo Black", sans-serif;
 }
 
-
-body{
+body {
     background-color: white;
     margin: 0;
     padding: 0;
     transition: background-color 0.5s, color 0.5s;
 }
 
-
-/* Styl pro obsah stránky */
-.content {
-    padding: 20px;
-}
-
-/* Styl pro přepínač témat */
-
-/* Styl pro přepínač témat */
-.theme-switch {
-    
+/* THEME SWITCH */
+.theme-switch { 
     background: transparent;
     border: none;
     font-size: 35px;
     cursor: pointer;
-
     color: #333; /* Barva ikony ve světlém režimu */
-    transition: color 0.3s;
+    transition: color 0.3s, transform 0.3s;
 }
 
-
-/* Styl pro tmavý režim */
-body.dark-mode{
-    background-color: #1E2227;
-    color: white;
+.theme-switch:hover {
+    transform: rotate(15deg) scale(1.2);
     
 }
 
-
-body.dark-mode .theme-switch {
-    color: #f1c40f; /* Barva ikony ve tmavém režimu */
+/* Styl pro tmavý režim */
+body.dark-mode {
+    background-color: #1E2227;
+    color: white;
 }
 
-/* Skrytí a zobrazení ikon podle aktuálního režimu */
+body.dark-mode .theme-switch {
+    color: #f1c40f;
+}
+
 body.dark-mode .fa-moon {
     display: none;
 }
@@ -63,118 +52,102 @@ body:not(.dark-mode) .fa-moon {
     display: inline;
 }
 
-
-.blankspace.blank-dark{
-
+/* Barvy pro gradienty */
+.blankspace.blank-dark {
     background: linear-gradient(90deg, #2e6f83 0%, #0d1827 100%);
-    
 }
-.blankspace.blank-light{
+
+.blankspace.blank-light {
     background: linear-gradient(90deg, #FDBB2D 0%, #22C1C3 100%);
 }
 
-
-.blankspace.blank-dark .footerbox{
-
+.blankspace.blank-dark .footerbox {
     background: rgb(1, 102, 150);
-    
 }
-.blankspace.blank-light .footerbox{
+
+.blankspace.blank-light .footerbox {
     background: #FFC831;
 }
 
-
-    
-
-
-
-
-
+/* Logo */
 .logo-container {
-    
     width: auto;
-
     font-size: 2.5rem; /* Velikost písma pro logo */
     font-weight: bold;
     color: rgb(24, 24, 24);
     height: 2.5rem;
-
     white-space: nowrap;
     overflow: hidden;
     padding-right: 5px;
-
     font-family: "Archivo", sans-serif;
     font-weight: 900;
     font-style: italic;
     text-transform: uppercase;
-   
-            
-               }
-               
-        /* Typing animation */
-        @keyframes typing {
-            from { width: 0; }
-            to { width: 100%; }
-        }
+}
 
-    .needmoney{
-        padding: 0;
-        margin: 0;
-        font-family: "Archivo", sans-serif;
-        font-size: 20px;
-        font-optical-sizing: auto;
-        font-weight: 600;
-        font-style: italic;
-        color: black;
-    }
-   
-    .dark-logo-needmoney{
-        color: #E0E0E0;
-    }
+/* Typing animation */
+@keyframes typing {
+    from { width: 0; }
+    to { width: 100%; }
+}
 
-
-.bs1{
+.needmoney {
     padding: 0;
+    margin: 0;
+    font-family: "Archivo", sans-serif;
+    font-size: 20px;
+    font-optical-sizing: auto;
+    font-weight: 600;
+    font-style: italic;
+    color: black;
+}
 
-    height: 200px;
+.dark-logo-needmoney {
+    color: #E0E0E0;
+}
+
+.bs1 {
+    padding: 0;
+    height: 150px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin: 0;
-
-
-    
 }
 
-
-.slidecontainer{
-    margin: 0 ;
+/* Slider */
+.main-content {
+    margin: 0;
     display: flex;
     flex-direction: column;
-    padding:  100px 0;
+    padding: 100px 0;
     margin: auto;
     width: 100%;
     text-align: center;
 }
-.imgholder{
+
+.imgholder {
     display: flex;
     justify-content: center;
     align-items: center;
 }
-#price{
+
+#price {
     font-family: "Archivo Black", sans-serif;
     font-weight: 900;
     font-size: 30px;
-
+    padding: 20px 0 0;
+    margin: 0;
 }
-#mySlider {
 
+#mySlider {
     width: 100%;
-    max-width: 500px ;
-    margin: 20px 0;
+    max-width: 500px;
+    margin: 0;
     accent-color: #FFC831;
 }
-#mySlider.slider-dark{
+
+#mySlider.slider-dark {
     accent-color: rgb(1, 102, 150);
 }
 
@@ -182,70 +155,67 @@ body:not(.dark-mode) .fa-moon {
     #mySlider {
         width: 70%; /* Zmenší obrázek na 50 % rodičovského prvku */
     }
-} 
+}
+
 @media (max-width: 510px) {
     #mySlider {
         width: 50%; /* Zmenší obrázek na 50 % rodičovského prvku */
     }
-} 
+}
 
 #image {
-
     display: block;
     margin-top: 20px;
     max-width: 100%;
     height: auto;
-   
 }
 
 @media (max-width: 768px) {
     #image {
         width: 70%; /* Zmenší obrázek na 50 % rodičovského prvku */
     }
-} 
+}
+
 @media (max-width: 510px) {
     #mySlider {
         width: 50%; /* Zmenší obrázek na 50 % rodičovského prvku */
     }
-} 
+}
 
-.bfrblank{
+.bfrblank {
     width: 100%;
 }
-.bs1{
+
+.bs1 {
     padding: 0 20%;
 }
 
-
-
-
-.bs2 a{
-
+/* Footer */
+.bs2 a {
     text-decoration: none;
     color: #181818;
     cursor: pointer;
-    padding:  0;
+    padding: 0;
     margin: 0 15px;
 }
 
-
-.bs2 i{
-   
+.bs2 i {
     font-size: 45px;
-
 }
-.fa-brands.fa-instagram, .fa-brands.fa-snapchat{
+
+.fa-brands.fa-instagram, .fa-brands.fa-snapchat {
     font-weight: 600;
 }
 
-.set-text-light a{
+.set-text-light a {
     color: white;
 }
-.set-text-light .fa-brands.fa-instagram{
+
+.set-text-light .fa-brands.fa-instagram {
     font-weight: 400;
 }
 
-.bs2, .footerbox-container{
+.bs2, .footerbox-container {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -253,26 +223,28 @@ body:not(.dark-mode) .fa-moon {
     gap: 20px;
     padding: 50px 5%;
 }
-.bs2 .footerbox{
+
+.bs2 .footerbox {
     font-size: 20px;
     display: flex;
-    border-radius: 20px;
+    border-radius: 50px;
     box-shadow: 7px 7px black;
-    width: 200px;
+
+    width: 250px;
     height: 200px;
 
+    margin: 0;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     transition: transform 0.3s ease;
-    
 }
 
-.bs2 .footerbox:hover{
-
+.bs2 .footerbox:hover {
     transform: scale(1.1);
 }
-.bs2 .bs2-text{
+
+.bs2 .bs2-text {
     display: flex;
     margin: 0;
     margin-top: 50px;
@@ -280,37 +252,33 @@ body:not(.dark-mode) .fa-moon {
     gap: 0;
     flex-wrap: wrap;
     flex-direction: column;
-
     justify-content: flex-start; 
     align-self: flex-start;
 }
-.bs2-text p{
+
+.bs2-text p {
     font-size: 20px;
 }
-.bs2-text h3{
+
+.bs2-text h3 {
     margin: 0;
     padding: 5px 0;
     font-size: 40px;
 }
-.bs2-text h3>span{
-    text-decoration: underline ;
+
+.bs2-text h3>span {
+    text-decoration: underline;
 }
 
-
-/*RULES-PRAVIDLA-TERMS*/
-
-.button-container 
-{
+/* TERMS BUTTON */
+.button-container {
     margin: 20px;
     display: flex;
     justify-content: center;
     position: relative;
- 
-    
 }
 
 #button-terms {
-    
     padding: 10px 20px;
     font-size: 25px;
     font-weight: 800;
@@ -333,87 +301,118 @@ body:not(.dark-mode) .fa-moon {
     background-color: #333;
     color: #fff;
     padding: 15px;
-    border-radius: 5px;
+    border-radius: 15px;
     visibility: hidden;
     opacity: 0;
     transition: opacity 0.3s, visibility 0.3s;
-    white-space: pre-wrap; 
-    max-width: 500px; 
+    white-space: pre-wrap;
+    max-width: 500px;
 }
 
 #button-terms.terms-dark {
     background: rgb(1, 102, 150);
 }
 
+/* Responsive design */
+
+@media (max-width: 670px) {
+
+    .bs2 .footerbox {
+        width: 100%;
+        height:200px;
+    }
 
 
+}
 @media (max-width: 510px) {
-
-    .bs1.blankspace{
+    .bs1.blankspace {
         flex-direction: column;
         align-items: start;
         justify-content: center;
         gap: 15%;
     }
+
     .needmoney {
         font-size: 18px; 
     }
-    #price{
+
+    #price {
         font-size: 25px;
     }
+
     .theme-switch {
-        font-size: 30px; 
-        
+        font-size: 30px;
     }
-    .theme{
+
+    .theme {
         align-self: center;
     }
-    .soc-links i{
-        font-size: 45px;
-    }
-    .bs2 .copyright{
+
+    .bs2 .copyright {
         font-size: 15px;
     }
-    .soc-links a{
-        margin: 0 10px;
-    }
-    .soc-links{
-        margin: 45px 0 30px; 
-        
-    }
-    #button-terms{
-        font-size:12px;
+
+    #button-terms {
+        font-size: 12px;
         padding: 10px 15px;
         margin: 0px;
         box-shadow: 5px 5px black;
-
     }
-    .tooltip{
+
+    .tooltip {
         font-size: 14px;
         min-width: 70%;
     }
-    .bs2 .footerbox{
-        width: 100%;
-        height: 150px;
-    }
-} 
 
+    .bs2 .footerbox {
+        width: 100%;
+        height:185px;
+    }
+
+    .bs1 {
+        height: 200px;
+    }
+
+    .main-content {
+        padding: 50px 0 15px;
+    }
+
+    .bs2 {
+        padding: 0px 5% 20px;
+    }
+    .bs2 p{
+        font-size: 18px;
+    }
+    .bs2-text h3{
+        font-size: 35px;
+    }
+
+    .footerbox-container {
+        padding: 10px 5%;
+    }
+}
 
 @media (max-width: 380px) {
-    .logo-container{
+    .logo-container {
         font-size: 2rem;
         height: 2rem;
     }
+
     .needmoney {
-        font-size: 12px; 
+        font-size: 12px;
     }
+
+    .bs2 .footerbox {
+        width: 100%;
+        height: 150px;
+    }
+
     .bs2 p{
         font-size: 15px;
     }
     .bs2-text h3{
         font-size: 30px;
     }
-   
 }
 @media (max-width: 300px) {
     .logo-container{
@@ -424,8 +423,9 @@ body:not(.dark-mode) .fa-moon {
         padding: 0 10%;
     }
     .bs2 .footerbox{
-        width:150px;
+        width:100%;
         height: 150px;
+        
     }
   
 
