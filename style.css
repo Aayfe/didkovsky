@@ -207,7 +207,7 @@ body:not(.dark-mode) .fa-moon {
     font-weight: 600;
 }
 
-.set-text-light a {
+.set-text-light i, .set-text-light p{ 
     color: white;
 }
 
