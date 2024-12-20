@@ -1,305 +1,115 @@
-<!DOCTYPE html>
-<html lang="en">
 
+<!DOCTYPE html>
+<html lang="cs">
 <head>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/x-icon"
-        href="https://img.icons8.com/?size=100&id=4T5VAk5CB92r&format=png&color=000000">
-    <title>Přispěj do kasičky Jakuba</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://kit.fontawesome.com/da4657a244.js" crossorigin="anonymous"></script>
+    <meta name="description" content="Osobní stránka Jakuba Didkovského - Developer, Nadšenec do technologií">
+    <title>Jakub Didkovský - Developer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="script.js" defer></script>
 </head>
-
 <body>
-    <div class="bfrblank">
-        <div class="bs1 blankspace blank-light">
-            <div class="logowrap">
-                <div class="logo-container" id="logoText">
 
+    <!-- Navigation Bar -->
+    <nav>
+        <div class="nav-container">
+            <div class="logo"><a href="#"><h1>Jakub Didkovský</h1></a></div>
+            <ul>
+                <li><a href="#about">O mně</a></li>
+                <li><a href="#qr-section">Na Kafíčko</a></li>
+                <li><a href="#contact">Kontakt</a></li>
+            </ul>
+            <div class="burger" id="burger">
+                <div class="burger-line"></div>
+                <div class="burger-line"></div>
+                <div class="burger-line"></div>
+            </div>
+        </div>
+    </nav>
+    
+    
+
+    <!-- Main Content -->
+    <main>
+        <!-- About Me Section -->
+        <section id="about">
+            <h2>O mně</h2>
+            <p>Ahoj! Jsem někdo, kdo se vždy rád baví s technologiemi - ať už jde o kódování, grafiku nebo vytváření cool projektů. Mám rád nové výzvy a experimentování, ať už jde o tvorbu webovek, grafiku nebo jen tak prozkoumávání různých nástrojů. Tato stránka je moje místo, kde se věnuji věcem, které mě baví a kde si mohu užívat kreativitu bez hranic. Pokud hledáš inspiraci, novou zábavu nebo něco zajímavého, tady jsi správně!</p>
+        </section>
+
+        <!-- Projects Section -->
+         <!--
+        <section id="projects">
+            <h2>Projekty</h2>
+            <div class="projects-container">
+                <div class="project">
+                    <div class="project-placeholder">Projekt 1</div>
+                    <div class="project-description">
+                        <h3>Projekt 1</h3>
+                        <p>Popis projektu 1, který zde můžeš upravit podle potřeby.</p>
+                    </div>
+                </div>
+                <div class="project">
+                    <div class="project-placeholder">Projekt 2</div>
+                    <div class="project-description">
+                        <h3>Projekt 2</h3>
+                        <p>Popis projektu 2, který zde můžeš upravit podle potřeby.</p>
+                    </div>
+                </div>
+                <div class="project">
+                    <div class="project-placeholder">Projekt 3</div>
+                    <div class="project-description">
+                        <h3>Projekt 3</h3>
+                        <p>Popis projektu 3, který zde můžeš upravit podle potřeby.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    -->
+        <section id="qr-section" class="qr-section">
+            <h2>Kup mi kávu</h2>
+            <div class="qr-container">
+                <div class="price-container">
+                    <button id="decrease" class="arrow-btn"><i class="fa-solid fa-minus"></i></button>
+                    <h2 id="price" contenteditable="true">250</h2>
+                    <button id="increase" class="arrow-btn"><i class="fa-solid fa-plus"></i></button>
+                </div>
+            
+                <div class="imgholder">
+                    <img src="" id="image" alt="QR Code Image">
                 </div>
 
-                <h2 id="needmoney" class="needmoney">Přispěj do kasičky</h2>
             </div>
+            
+        </section>
+        
+        <!-- Contact Section -->
+        <section id="contact">
+            <h2>Kontakt</h2>
+            <ul class="contact-list">
+                <li><i class="fa fa-phone"></i> <a href="tel:+420735057821">+420 735 057 821</a></li>
+                <li><i class="fa fa-envelope"></i> <a href="mailto:jakub@didkovsky.cz">jakub@didkovsky.cz</a></li>
+                <li><i class="fa-brands fa-instagram"></i> <a href="https://instagram.com/jakub_didkovsky">Instagram</a></li>
+            </ul>
+            
+        </section>
+    </main>
 
-            <div class="theme">
-                <button id="theme-toggle" class="theme-switch">
-                    <i id="theme-icon" class="fas fa-moon"></i> <!-- Výchozí ikona pro světlý režim -->
-                </button>
-
-            </div>
-        </div>
-    </div>
-
-    <div class="main-content">
-        <div class="slider">
-            <input type="range" min="50" max="1000" value="250" step="50" class="slider" id="mySlider">
-        </div>
-
-
-        <h2 id="price"></h2>
-        <div class="imgholder">
-            <img src="" id="image" alt="">
-        </div>
-        <div class="button-container">
-            <div id="button-terms">
-                <i class="fa-solid fa-question"></i>
-            </div>
-            <div id="tooltip" class="tooltip">Slouží pouze k interaktivním účelům, majitel ani zřizovatel nenese
-                zodpovědnost za chyby a případné odeslané peněžní prostředky. Uživatel po zaslání peněžních prostředků
-                jako daru strácí nárok odvolat svoje rozhodnutí. Jakékoliv peněžní prostředky odeslané skrze QR kód
-                náleží majiteli bankovního účtu uloženého v naskenovaném QR kódu.</div>
-        </div>
-    </div>
-
-
-
-    <div class="bs2 blankspace blank-light">
-        <div class="bs2-text">
-            <h3><span>Kde mě</span> najdeš?</h3>
-            <p>I když nevíš kdo jsem, tak mě sleduj na Instagramu! Nebo mi rovnou napiš e-mail, ať si můžeme pokecat o
-                čemkoliv. Tak na co ještě čekáš? Dej o sobě vědět, ať nepromeškáš žádnou srandu!
-            </p>
-        </div>
-        <div class="footerbox-container">
-
-            <a href="https://instagram.com/jakubdidkovsky" id="bs2-box1-links" class="footerbox">
-                <i class="fa-brands fa-square-instagram"></i>
-
-                <p>@jakubdidkovsky</p>
-            </a>
-            <a href="mailto:jakub@didkovsky.cz" id="bs2-box2-links" class="footerbox">
-
-                <i class="fa-solid fa-envelope"></i>
-
-                <p>jakub@didkovsky.cz</p>
-            </a>
-        </div>
-
-
-    </div>
-
+    <!-- Footer -->
+    <footer>
+         <!--<p>&copy; 2024 Jakub Didkovský. Všechna práva vyhrazena.</p>-->
+    </footer>
 
 
     <script>
 
-        // Vyber slider a obrázek podle jejich ID
-        const slider = document.getElementById('mySlider');
-        const h2 = document.getElementById('price');
-        const image = document.getElementById('image');
-        const date = getNewDate();
-
-        console.log(date);
-
-
-        function updateImage() {
-            const value = slider.value;
-            const imageUrl = `https://api.paylibo.com/paylibo/generator/czech/image?compress=false&size=440&accountNumber=4611090023&bankCode=0800&amount=${value}&currency=CZK&vs=${date}&message=str%C3%A1nka`; // 
-            image.src = imageUrl;
-        }
-        function updatePrice() {
-            const value = slider.value;
-            h2.textContent = value + " Kč";
-        }
-
-
-        function getNewDate() {
-            // Získání aktuálního data
-            const today = new Date();
-
-            // Získání dne, měsíce a roku
-            let day = today.getDate();
-            let month = today.getMonth() + 1; // Měsíce jsou v JavaScriptu indexovány od 0, takže musíme přidat 1
-            const year = today.getFullYear();
-
-            // Přidání nuly před jednociferný den a měsíc
-            if (day < 10) {
-                day = '0' + day;
-            }
-            if (month < 10) {
-                month = '0' + month;
-            }
-
-            // Spojení ve formátu ddmmyyyy
-            const formattedDate = day + '' + month + '' + year;
-            return formattedDate;
-        }
-
-        // Přidání event listeneru na změnu slideru
-        slider.addEventListener('input', updateImage);
-        slider.addEventListener('input', updatePrice);
-
-
-        // Načtení prvního obrázku při načtení stránky
-        updateImage();
-        updatePrice();
-
-    </script>
-
-    <script>
-        document.getElementById('button-terms').addEventListener('mouseover', function () {
-            document.getElementById('tooltip').style.visibility = 'visible';
-            document.getElementById('tooltip').style.opacity = '1';
-        });
-
-        document.getElementById('button-terms').addEventListener('mouseout', function () {
-            document.getElementById('tooltip').style.visibility = 'hidden';
-            document.getElementById('tooltip').style.opacity = '0';
-        });
-
-        // Přidání události click na tooltip
-        document.getElementById('tooltip').addEventListener('click', function () {
-            this.style.visibility = 'hidden';
-            this.style.opacity = '0';
-        });
-
-
-    </script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const logoText = document.getElementById('logoText');
-            const texts = ['Didkovský', 'Jakub'];
-            let currentTextIndex = 0;
-            let index = 0;
-            let typingSpeed = 700; // Rychlost psaní (v milisekundách)
-            let deleteSpeed = 150; // Rychlost mazání (v milisekundách)
-            let pauseBeforeDelete = 2000; // Pauza před mazáním (v milisekundách)
-            let pauseAfterTyping = 100; // Pauza po dopsání slova (v milisekundách)
-
-            // Nastavíme počáteční text
-            logoText.textContent = texts[currentTextIndex];
-
-            function deleteText() {
-                // Mazání aktuálního textu
-                if (index > 0) {
-                    logoText.textContent = texts[currentTextIndex].substring(0, index - 1);
-                    index--;
-                    setTimeout(deleteText, deleteSpeed);
-                } else {
-                    currentTextIndex = (currentTextIndex + 1) % texts.length; // Přejdi na další text
-                    index = 0; // Reset indexu na začátek pro nový text
-                    setTimeout(type, pauseAfterTyping); // Začátek psaní nového textu po pauze
-                }
-            }
-
-            function type() {
-                // Typování aktuálního textu
-                if (index < texts[currentTextIndex].length) {
-                    logoText.textContent += texts[currentTextIndex].charAt(index);
-                    index++;
-                    setTimeout(type, typingSpeed);
-                } else {
-                    // Po dokončení psaní nastaví pauzu a poté začne mazat text
-                    setTimeout(deleteText, pauseBeforeDelete);
-                }
-            }
-
-            // Zahájení mazání počátečního textu po 10 sekundách
-            setTimeout(function () {
-                index = texts[currentTextIndex].length; // Nastav index na délku aktuálního textu pro mazání
-                deleteText(); // Zahájení mazání
-            }, 10000); // 10000 milisekund = 10 sekund
-        });
-
-
-    </script>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const themeToggleButton = document.getElementById('theme-toggle');
-            const themeIcon = document.getElementById('theme-icon');
-            const logo = document.querySelector('#logoText');
-            const needmoney = document.querySelector('#needmoney');
-            const themeBlank1 = document.querySelector('.bs1');
-            const themeBlank2 = document.querySelector('.bs2');
-            const imageqr = document.querySelector('#image');
-            const slider = document.querySelector('#mySlider');
-            const footerbox1 = document.querySelector("#bs2-box1-links");
-            const footerbox2 = document.querySelector("#bs2-box2-links");
-            const buttonTerms = document.querySelector("#button-terms");
-
-            // Načti preference z localStorage
-            const savedTheme = localStorage.getItem('theme');
-
-
-            if (savedTheme === 'dark') {
-                document.body.classList.add('dark-mode');
-                themeIcon.classList.remove('fa-moon');
-                themeIcon.classList.add('fa-sun');
-                themeBlank1.classList.add('blank-dark');
-                themeBlank1.classList.remove('blank-light');
-                themeBlank2.classList.add('blank-dark');
-                themeBlank2.classList.remove('blank-light');
-                logo.classList.add('dark-logo-needmoney');
-                needmoney.classList.add('dark-logo-needmoney');
-                footerbox1.classList.add('set-text-light');
-                footerbox2.classList.add('set-text-light');
-                buttonTerms.classList.add('terms-dark');
-                slider.classList.add('slider-dark');
-
-            } else {
-                document.body.classList.remove('dark-mode');
-                themeIcon.classList.remove('fa-sun');
-                themeIcon.classList.add('fa-moon');
-                themeBlank1.classList.remove('blank-dark');
-                themeBlank1.classList.add('blank-light');
-                themeBlank2.classList.remove('blank-dark');
-                themeBlank2.classList.add('blank-light');
-                logo.classList.remove('dark-logo-needmoney');
-                needmoney.classList.remove('dark-logo-needmoney');
-                footerbox1.classList.remove('set-text-light');
-                footerbox2.classList.remove('set-text-light');
-                buttonTerms.classList.remove('terms-dark');
-                slider.classList.remove('slider-dark');
-
-            }
-
-            // Přepni téma při kliknutí na tlačítko
-            themeToggleButton.addEventListener('click', () => {
-                if (document.body.classList.contains('dark-mode')) {
-                    document.body.classList.remove('dark-mode');
-                    themeIcon.classList.remove('fa-sun');
-                    themeIcon.classList.add('fa-moon');
-                    themeBlank1.classList.remove('blank-dark');
-                    themeBlank1.classList.add('blank-light');
-                    themeBlank2.classList.remove('blank-dark');
-                    themeBlank2.classList.add('blank-light');
-                    logo.classList.remove('dark-logo-needmoney');
-                    needmoney.classList.remove('dark-logo-needmoney');
-                    footerbox1.classList.remove('set-text-light');
-                    footerbox2.classList.remove('set-text-light');
-                    buttonTerms.classList.remove('terms-dark');
-                    slider.classList.remove('slider-dark');
-
-                    localStorage.setItem('theme', 'light');
-                } else {
-                    document.body.classList.add('dark-mode');
-                    themeIcon.classList.remove('fa-moon');
-                    themeIcon.classList.add('fa-sun');
-                    themeBlank1.classList.add('blank-dark');
-                    themeBlank1.classList.remove('blank-light');
-                    themeBlank2.classList.add('blank-dark');
-                    themeBlank2.classList.remove('blank-light');
-                    logo.classList.add('dark-logo-needmoney');
-                    needmoney.classList.add('dark-logo-needmoney');
-                    footerbox1.classList.add('set-text-light');
-                    footerbox2.classList.add('set-text-light');
-                    buttonTerms.classList.add('terms-dark');
-                    slider.classList.add('slider-dark');
-
-
-
-                    localStorage.setItem('theme', 'dark');
-                }
-
-            });
-        });
-    </script>
 
 
 
 
     </script>
+
 </body>
-
 </html>
