@@ -50,7 +50,9 @@ main {
 #changelog-btn:hover {
     background-color: rgb(0, 140, 255);
 }
-
+.update{
+    color: #a5a5a5;
+}
 /* Tlačítka pro stažení */
 #download-btn, #download-btn-java, #download-btn-mc {
     background-color: transparent;
