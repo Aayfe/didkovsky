@@ -25,7 +25,7 @@ header {
 
 
 /* Tlačítko pro stažení */
-#download-btn, #download-btn-java, download-btn-mc {
+#download-btn, #download-btn-java, #download-btn-mc {
     background-color: transparent;
     border: 2px solid rgb(0, 140, 255); 
     color: white; 
