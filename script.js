@@ -7,11 +7,6 @@ document.addEventListener("DOMContentLoaded", function () {
             window.location.href = "modpack.zip";
         });
 
-        // Stahování modpacku
-    const downloadBtnJava = document.getElementById("download-btn-java");
-    if (downloadBtnJava) {
-        downloadBtnJava.addEventListener("click", function () {
-            window.location.href = "https://download.oracle.com/java/17/archive/jdk-17.0.12_windows-x64_bin.exe";
-        });
+
     }
 });
