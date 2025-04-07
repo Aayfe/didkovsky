@@ -9,16 +9,14 @@
 <body>
     <main>
 
-        <button id="download-btn-java" onclick="window.location.href='https://drive.google.com/file/d/1KonNCOsIBHXaCNbzwtkO1btYfb5YbxIm/view?usp=sharing';">
-        Stáhnout Modpack (zastaralý)
-      </button>
+        
       <button id="download-btn-java" onclick="window.location.href='https://download.oracle.com/java/17/archive/jdk-17.0.12_windows-x64_bin.exe';">
         Stáhnout Java 17
       </button>
 
 
       <button id="download-btn-mc">
-        <a href="https://drive.google.com/file/d/1EpizC80sYlkmXYiZtPThxmsGZ27AkBJS/view?usp=sharing" style="text-decoration: none; color: inherit; display: block; width: 100%; height: 100%;">
+        <a href="https://drive.google.com/file/d/1Xnqlw8v38aylDjER6xBma9i-lb9Ch_xD/view?usp=sharing" style="text-decoration: none; color: inherit; display: block; width: 100%; height: 100%;">
           Stáhnout MultiMC i s modpackem
         </a>
       </button>
@@ -37,6 +35,68 @@
             <li>-> Sensitivity 60%</li>
             <li>-> Add waypoint na "+"</li>
             <li>-> Unbind všech nepotřebných věcí > Essentials</li>
+            <li>-> Removed otravný graf</li>
+        </ul>
+        <br>
+        <button id="mods-btn">Všechny Mody</button>
+
+        <ul class="mods-list" id="mods-list" style="display: none;">
+            <button id="close-mods-btn">Zavřít</button>
+              <li>AppleSkin</li>
+              <li>Architectury</li>
+              <li>Biomes O' Plenty</li>
+              <li>Butcher</li>
+              <li>Carry On</li>
+              <li>Chunk Loaders</li>
+              <li>Cloth Config v10 API</li>
+              <li>CodeChicken Lib</li>
+              <li>Collective</li>
+              <li>Create</li>
+              <li>Create Crafts &amp; Additions</li>
+              <li>Create Deco</li>
+              <li>Create Enchantment Industry</li>
+              <li>Create Goggles</li>
+              <li>Create Jetpack</li>
+              <li>Create Slice &amp; Dice</li>
+              <li>Curios API</li>
+              <li>EnderStorage</li>
+              <li>Essential Mod</li>
+              <li>FTB Library</li>
+              <li>FTB Quests</li>
+              <li>FTB Teams</li>
+              <li>Fast Leaf Decay</li>
+              <li>Framework</li>
+              <li>Full Brightness Toggle</li>
+              <li>Fusion</li>
+              <li>GeckoLib 4</li>
+              <li>Gravestone Mod</li>
+              <li>ImmediatelyFast</li>
+              <li>Immersive Aircraft</li>
+              <li>Immersive Paintings</li>
+              <li>Immersive Portals</li>
+              <li>Item Collectors</li>
+              <li>Jade</li>
+              <li>JamLib</li>
+              <li>Just Enough Items</li>
+              <li>Kotlin for Forge</li>
+              <li>More Mob Variants</li>
+              <li>MrCrayfish's Furniture Mod: Refurbished</li>
+              <li>Oculus</li>
+              <li>Pam's HarvestCraft 2 - Food Core</li>
+              <li>Patchouli</li>
+              <li>Rechiseled</li>
+              <li>Sophisticated Backpacks</li>
+              <li>Sophisticated Core</li>
+              <li>Sort It Out!</li>
+              <li>Storage Drawers</li>
+              <li>SuperMartijn642's Config Library</li>
+              <li>SuperMartijn642's Core Lib</li>
+              <li>TerraBlender</li>
+              <li>The Twilight Forest</li>
+              <li>Tree Harvester</li>
+              <li>Xaero's Minimap</li>
+              <li>Xaero's World Map</li>
+              <li>Xenon</li>
         </ul>
         
     </main>
@@ -51,6 +111,19 @@ changelogBtn.addEventListener("mouseenter", function() {
 changelogBtn.addEventListener("mouseleave", function() {
     changelogList.style.display = "none";
 });
+
+const modsBtn = document.getElementById("mods-btn");
+const modsList = document.getElementById("mods-list");
+const closeModsBtn = document.getElementById("close-mods-btn");
+
+modsBtn.addEventListener("click", function () {
+    modsList.style.display = "grid";
+});
+
+closeModsBtn.addEventListener("click", function () {
+    modsList.style.display = "none";
+});
+
   </script>
 </body>
 </html>
