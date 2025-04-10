@@ -8,21 +8,29 @@
 </head>
 <body>
     <main>
-
-        
-      <button id="download-btn-java" onclick="window.location.href='https://download.oracle.com/java/17/archive/jdk-17.0.12_windows-x64_bin.exe';">
-        Stáhnout Java 17
+      <button id="download-btn">
+        <a href="https://drive.google.com/file/d/1Cq7ISaCqOSSWRdGzd-wUXn3lcvhlcApr/view?usp=sharing" style="text-decoration: none; color: inherit; display: block; width: 100%; height: 100%;">
+          Stáhnout Modpack
+        </a>
       </button>
+        
+      <button id="download-btn-java">
+        <a href="https://drive.google.com/drive/folders/1w6GiQJjaPabbWTqUiZ2cqHUmxGdG6v_g?usp=sharing" style="text-decoration: none; color: inherit; display: block; width: 100%; height: 100%;">
+          Stáhnout Modpack
+        </a>
+      </button>
+    
 
 
       <button id="download-btn-mc">
-        <a href="https://drive.google.com/file/d/1Xnqlw8v38aylDjER6xBma9i-lb9Ch_xD/view?usp=sharing" style="text-decoration: none; color: inherit; display: block; width: 100%; height: 100%;">
+        <a href="https://drive.google.com/file/d/1j2GgLfrU602uHex7oeg_Ccuczs8rghLo/view?usp=sharing" style="text-decoration: none; color: inherit; display: block; width: 100%; height: 100%;">
           Stáhnout MultiMC i s modpackem
         </a>
       </button>
+      
       <br>
-      <p class="update">Update: <span> 7.4.2025 22:45</span></p>
-        <button id="changelog-btn">Changelog</button>
+      <p class="update">Update: <span> 10.4.2025 15:18</span></p>
+        <!--<button id="changelog-btn">Changelog</button>
         <ul class="changelog" id="changelog-list">
             <h3>Changelog</h3>
             <h5>Mod updates:</h5>
@@ -37,71 +45,82 @@
             <li>-> Unbind všech nepotřebných věcí > Essentials</li>
             <li>-> Removed otravný graf</li>
         </ul>
-   
+      -->
+      
         <button id="mods-btn">Všechny Mody</button>
 
         <ul class="mods-list" id="mods-list" style="display: none;">
             <button id="close-mods-btn">Zavřít</button>
-              <li>AppleSkin</li>
-              <li>Architectury</li>
-              <li>Biomes O' Plenty</li>
-              <li>Butcher</li>
-              <li>Carry On</li>
-              <li>Chunk Loaders</li>
-              <li>Cloth Config v10 API</li>
-              <li>CodeChicken Lib</li>
-              <li>Collective</li>
-              <li>Create</li>
-              <li>Create Crafts &amp; Additions</li>
-              <li>Create Deco</li>
-              <li>Create Enchantment Industry</li>
-              <li>Create Goggles</li>
-              <li>Create Jetpack</li>
-              <li>Create Slice &amp; Dice</li>
-              <li>Curios API</li>
-              <li>EnderStorage</li>
-              <li>Essential Mod</li>
-              <li>FTB Library</li>
-              <li>FTB Quests</li>
-              <li>FTB Teams</li>
-              <li>Fast Leaf Decay</li>
-              <li>Framework</li>
-              <li>Full Brightness Toggle</li>
-              <li>Fusion</li>
-              <li>GeckoLib 4</li>
-              <li>Gravestone Mod</li>
-              <li>ImmediatelyFast</li>
-              <li>Immersive Aircraft</li>
-              <li>Immersive Paintings</li>
-              <li>Immersive Portals</li>
-              <li>Item Collectors</li>
-              <li>Jade</li>
-              <li>JamLib</li>
-              <li>Just Enough Items</li>
-              <li>Kotlin for Forge</li>
-              <li>More Mob Variants</li>
-              <li>MrCrayfish's Furniture Mod: Refurbished</li>
-              <li>Oculus</li>
-              <li>Pam's HarvestCraft 2 - Food Core</li>
-              <li>Patchouli</li>
-              <li>Rechiseled</li>
-              <li>Sophisticated Backpacks</li>
-              <li>Sophisticated Core</li>
-              <li>Sort It Out!</li>
-              <li>Storage Drawers</li>
-              <li>SuperMartijn642's Config Library</li>
-              <li>SuperMartijn642's Core Lib</li>
-              <li>TerraBlender</li>
-              <li>The Twilight Forest</li>
-              <li>Tree Harvester</li>
-              <li>Xaero's Minimap</li>
-              <li>Xaero's World Map</li>
-              <li>Xenon</li>
+            <li>AppleSkin</li>
+            <li>Architectury</li>
+            <li>Bettercrafting</li>
+            <li>Biomes O' Plenty</li>
+            <li>Butcher</li>
+            <li>Carry On</li>
+            <li>Chunk Loaders</li>
+            <li>Cloth Config v10 API</li>
+            <li>CodeChicken Lib</li>
+            <li>Collective</li>
+            <li>Configured</li>
+            <li>Crafting Station</li>
+            <li>Create</li>
+            <li>Create Crafts &amp; Additions</li>
+            <li>Create Deco</li>
+            <li>Create Encased</li>
+            <li>Create Enchantment Industry</li>
+            <li>Create Goggles</li>
+            <li>Create Jetpack</li>
+            <li>Create Slice &amp; Dice</li>
+            <li>Create: More Automation</li>
+            <li>Curios API</li>
+            <li>EnderStorage</li>
+            <li>Essential Mod</li>
+            <li>FTB Library</li>
+            <li>FTB Quests</li>
+            <li>FTB Teams</li>
+            <li>Farmer's Delight</li>
+            <li>Fast Leaf Decay</li>
+            <li>Framework</li>
+            <li>Full Brightness Toggle</li>
+            <li>Fusion</li>
+            <li>GeckoLib 4</li>
+            <li>Gravestone Mod</li>
+            <li>ImmediatelyFast</li>
+            <li>Immersive Aircraft</li>
+            <li>Immersive Armors</li>
+            <li>Immersive Paintings</li>
+            <li>Immersive Portals</li>
+            <li>Item Collectors</li>
+            <li>Jade</li>
+            <li>JamLib</li>
+            <li>Just Enough Items</li>
+            <li>Kotlin for Forge</li>
+            <li>MrCrayfish's Furniture Mod: Refurbished</li>
+            <li>Necronomicon</li>
+            <li>Oculus</li>
+            <li>Pam's HarvestCraft 2 - Food Core</li>
+            <li>Patchouli</li>
+            <li>Portable Crafting Table</li>
+            <li>Rechiseled</li>
+            <li>SlimeBoots</li>
+            <li>Sophisticated Backpacks</li>
+            <li>Sophisticated Core</li>
+            <li>Sort It Out!</li>
+            <li>Storage Drawers</li>
+            <li>SuperMartijn642's Config Library</li>
+            <li>SuperMartijn642's Core Lib</li>
+            <li>TerraBlender</li>
+            <li>The Twilight Forest</li>
+            <li>Tree Harvester</li>
+            <li>Xaero's Minimap</li>
+            <li>Xaero's World Map</li>
+            <li>Xenon</li>
+            <li>restApi</li>
         </ul>
         
     </main>
     <script>
-   const changelogBtn = document.getElementById("changelog-btn");
+/*   const changelogBtn = document.getElementById("changelog-btn");
 const changelogList = document.getElementById("changelog-list");
 
 changelogBtn.addEventListener("mouseenter", function() {
@@ -110,7 +129,7 @@ changelogBtn.addEventListener("mouseenter", function() {
 
 changelogBtn.addEventListener("mouseleave", function() {
     changelogList.style.display = "none";
-});
+});*/
 
 const modsBtn = document.getElementById("mods-btn");
 const modsList = document.getElementById("mods-list");
