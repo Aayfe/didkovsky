@@ -1,17 +1,219 @@
 <!DOCTYPE html>
 <html lang="cs">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modpack Download</title>
-    <link rel="stylesheet" href="style.css">
-    <script defer src="script.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jakub Didkovský</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://kit.fontawesome.com/a2e0e9e6c0.js" crossorigin="anonymous"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #222222;
+      color: #ffffff;
+      overflow-x: hidden;
+    }
+
+    .navbar {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      padding: 20px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .nav-line {
+      position: absolute;
+      bottom: 0;
+      left: 10%;
+      width: 80%;
+      height: 1px;
+      background-color: #444;
+    }
+
+    .nav-left {
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .hero {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .hero-text {
+      font-size: 2rem;
+    }
+
+    .dot {
+      opacity: 0;
+      animation: blink 3.5s infinite;
+    }
+
+    .dot:nth-child(2) {
+      animation-delay: 0.7s;
+    }
+    .dot:nth-child(3) {
+      animation-delay: 1.4s;
+    }
+
+    @keyframes blink {
+      0%, 30% { opacity: 0; }
+      40%, 100% { opacity: 1; }
+    }
+
+    .loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: #222;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+      color: white;
+    }
+
+    .progress-bar {
+      width: 300px;
+      height: 12px;
+      background: transparent;
+      border: 2px solid white;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0;
+      background: white;
+      transition: width 0.5s ease-in-out;
+    }
+
+    .contact-section {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 20px;
+      text-align: left;
+      position: relative;
+    }
+
+    .contact-title {
+      position: absolute;
+      top: 85px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 2rem;
+      margin-bottom: 30px;
+    }
+
+    .contact-items {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .contact-item {
+      display: flex;
+      align-items: center;
+      font-size: 1.1rem;
+    }
+
+    .contact-item i {
+      margin-right: 10px;
+      font-size: 1.3rem;
+    }
+
+    .contact-item a {
+      color: white;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .contact-item a:hover {
+      color: #999;
+    }
+
+    i {
+      color:  white;
+    }
+
+  </style>
 </head>
 <body>
+
+  <div class="loading-screen">
+    <div class="progress-bar">
+      <div class="progress-bar-fill" id="bar"></div>
+    </div>
+    <div id="percent">0%</div>
+  </div>
+
+  <div class="navbar">
+    <div class="nav-left">Jakub Didkovský</div>
+    <div class="nav-right" onclick="document.getElementById('kontakt').scrollIntoView({ behavior: 'smooth' })">
+
+      <span>jakub@didkovsky.cz</span>
+    </div>
+    <div class="nav-line"></div>
+  </div>
+
+  <div class="hero" id="hero">
+    <div class="hero-text">
+      Work in progress<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
+    </div>
+  </div>
+
+
+  <script>
+    let percent = 0;
+    const bar = document.getElementById('bar');
+    const percentText = document.getElementById('percent');
+
+    const interval = setInterval(() => {
+      percent += Math.floor(Math.random() * 10) + 1;
+      if (percent >= 100) {
+        percent = 100;
+        clearInterval(interval);
+        document.querySelector('.loading-screen').style.opacity = 0;
+        setTimeout(() => document.querySelector('.loading-screen').style.display = 'none', 500);
+      }
+      bar.style.width = percent + '%';
+      percentText.innerText = percent + '%';
+    }, 100);
     
-    <main>
-        <button id="download-btn">Stáhnout TobiDidi modpack</button>
-        <p id="update-text">Update: <span id="update-date">dNESKA</span></p>
-    </main>
+  </script>
+
 </body>
 </html>
