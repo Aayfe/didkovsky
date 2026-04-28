@@ -104,6 +104,31 @@ const DEFAULT_CATEGORIES = [
   "Kombinace",
   "Ostatní"
 ];
+const PRODUCT_WORDS = {
+  rohlik: "rohlík",
+  rohliky: "rohlíky",
+  chleba: "chleba",
+  chleb: "chléb",
+  mleko: "mléko",
+  maslo: "máslo",
+  syr: "sýr",
+  sunka: "šunka",
+  salam: "salám",
+  kure: "kuře",
+  kvetak: "květák",
+  mrkev: "mrkev",
+  vejce: "vejce",
+  vajecna: "vaječná",
+  pomazanka: "pomazánka",
+  jogurt: "jogurt",
+  ryze: "rýže",
+  testoviny: "těstoviny",
+  mouka: "mouka",
+  cukr: "cukr",
+  sul: "sůl",
+  krystal: "krystal",
+  toust: "toust"
+};
 
 let lists = [];
 let activeListId = null;
@@ -121,6 +146,7 @@ let saveTimer = null;
 let currentUser = null;
 let currentAccess = null;
 let listNameBeforeEdit = "";
+let editingCatalogId = null;
 
 const icons = {
   edit: `
@@ -171,6 +197,7 @@ function setupEvents() {
   shoppingSubtractStock.addEventListener("change", updateShoppingSubtractSetting);
   settingsShoppingSubtractStock.addEventListener("change", updateShoppingSubtractSetting);
   catalogForm.addEventListener("submit", saveCatalogItem);
+  catalogBody.addEventListener("click", handleCatalogClick);
   shoppingForm.addEventListener("submit", addShoppingItem);
   shoppingProduct.addEventListener("input", syncShoppingUnitFromProduct);
   shoppingProduct.addEventListener("change", syncShoppingUnitFromProduct);
@@ -186,7 +213,7 @@ function setupEvents() {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
-    const name = tidyName(productInput.value);
+    const name = formatProductName(productInput.value);
     const amount = Number(amountInput.value);
     const category = tidyName(categoryInput.value) || "Ostatní";
     const existingProduct = findItemByName(name);
@@ -826,7 +853,7 @@ function parseXmlItems(value) {
   }
 
   doc.querySelectorAll("item").forEach((node) => {
-    const name = tidyName(node.getAttribute("name") || node.querySelector("name")?.textContent || "");
+    const name = formatProductName(node.getAttribute("name") || node.querySelector("name")?.textContent || "");
     const rawAmount = parseImportAmount(node.getAttribute("amount") || node.querySelector("amount")?.textContent || "1");
     const normalized = normalizeImportAmountAndUnit(rawAmount, node.getAttribute("unit") || node.querySelector("unit")?.textContent || unitSelect.value);
     const amount = normalized.amount;
@@ -852,7 +879,7 @@ function parseNameFirstImportLine(line) {
     return null;
   }
 
-  const name = tidyName(match[1]);
+  const name = formatProductName(match[1]);
   const parsedAmount = parseImportAmount(match[2]);
   const normalized = normalizeImportAmountAndUnit(parsedAmount, match[3] || unitSelect.value);
   const amount = normalized.amount;
@@ -876,7 +903,7 @@ function parseAmountFirstImportLine(line) {
   const normalized = normalizeImportAmountAndUnit(parsedAmount, match[2] || unitSelect.value);
   const amount = normalized.amount;
   const unit = normalized.unit;
-  const name = tidyName(match[3]);
+  const name = formatProductName(match[3]);
 
   if (!name || !amount || !unit) {
     return null;
@@ -1150,6 +1177,7 @@ function setState(state) {
   activeListId = state.activeListId;
   history = state.history || [];
   shoppingItems = state.shoppingItems || [];
+  mergeShoppingItems();
   combos = state.combos || [];
   catalogItems = state.catalogItems || [];
   appSettings = {
@@ -1208,7 +1236,7 @@ function sanitizeState(state) {
             .map((item) => {
               return {
                 id: typeof item.id === "string" ? item.id : createId(),
-                name: item.name,
+                name: formatProductName(item.name),
                 amount: Math.max(0.01, roundAmount(Number(item.amount))),
                 unit: normalizeImportUnit(item.unit),
                 category: typeof item.category === "string" ? item.category : "Ostatní"
@@ -1263,7 +1291,7 @@ function sanitizeCatalogItems(items) {
       .filter((item) => item && typeof item.name === "string")
       .map((item) => ({
         id: typeof item.id === "string" ? item.id : createId(),
-        name: tidyName(item.name),
+        name: formatProductName(item.name),
         category: tidyName(item.category || "Ostatní"),
         unit: normalizeImportUnit(item.unit || "ks"),
         ean: typeof item.ean === "string" ? item.ean : ""
@@ -1278,7 +1306,7 @@ function sanitizeShoppingItems(items) {
       .filter((item) => item && typeof item.name === "string")
       .map((item) => ({
         id: typeof item.id === "string" ? item.id : createId(),
-        name: item.name,
+        name: formatProductName(item.name),
         done: Boolean(item.done),
         createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString()
       }))
@@ -1291,11 +1319,11 @@ function sanitizeCombos(items) {
       .filter((combo) => combo && typeof combo.name === "string" && Array.isArray(combo.items))
       .map((combo) => ({
         id: typeof combo.id === "string" ? combo.id : createId(),
-        name: combo.name,
+        name: formatProductName(combo.name),
         items: combo.items
           .filter((item) => item && typeof item.name === "string")
           .map((item) => ({
-            name: item.name,
+            name: formatProductName(item.name),
             amount: Math.max(0.01, roundAmount(Number(item.amount) || 1)),
             unit: normalizeImportUnit(item.unit || "ks"),
             category: typeof item.category === "string" ? item.category : "Ostatní"
@@ -1693,7 +1721,7 @@ async function removeItem(id) {
 
 async function addShoppingItem(event) {
   event.preventDefault();
-  const product = tidyName(shoppingProduct.value);
+  const product = formatProductName(shoppingProduct.value);
   const amount = Number(shoppingAmount.value);
   const unit = shoppingUnit.value;
 
@@ -1709,18 +1737,37 @@ async function addShoppingItem(event) {
 
   const name = `${product} ${formatAmount(amount)} ${unit}`;
 
-  shoppingItems.unshift({
-    id: createId(),
-    name,
-    done: false,
-    createdAt: new Date().toISOString()
-  });
+  upsertShoppingItem({ product, amount: roundAmount(amount), unit });
   shoppingForm.reset();
   shoppingUnit.value = unit;
   recordHistory(`Do nákupního listu přidáno: ${name}.`, "shopping");
   renderShoppingList();
   renderHistory();
   await saveState();
+}
+
+function upsertShoppingItem({ product, amount, unit }) {
+  const existing = shoppingItems.find((item) => {
+    const parsed = parseImportLine(item.name);
+
+    return !item.done
+      && parsed
+      && normalize(parsed.name) === normalize(product)
+      && parsed.unit === unit;
+  });
+
+  if (existing) {
+    const parsed = parseImportLine(existing.name);
+    existing.name = `${parsed.name} ${formatAmount(roundAmount(parsed.amount + amount))} ${unit}`;
+    return;
+  }
+
+  shoppingItems.unshift({
+    id: createId(),
+    name: `${product} ${formatAmount(amount)} ${unit}`,
+    done: false,
+    createdAt: new Date().toISOString()
+  });
 }
 
 function syncShoppingUnitFromProduct() {
@@ -1784,6 +1831,7 @@ async function handleShoppingClick(event) {
 }
 
 function renderShoppingList() {
+  mergeShoppingItems();
   shoppingList.replaceChildren();
 
   if (!shoppingItems.length) {
@@ -1832,6 +1880,35 @@ function renderShoppingList() {
   });
 }
 
+function mergeShoppingItems() {
+  const merged = [];
+  const openMap = new Map();
+
+  shoppingItems.forEach((item) => {
+    const parsed = parseImportLine(item.name);
+
+    if (item.done || !parsed) {
+      merged.push(item);
+      return;
+    }
+
+    const key = `${normalize(parsed.name)}|${parsed.unit}`;
+    const existing = openMap.get(key);
+
+    if (existing) {
+      const existingParsed = parseImportLine(existing.name);
+      existing.name = `${existingParsed.name} ${formatAmount(roundAmount(existingParsed.amount + parsed.amount))} ${parsed.unit}`;
+      return;
+    }
+
+    item.name = `${parsed.name} ${formatAmount(parsed.amount)} ${parsed.unit}`;
+    openMap.set(key, item);
+    merged.push(item);
+  });
+
+  shoppingItems = merged;
+}
+
 function getShoppingItemMeta(item) {
   if (!appSettings.subtractStockFromShopping) {
     return "";
@@ -1843,18 +1920,44 @@ function getShoppingItemMeta(item) {
     return "Zadej třeba: Mléko 1000 ml, potom odečtu zásoby.";
   }
 
+  const summary = getShoppingNeedSummary(parsed);
+
+  if (summary.totalWanted !== parsed.amount) {
+    if (summary.missing === 0) {
+      return `Celkem chceš ${formatAmount(summary.totalWanted)} ${parsed.unit}, v zásobách je ${formatAmount(summary.currentAmount)} ${parsed.unit}.`;
+    }
+
+    return `Celkem chceš ${formatAmount(summary.totalWanted)} ${parsed.unit}, koupit ještě ${formatAmount(summary.missing)} ${parsed.unit}.`;
+  }
+
+  if (summary.missing === 0) {
+    return `V zásobách je ${formatAmount(summary.currentAmount)} ${parsed.unit}, kupovat netřeba.`;
+  }
+
+  return `Koupit ještě ${formatAmount(summary.missing)} ${parsed.unit} z ${formatAmount(parsed.amount)} ${parsed.unit}.`;
+}
+
+function getShoppingNeedSummary(parsed) {
   const stocked = getActiveItems().find((currentItem) => {
     return normalize(currentItem.name) === normalize(parsed.name)
       && currentItem.unit === parsed.unit;
   });
   const currentAmount = stocked ? stocked.amount : 0;
-  const missing = Math.max(0, roundAmount(parsed.amount - currentAmount));
+  const totalWanted = shoppingItems
+    .filter((item) => !item.done)
+    .map((item) => parseImportLine(item.name))
+    .filter((item) => {
+      return item
+        && normalize(item.name) === normalize(parsed.name)
+        && item.unit === parsed.unit;
+    })
+    .reduce((sum, item) => sum + item.amount, 0);
 
-  if (missing === 0) {
-    return `V zásobách je ${formatAmount(currentAmount)} ${parsed.unit}, kupovat netřeba.`;
-  }
-
-  return `Koupit ještě ${formatAmount(missing)} ${parsed.unit} z ${formatAmount(parsed.amount)} ${parsed.unit}.`;
+  return {
+    currentAmount,
+    totalWanted: roundAmount(totalWanted || parsed.amount),
+    missing: Math.max(0, roundAmount((totalWanted || parsed.amount) - currentAmount))
+  };
 }
 
 async function saveCombo(event) {
@@ -1979,7 +2082,7 @@ function updateComboRemoveButtons() {
 function getComboBuilderItems() {
   return [...comboItemsList.querySelectorAll(".combo-item-row")]
     .map((row) => {
-      const name = tidyName(row.querySelector(".combo-product").value);
+      const name = formatProductName(row.querySelector(".combo-product").value);
       const amount = Number(row.querySelector(".combo-amount").value);
       const unit = row.querySelector(".combo-unit").value;
       const category = tidyName(row.querySelector(".combo-category").value) || "Ostatní";
@@ -2191,7 +2294,7 @@ function renderCategoryOptions() {
 
 async function saveCatalogItem(event) {
   event.preventDefault();
-  const name = tidyName(catalogName.value);
+  const name = formatProductName(catalogName.value);
   const category = tidyName(catalogCategory.value) || "Ostatní";
   const unit = normalizeImportUnit(catalogUnit.value || "ks");
 
@@ -2201,8 +2304,9 @@ async function saveCatalogItem(event) {
     return;
   }
 
-  upsertCatalogItem({ name, category, unit });
+  upsertCatalogItem({ id: editingCatalogId, name, category, unit });
   catalogForm.reset();
+  editingCatalogId = null;
   catalogUnit.value = unit;
   renderProductOptions();
   renderCategoryOptions();
@@ -2211,6 +2315,41 @@ async function saveCatalogItem(event) {
   renderHistory();
   showMessage(`Potravina ${name} je v číselníku.`);
   await saveState();
+}
+
+async function handleCatalogClick(event) {
+  const button = event.target.closest("button[data-catalog-action]");
+
+  if (!button) {
+    return;
+  }
+
+  const item = getCatalogItems().find((currentItem) => normalize(currentItem.name) === button.dataset.name);
+
+  if (!item) {
+    return;
+  }
+
+  if (button.dataset.catalogAction === "edit") {
+    const existing = catalogItems.find((currentItem) => normalize(currentItem.name) === normalize(item.name));
+    editingCatalogId = existing?.id || null;
+    catalogName.value = item.name;
+    catalogCategory.value = item.category || "Ostatní";
+    catalogUnit.value = item.unit || "ks";
+    catalogName.focus();
+    showMessage(`Upravuješ položku číselníku ${item.name}.`);
+    return;
+  }
+
+  if (button.dataset.catalogAction === "delete") {
+    catalogItems = catalogItems.filter((currentItem) => normalize(currentItem.name) !== normalize(item.name));
+    renderProductOptions();
+    renderCategoryOptions();
+    renderCatalog();
+    recordHistory(`Číselník: smazána potravina ${item.name}.`, "catalog");
+    renderHistory();
+    await saveState();
+  }
 }
 
 async function lookupEanProduct() {
@@ -2336,14 +2475,41 @@ async function recognizeReceiptText(file) {
 function tidyReceiptText(text) {
   return text
     .split(/\r?\n/)
-    .map((line) => tidyName(line.replace(/\s+\d+[,.]\d{2}\s*(Kč|CZK)?$/i, "")))
-    .filter((line) => /[a-zá-ž]/i.test(line))
+    .map(normalizeReceiptLine)
+    .map(parseReceiptProductLine)
+    .filter(Boolean)
+    .map((item) => `${item.name} ${formatAmount(item.amount)} ${item.unit}`)
     .slice(0, 80)
     .join("\n");
 }
 
+function parseReceiptProductLine(line) {
+  if (!/\b\d+(?:[,.]\d+)?\s*(kg|g|l|ml|ks|kč)\b/iu.test(line)) {
+    return null;
+  }
+
+  const parsed = parseImportLine(line);
+
+  if (!parsed || normalize(parsed.name).length < 3) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function normalizeReceiptLine(line) {
+  return tidyName(String(line || "")
+    .replace(/[|*_~]/g, " ")
+    .replace(/^[A-Z]\.(?=\S)/u, "")
+    .replace(/\b\d+\s*x\s+\d+[,.]\d{2}.*$/iu, "")
+    .replace(/\s+\d+[,.]\d{2}\s*(Kč|CZK)?\s*[A-Z0-9]?$/iu, "")
+    .replace(/(\d+(?:[,.]\d+)?)(kg|g|l|ml|ks)\b/iu, "$1 $2")
+    .replace(/[.,;:]+/g, " ")
+    .replace(/\s+/g, " "));
+}
+
 function mapOpenFoodFactsProduct(product, ean) {
-  const name = tidyName(product.product_name_cs || product.product_name || product.generic_name || product.brands || `EAN ${ean}`);
+  const name = formatProductName(product.product_name_cs || product.product_name || product.generic_name || product.brands || `EAN ${ean}`);
   const category = inferProductCategory(product);
   const quantity = inferQuantity(product.quantity);
 
@@ -2393,9 +2559,13 @@ function inferProductCategory(product) {
 }
 
 function upsertCatalogItem(item) {
-  const existing = catalogItems.find((currentItem) => normalize(currentItem.name) === normalize(item.name));
+  const existing = catalogItems.find((currentItem) => {
+    return (item.id && currentItem.id === item.id)
+      || normalize(currentItem.name) === normalize(item.name);
+  });
 
   if (existing) {
+    existing.name = item.name || existing.name;
     existing.category = item.category || existing.category || "Ostatní";
     existing.unit = item.unit || existing.unit || "ks";
     existing.ean = item.ean || existing.ean || "";
@@ -2424,10 +2594,19 @@ function renderCatalog() {
       <td></td>
       <td></td>
       <td></td>
+      <td class="icon-cell">
+        <div class="row-actions">
+          <button class="ghost-button" type="button" data-catalog-action="edit">Upravit</button>
+          <button class="danger-button" type="button" data-catalog-action="delete">Smazat</button>
+        </div>
+      </td>
     `;
     row.children[0].textContent = item.name;
     row.children[1].textContent = item.category;
     row.children[2].textContent = item.unit;
+    row.querySelectorAll("[data-catalog-action]").forEach((button) => {
+      button.dataset.name = normalize(item.name);
+    });
     catalogBody.append(row);
   });
 }
@@ -2759,7 +2938,21 @@ function getEditDistance(firstValue, secondValue) {
 }
 
 function tidyName(value) {
-  return value.trim().replace(/\s+/g, " ");
+  return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function formatProductName(value) {
+  const text = tidyName(value)
+    .toLocaleLowerCase("cs")
+    .split(" ")
+    .map((word) => PRODUCT_WORDS[normalize(word)] || word)
+    .join(" ");
+
+  if (!text) {
+    return "";
+  }
+
+  return text.charAt(0).toLocaleUpperCase("cs") + text.slice(1);
 }
 
 function normalizeEmail(value) {
