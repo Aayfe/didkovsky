@@ -18,6 +18,14 @@ const anonymousExportButton = document.querySelector("#anonymous-export-button")
 const receiptImportButton = document.querySelector("#receipt-import-button");
 const eanImportButton = document.querySelector("#ean-import-button");
 const xmlImportButton = document.querySelector("#xml-import-button");
+const eanTool = document.querySelector("#ean-tool");
+const eanInput = document.querySelector("#ean-input");
+const eanLookupButton = document.querySelector("#ean-lookup-button");
+const eanFileInput = document.querySelector("#ean-file-input");
+const eanMessage = document.querySelector("#ean-message");
+const receiptTool = document.querySelector("#receipt-tool");
+const receiptFileInput = document.querySelector("#receipt-file-input");
+const receiptMessage = document.querySelector("#receipt-message");
 const toggleAdminPanelButton = document.querySelector("#toggle-admin-panel");
 const adminPanel = document.querySelector("#admin-panel");
 const adminForm = document.querySelector("#admin-form");
@@ -58,9 +66,14 @@ const tableWrap = document.querySelector(".table-wrap");
 const historyList = document.querySelector("#history-list");
 const historyDateFilter = document.querySelector("#history-date-filter");
 const catalogBody = document.querySelector("#catalog-body");
+const catalogForm = document.querySelector("#catalog-form");
+const catalogName = document.querySelector("#catalog-name");
+const catalogCategory = document.querySelector("#catalog-category");
+const catalogUnit = document.querySelector("#catalog-unit");
 const shoppingForm = document.querySelector("#shopping-form");
 const shoppingInput = document.querySelector("#shopping-input");
 const shoppingList = document.querySelector("#shopping-list");
+const shoppingSubtractStock = document.querySelector("#shopping-subtract-stock");
 const comboForm = document.querySelector("#combo-form");
 const comboName = document.querySelector("#combo-name");
 const comboItems = document.querySelector("#combo-items");
@@ -68,6 +81,7 @@ const comboSelect = document.querySelector("#combo-select");
 const useComboButton = document.querySelector("#use-combo-button");
 const comboList = document.querySelector("#combo-list");
 const darkModeToggle = document.querySelector("#dark-mode-toggle");
+const settingsShoppingSubtractStock = document.querySelector("#settings-shopping-subtract-stock");
 const message = document.querySelector("#message");
 
 const SUPABASE_TABLE = "shopping_app_state";
@@ -80,6 +94,10 @@ let activeListId = null;
 let history = [];
 let shoppingItems = [];
 let combos = [];
+let catalogItems = [];
+let appSettings = {
+  subtractStockFromShopping: false
+};
 let activeView = "pantry";
 let editingId = null;
 let supabaseClient = null;
@@ -126,11 +144,17 @@ function setupEvents() {
   receiptImportButton.addEventListener("click", openReceiptImport);
   eanImportButton.addEventListener("click", openEanImport);
   xmlImportButton.addEventListener("click", openXmlImport);
+  eanLookupButton.addEventListener("click", lookupEanProduct);
+  eanFileInput.addEventListener("change", scanEanFromFile);
+  receiptFileInput.addEventListener("change", importReceiptFromImage);
   toggleAdminPanelButton.addEventListener("click", toggleAdminPanel);
   adminForm.addEventListener("submit", saveAllowedUser);
   allowedUsersList.addEventListener("click", handleAllowedUsersClick);
   historyDateFilter.addEventListener("input", renderHistory);
   darkModeToggle.addEventListener("change", toggleDarkMode);
+  shoppingSubtractStock.addEventListener("change", updateShoppingSubtractSetting);
+  settingsShoppingSubtractStock.addEventListener("change", updateShoppingSubtractSetting);
+  catalogForm.addEventListener("submit", saveCatalogItem);
   shoppingForm.addEventListener("submit", addShoppingItem);
   shoppingList.addEventListener("click", handleShoppingClick);
   comboForm.addEventListener("submit", saveCombo);
@@ -292,6 +316,7 @@ async function initializeApp() {
   renderCatalog();
   renderShoppingList();
   renderCombos();
+  syncSettingsControls();
   applyTheme();
   switchView(activeView, { keepMenu: true });
   setActionState(actionSelect.value);
@@ -436,6 +461,7 @@ async function handleSession(session) {
     renderCatalog();
     renderShoppingList();
     renderCombos();
+    syncSettingsControls();
     showSignedOut("Přihlas se Google účtem.");
     return;
   }
@@ -460,6 +486,7 @@ async function handleSession(session) {
   renderCatalog();
   renderShoppingList();
   renderCombos();
+  syncSettingsControls();
   showMessage("Data načtená.");
 
   if (currentAccess.is_admin) {
@@ -661,13 +688,19 @@ function anonymizeValue(value) {
 }
 
 function openReceiptImport() {
-  openImportModal("Vlož text z účtenky", "Rohlík 4 ks\nŠunka 100 g\nJogurt 2 ks");
-  importError.textContent = "OCR z fotky je připravené jako další krok. Teď sem vlož přečtené položky z účtenky.";
+  switchView("tools");
+  receiptTool.hidden = false;
+  eanTool.hidden = true;
+  receiptMessage.textContent = "Vyber fotku účtenky. Text po rozpoznání ještě můžeš upravit před importem.";
+  receiptFileInput.focus();
 }
 
 function openEanImport() {
-  openImportModal("Import EAN", "EAN 8594000000000\nMléko 1000 ml");
-  importError.textContent = "EAN sken potřebuje databázi potravin nebo API. Teď umím uložit ručně doplněnou položku.";
+  switchView("tools");
+  eanTool.hidden = false;
+  receiptTool.hidden = true;
+  eanMessage.textContent = "Naskenuj fotku čárového kódu nebo zadej EAN ručně.";
+  eanInput.focus();
 }
 
 function openXmlImport() {
@@ -1089,6 +1122,10 @@ function setState(state) {
   history = state.history || [];
   shoppingItems = state.shoppingItems || [];
   combos = state.combos || [];
+  catalogItems = state.catalogItems || [];
+  appSettings = {
+    subtractStockFromShopping: Boolean(state.appSettings?.subtractStockFromShopping)
+  };
 }
 
 function createDefaultState() {
@@ -1099,7 +1136,11 @@ function createDefaultState() {
     activeListId: list.id,
     history: [],
     shoppingItems: [],
-    combos: []
+    combos: [],
+    catalogItems: [],
+    appSettings: {
+      subtractStockFromShopping: false
+    }
   };
 }
 
@@ -1109,7 +1150,9 @@ function serializeState() {
     activeListId,
     history,
     shoppingItems,
-    combos
+    combos,
+    catalogItems,
+    appSettings
   };
 }
 
@@ -1176,8 +1219,27 @@ function sanitizeState(state) {
     activeListId: activeId,
     history: sanitizedHistory,
     shoppingItems: sanitizeShoppingItems(state.shoppingItems),
-    combos: sanitizeCombos(state.combos)
+    combos: sanitizeCombos(state.combos),
+    catalogItems: sanitizeCatalogItems(state.catalogItems),
+    appSettings: {
+      subtractStockFromShopping: Boolean(state.appSettings?.subtractStockFromShopping)
+    }
   };
+}
+
+function sanitizeCatalogItems(items) {
+  return Array.isArray(items)
+    ? items
+      .filter((item) => item && typeof item.name === "string")
+      .map((item) => ({
+        id: typeof item.id === "string" ? item.id : createId(),
+        name: tidyName(item.name),
+        category: tidyName(item.category || "Ostatní"),
+        unit: normalizeImportUnit(item.unit || "ks"),
+        ean: typeof item.ean === "string" ? item.ean : ""
+      }))
+      .filter((item) => item.name)
+    : [];
 }
 
 function sanitizeShoppingItems(items) {
@@ -1567,6 +1629,30 @@ async function addShoppingItem(event) {
   await saveState();
 }
 
+async function updateShoppingSubtractSetting(event) {
+  appSettings.subtractStockFromShopping = Boolean(event.target.checked);
+  syncSettingsControls();
+  renderShoppingList();
+  recordHistory(
+    appSettings.subtractStockFromShopping
+      ? "Nákupní list odečítá aktuální zásoby."
+      : "Nákupní list už zásoby neodečítá.",
+    "settings"
+  );
+  renderHistory();
+  await saveState();
+}
+
+function syncSettingsControls() {
+  if (shoppingSubtractStock) {
+    shoppingSubtractStock.checked = Boolean(appSettings.subtractStockFromShopping);
+  }
+
+  if (settingsShoppingSubtractStock) {
+    settingsShoppingSubtractStock.checked = Boolean(appSettings.subtractStockFromShopping);
+  }
+}
+
 async function handleShoppingClick(event) {
   const button = event.target.closest("button[data-shopping-action]");
 
@@ -1608,13 +1694,18 @@ function renderShoppingList() {
 
   shoppingItems.forEach((item) => {
     const row = document.createElement("article");
+    const content = document.createElement("div");
     const text = document.createElement("strong");
+    const meta = document.createElement("span");
     const actions = document.createElement("div");
     const toggle = document.createElement("button");
     const remove = document.createElement("button");
 
     row.className = `card-row${item.done ? " is-done" : ""}`;
+    content.className = "row-content";
     text.textContent = item.name;
+    meta.className = "muted-text";
+    meta.textContent = getShoppingItemMeta(item);
     actions.className = "row-actions";
     toggle.className = "ghost-button";
     toggle.type = "button";
@@ -1627,10 +1718,41 @@ function renderShoppingList() {
     remove.dataset.id = item.id;
     remove.textContent = "Smazat";
 
+    content.append(text);
+
+    if (meta.textContent) {
+      content.append(meta);
+    }
+
     actions.append(toggle, remove);
-    row.append(text, actions);
+    row.append(content, actions);
     shoppingList.append(row);
   });
+}
+
+function getShoppingItemMeta(item) {
+  if (!appSettings.subtractStockFromShopping) {
+    return "";
+  }
+
+  const parsed = parseImportLine(item.name);
+
+  if (!parsed) {
+    return "Zadej třeba: Mléko 1000 ml, potom odečtu zásoby.";
+  }
+
+  const stocked = getActiveItems().find((currentItem) => {
+    return normalize(currentItem.name) === normalize(parsed.name)
+      && currentItem.unit === parsed.unit;
+  });
+  const currentAmount = stocked ? stocked.amount : 0;
+  const missing = Math.max(0, roundAmount(parsed.amount - currentAmount));
+
+  if (missing === 0) {
+    return `V zásobách je ${formatAmount(currentAmount)} ${parsed.unit}, kupovat netřeba.`;
+  }
+
+  return `Koupit ještě ${formatAmount(missing)} ${parsed.unit} z ${formatAmount(parsed.amount)} ${parsed.unit}.`;
 }
 
 async function saveCombo(event) {
@@ -1790,14 +1912,10 @@ function renderItems() {
         <td class="number-cell">${formatAmount(item.amount)}</td>
         <td class="unit-cell"></td>
         <td class="icon-cell">
-          <button class="icon-button" type="button" data-action="edit" data-id="${item.id}" aria-label="Upravit ${escapeAttribute(item.name)}">
-            ${icons.edit}
-          </button>
-        </td>
-        <td class="icon-cell">
-          <button class="icon-button delete" type="button" data-action="delete" data-id="${item.id}" aria-label="Smazat ${escapeAttribute(item.name)}">
-            ${icons.trash}
-          </button>
+          <div class="row-actions">
+            <button class="ghost-button" type="button" data-action="edit" data-id="${item.id}" aria-label="Upravit ${escapeAttribute(item.name)}">Upravit</button>
+            <button class="danger-button" type="button" data-action="delete" data-id="${item.id}" aria-label="Smazat ${escapeAttribute(item.name)}">Smazat</button>
+          </div>
         </td>
       `;
 
@@ -1809,10 +1927,9 @@ function renderItems() {
 }
 
 function renderProductOptions() {
-  const items = getActiveItems();
   productOptions.innerHTML = "";
 
-  items
+  getCatalogItems()
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name, "cs"))
     .forEach((item) => {
@@ -1829,13 +1946,235 @@ function renderCategoryOptions() {
     return;
   }
 
-  const categories = [...new Set(getActiveItems().map((item) => item.category || "Ostatní"))].sort((a, b) => a.localeCompare(b, "cs"));
+  const categories = [...new Set(getCatalogItems().map((item) => item.category || "Ostatní"))].sort((a, b) => a.localeCompare(b, "cs"));
   categoryOptions.replaceChildren();
 
   categories.forEach((category) => {
     const option = document.createElement("option");
     option.value = category;
     categoryOptions.append(option);
+  });
+}
+
+async function saveCatalogItem(event) {
+  event.preventDefault();
+  const name = tidyName(catalogName.value);
+  const category = tidyName(catalogCategory.value) || "Ostatní";
+  const unit = normalizeImportUnit(catalogUnit.value || "ks");
+
+  if (!name) {
+    showMessage("Zadej název potraviny do číselníku.", true);
+    catalogName.focus();
+    return;
+  }
+
+  upsertCatalogItem({ name, category, unit });
+  catalogForm.reset();
+  catalogUnit.value = unit;
+  renderProductOptions();
+  renderCategoryOptions();
+  renderCatalog();
+  recordHistory(`Číselník: uložena potravina ${name}.`, "catalog");
+  renderHistory();
+  showMessage(`Potravina ${name} je v číselníku.`);
+  await saveState();
+}
+
+async function lookupEanProduct() {
+  const ean = String(eanInput.value || "").replace(/\D/g, "");
+
+  if (!/^\d{8,14}$/.test(ean)) {
+    eanMessage.textContent = "Zadej platný EAN, obvykle 8 až 14 číslic.";
+    eanInput.focus();
+    return;
+  }
+
+  eanMessage.textContent = "Hledám potravinu v Open Food Facts...";
+
+  try {
+    const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${ean}.json?fields=product_name,product_name_cs,generic_name,brands,categories,categories_tags,quantity,code`);
+    const data = await response.json();
+
+    if (!response.ok || data.status === 0 || !data.product) {
+      eanMessage.textContent = "EAN jsem nenašel. Můžeš položku doplnit ručně a uložit do číselníku.";
+      return;
+    }
+
+    const product = mapOpenFoodFactsProduct(data.product, ean);
+    productInput.value = product.name;
+    categoryInput.value = product.category;
+    amountInput.value = product.amount;
+    unitSelect.value = product.unit;
+    upsertCatalogItem(product);
+    renderProductOptions();
+    renderCategoryOptions();
+    renderCatalog();
+    switchView("pantry");
+    eanMessage.textContent = `Načteno: ${product.name}.`;
+    showMessage(`EAN našel ${product.name}. Stačí potvrdit akci.`);
+    recordHistory(`EAN načten: ${product.name}.`, "catalog");
+    renderHistory();
+    await saveState();
+  } catch (error) {
+    eanMessage.textContent = "EAN API teď neodpovídá. Zkus to za chvíli nebo zadej položku ručně.";
+  }
+}
+
+async function scanEanFromFile(event) {
+  const file = event.target.files?.[0];
+
+  if (!file) {
+    return;
+  }
+
+  if (!("BarcodeDetector" in window)) {
+    eanMessage.textContent = "Tenhle prohlížeč neumí číst EAN z fotky. Zadej číslo ručně.";
+    return;
+  }
+
+  eanMessage.textContent = "Čtu čárový kód z obrázku...";
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const detector = new BarcodeDetector({
+      formats: ["ean_13", "ean_8", "upc_a", "upc_e"]
+    });
+    const codes = await detector.detect(bitmap);
+    const code = codes[0]?.rawValue || "";
+
+    if (!code) {
+      eanMessage.textContent = "Na fotce jsem EAN nenašel. Zkus ostřejší fotku nebo číslo napiš.";
+      return;
+    }
+
+    eanInput.value = code;
+    await lookupEanProduct();
+  } catch (error) {
+    eanMessage.textContent = "Sken se nepovedl. Zkus jinou fotku nebo ruční zadání.";
+  } finally {
+    eanFileInput.value = "";
+  }
+}
+
+async function importReceiptFromImage(event) {
+  const file = event.target.files?.[0];
+
+  if (!file) {
+    return;
+  }
+
+  if (!window.Tesseract) {
+    receiptMessage.textContent = "OCR knihovna se nenačetla. Účtenku můžeš zatím přepsat přes hromadný import.";
+    return;
+  }
+
+  receiptMessage.textContent = "Rozpoznávám text z účtenky...";
+
+  try {
+    const result = await recognizeReceiptText(file);
+    const text = tidyReceiptText(result);
+
+    if (!text) {
+      receiptMessage.textContent = "Z účtenky jsem nevyčetl žádný použitelný text.";
+      return;
+    }
+
+    openImportModal("Import z účtenky", "Rozpoznané položky uprav a potvrď.");
+    importText.value = text;
+    importError.textContent = "Zkontroluj množství a jednotky, účtenky bývají šumivé.";
+    receiptMessage.textContent = "Hotovo. Otevřel jsem import, kde si text doladíš.";
+  } catch (error) {
+    receiptMessage.textContent = "OCR se nepovedlo. Zkus ostřejší fotku nebo ruční hromadný import.";
+  } finally {
+    receiptFileInput.value = "";
+  }
+}
+
+async function recognizeReceiptText(file) {
+  try {
+    const { data } = await Tesseract.recognize(file, "ces+eng");
+    return data.text || "";
+  } catch (error) {
+    const { data } = await Tesseract.recognize(file, "eng");
+    return data.text || "";
+  }
+}
+
+function tidyReceiptText(text) {
+  return text
+    .split(/\r?\n/)
+    .map((line) => tidyName(line.replace(/\s+\d+[,.]\d{2}\s*(Kč|CZK)?$/i, "")))
+    .filter((line) => /[a-zá-ž]/i.test(line))
+    .slice(0, 80)
+    .join("\n");
+}
+
+function mapOpenFoodFactsProduct(product, ean) {
+  const name = tidyName(product.product_name_cs || product.product_name || product.generic_name || product.brands || `EAN ${ean}`);
+  const category = inferProductCategory(product);
+  const quantity = inferQuantity(product.quantity);
+
+  return {
+    id: createId(),
+    name,
+    category,
+    amount: quantity.amount,
+    unit: quantity.unit,
+    ean
+  };
+}
+
+function inferQuantity(quantity) {
+  const match = String(quantity || "").match(/(\d+(?:[,.]\d+)?)\s*(kg|g|l|ml|ks|pcs|pc)/i);
+
+  if (!match) {
+    return { amount: 1, unit: "ks" };
+  }
+
+  const amount = parseImportAmount(match[1]) || 1;
+  const normalized = normalizeImportAmountAndUnit(amount, match[2]);
+  return {
+    amount: normalized.amount,
+    unit: normalized.unit
+  };
+}
+
+function inferProductCategory(product) {
+  const text = [
+    product.categories,
+    ...(Array.isArray(product.categories_tags) ? product.categories_tags : [])
+  ].join(" ").toLocaleLowerCase("cs");
+
+  const rules = [
+    [/dair|milk|yogurt|cheese|mlé|sýr|jogurt/, "Mléčné"],
+    [/bread|bakery|peč|rohl|hous/, "Pečivo"],
+    [/meat|ham|salami|maso|šunk|salám/, "Maso"],
+    [/fruit|vegetable|ovoce|zelen/, "Ovoce a zelenina"],
+    [/beverage|drink|water|juice|nápoj|voda|džus/, "Nápoje"],
+    [/sweet|chocolate|candy|sušen|čokol/, "Sladké"],
+    [/frozen|mraž/, "Mražené"]
+  ];
+  const match = rules.find(([pattern]) => pattern.test(text));
+
+  return match ? match[1] : "Ostatní";
+}
+
+function upsertCatalogItem(item) {
+  const existing = catalogItems.find((currentItem) => normalize(currentItem.name) === normalize(item.name));
+
+  if (existing) {
+    existing.category = item.category || existing.category || "Ostatní";
+    existing.unit = item.unit || existing.unit || "ks";
+    existing.ean = item.ean || existing.ean || "";
+    return;
+  }
+
+  catalogItems.unshift({
+    id: item.id || createId(),
+    name: item.name,
+    category: item.category || "Ostatní",
+    unit: item.unit || "ks",
+    ean: item.ean || ""
   });
 }
 
@@ -1862,6 +2201,18 @@ function renderCatalog() {
 
 function getCatalogItems() {
   const map = new Map();
+
+  catalogItems.forEach((item) => {
+    const key = normalize(item.name);
+
+    if (!map.has(key)) {
+      map.set(key, {
+        name: item.name,
+        category: item.category || "Ostatní",
+        unit: item.unit || "ks"
+      });
+    }
+  });
 
   lists.forEach((list) => {
     list.items.forEach((item) => {
@@ -2009,7 +2360,7 @@ function stepAmount(direction) {
 }
 
 function syncUnitFromProduct() {
-  const item = findItemByName(productInput.value);
+  const item = findCatalogItemByName(productInput.value) || findItemByName(productInput.value);
 
   if (item) {
     unitSelect.value = item.unit;
@@ -2017,11 +2368,21 @@ function syncUnitFromProduct() {
 }
 
 function syncCategoryFromProduct() {
-  const item = findItemByName(productInput.value);
+  const item = findCatalogItemByName(productInput.value) || findItemByName(productInput.value);
 
   if (item) {
     categoryInput.value = item.category || "Ostatní";
   }
+}
+
+function findCatalogItemByName(name) {
+  const normalizedName = normalize(name);
+
+  if (!normalizedName) {
+    return null;
+  }
+
+  return getCatalogItems().find((item) => normalize(item.name) === normalizedName) || null;
 }
 
 function findItemByName(name) {

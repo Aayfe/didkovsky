@@ -428,6 +428,7 @@ h1 {
 }
 
 .compact-form,
+.catalog-form,
 .combo-form,
 .combo-runner {
   display: grid;
@@ -442,6 +443,12 @@ h1 {
 
 .combo-form {
   margin-bottom: 14px;
+}
+
+.catalog-form {
+  grid-template-columns: minmax(180px, 1fr) minmax(160px, 220px) 110px auto;
+  align-items: end;
+  margin-bottom: 18px;
 }
 
 .card-list {
@@ -463,6 +470,7 @@ h1 {
 
 body.dark-mode .card-row,
 body.dark-mode .history-entry,
+body.dark-mode .tool-card,
 body.dark-mode .table-wrap,
 body.dark-mode th,
 body.dark-mode .number-buttons,
@@ -478,7 +486,14 @@ body.dark-mode .modal {
 .row-actions {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
+}
+
+.row-content {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
 }
 
 .muted-text {
@@ -811,6 +826,47 @@ body.dark-mode .modal {
   color: var(--danger);
 }
 
+.setting-line {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 14px;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: var(--field);
+  padding: 10px 12px;
+}
+
+.tool-card {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdff;
+  padding: 16px;
+}
+
+.tool-card h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.file-drop {
+  display: grid;
+  gap: 8px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 700;
+  padding: 14px;
+}
+
+.file-drop input {
+  max-width: 100%;
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--line);
@@ -1076,6 +1132,7 @@ tbody tr:last-child td {
   }
 
   .compact-form,
+  .catalog-form,
   .combo-runner,
   .card-row {
     grid-template-columns: 1fr;
