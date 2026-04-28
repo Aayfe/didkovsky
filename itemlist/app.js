@@ -5,6 +5,9 @@ const authMessage = document.querySelector("#auth-message");
 const googleLoginButton = document.querySelector("#google-login-button");
 const userEmail = document.querySelector("#user-email");
 const logoutButton = document.querySelector("#logout-button");
+const importButton = document.querySelector("#import-button");
+const exportButton = document.querySelector("#export-button");
+const toggleHistoryButton = document.querySelector("#toggle-history-button");
 const toggleAdminPanelButton = document.querySelector("#toggle-admin-panel");
 const adminPanel = document.querySelector("#admin-panel");
 const adminForm = document.querySelector("#admin-form");
@@ -33,20 +36,31 @@ const deleteAllButton = document.querySelector("#delete-all-button");
 const deleteAllModal = document.querySelector("#delete-all-modal");
 const cancelDeleteAll = document.querySelector("#cancel-delete-all");
 const confirmDeleteAll = document.querySelector("#confirm-delete-all");
+const importModal = document.querySelector("#import-modal");
+const importText = document.querySelector("#import-text");
+const importError = document.querySelector("#import-error");
+const cancelImport = document.querySelector("#cancel-import");
+const confirmImport = document.querySelector("#confirm-import");
 const itemsBody = document.querySelector("#items-body");
 const tableWrap = document.querySelector(".table-wrap");
+const historyPanel = document.querySelector("#history-panel");
+const historyList = document.querySelector("#history-list");
 const message = document.querySelector("#message");
 
 const SUPABASE_TABLE = "shopping_app_state";
 const ALLOWED_USERS_TABLE = "allowed_users";
+const HISTORY_LIMIT = 120;
+const IMPORT_UNITS = ["kusů", "ks", "kg", "gramů", "g", "l", "ml", "balení", "plechovek"];
 
 let lists = [];
 let activeListId = null;
+let history = [];
 let editingId = null;
 let supabaseClient = null;
 let saveTimer = null;
 let currentUser = null;
 let currentAccess = null;
+let listNameBeforeEdit = "";
 
 const icons = {
   edit: `
@@ -72,6 +86,9 @@ initializeApp();
 function setupEvents() {
   googleLoginButton.addEventListener("click", signInWithGoogle);
   logoutButton.addEventListener("click", signOut);
+  importButton.addEventListener("click", openImportModal);
+  exportButton.addEventListener("click", exportData);
+  toggleHistoryButton.addEventListener("click", toggleHistoryPanel);
   toggleAdminPanelButton.addEventListener("click", toggleAdminPanel);
   adminForm.addEventListener("submit", saveAllowedUser);
   allowedUsersList.addEventListener("click", handleAllowedUsersClick);
@@ -82,8 +99,8 @@ function setupEvents() {
     const name = tidyName(productInput.value);
     const amount = Number(amountInput.value);
     const existingProduct = findItemByName(name);
-    const unit = existingProduct ? existingProduct.unit : unitSelect.value;
     const action = actionSelect.value;
+    const unit = existingProduct && action !== "set" ? existingProduct.unit : unitSelect.value;
 
     if (!name) {
       showMessage("Vyplň položku.", true);
@@ -91,8 +108,8 @@ function setupEvents() {
       return;
     }
 
-    if (!Number.isFinite(amount) || amount <= 0 || !Number.isInteger(amount)) {
-      showMessage("Počet musí být celé číslo větší než nula.", true);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showMessage("Počet musí být číslo větší než nula.", true);
       amountInput.focus();
       return;
     }
@@ -133,6 +150,10 @@ function setupEvents() {
     queueSaveState();
   });
 
+  listNameInput.addEventListener("focus", () => {
+    listNameBeforeEdit = getDisplayListName(getActiveList());
+  });
+
   listNameInput.addEventListener("blur", () => {
     const list = getActiveList();
 
@@ -141,6 +162,16 @@ function setupEvents() {
       renderLists();
       queueSaveState();
     }
+
+    const nextName = getDisplayListName(list);
+
+    if (listNameBeforeEdit && listNameBeforeEdit !== nextName) {
+      recordHistory(`Seznam přejmenován z ${listNameBeforeEdit} na ${nextName}.`, "list");
+      renderHistory();
+      queueSaveState();
+    }
+
+    listNameBeforeEdit = "";
   });
 
   actionButtons.forEach((button) => {
@@ -163,6 +194,8 @@ function setupEvents() {
   deleteAllButton.addEventListener("click", openDeleteAllModal);
   cancelDeleteAll.addEventListener("click", closeDeleteAllModal);
   confirmDeleteAll.addEventListener("click", confirmDeleteAllLists);
+  cancelImport.addEventListener("click", closeImportModal);
+  confirmImport.addEventListener("click", importShoppingList);
 
   deleteListModal.addEventListener("click", (event) => {
     if (event.target === deleteListModal) {
@@ -173,6 +206,12 @@ function setupEvents() {
   deleteAllModal.addEventListener("click", (event) => {
     if (event.target === deleteAllModal) {
       closeDeleteAllModal();
+    }
+  });
+
+  importModal.addEventListener("click", (event) => {
+    if (event.target === importModal) {
+      closeImportModal();
     }
   });
 
@@ -199,6 +238,7 @@ async function initializeApp() {
   setState(createDefaultState());
   renderLists();
   renderItems();
+  renderHistory();
   setActionState(actionSelect.value);
   showSignedOut("Kontroluji přihlášení...");
 
@@ -335,6 +375,7 @@ async function handleSession(session) {
     setState(createDefaultState());
     renderLists();
     renderItems();
+    renderHistory();
     showSignedOut("Přihlas se Google účtem.");
     return;
   }
@@ -355,6 +396,7 @@ async function handleSession(session) {
   await loadStateFromSupabase();
   renderLists();
   renderItems();
+  renderHistory();
   showMessage("Data načtená.");
 
   if (currentAccess.is_admin) {
@@ -417,6 +459,196 @@ async function saveState() {
   if (error) {
     showMessage(`Uložení do Supabase selhalo: ${error.message}`, true);
   }
+}
+
+function exportData() {
+  const exportedState = {
+    exportedAt: new Date().toISOString(),
+    user: getCurrentUserEmail(),
+    ...serializeState()
+  };
+  const blob = new Blob([JSON.stringify(exportedState, null, 2)], {
+    type: "application/json"
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = `itemlist-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  recordHistory("Export dat.", "export");
+  renderHistory();
+  queueSaveState();
+  showMessage("Export připraven.");
+}
+
+function toggleHistoryPanel() {
+  historyPanel.hidden = !historyPanel.hidden;
+  renderHistory();
+}
+
+function openImportModal() {
+  importModal.hidden = false;
+  importText.value = "";
+  importError.textContent = "";
+  importText.focus();
+}
+
+function closeImportModal() {
+  importModal.hidden = true;
+  importText.value = "";
+  importError.textContent = "";
+  importButton.focus();
+}
+
+async function importShoppingList() {
+  const parsedItems = parseImportedItems(importText.value);
+
+  if (!parsedItems.items.length) {
+    importError.textContent = "Nenašel jsem žádnou použitelnou položku.";
+    importText.focus();
+    return;
+  }
+
+  const list = getActiveList();
+  let added = 0;
+  let updated = 0;
+
+  parsedItems.items.forEach((importedItem) => {
+    const result = upsertItemAmount({
+      name: importedItem.name,
+      amount: importedItem.amount,
+      unit: importedItem.unit,
+      action: "add"
+    });
+
+    if (result === "created") {
+      added += 1;
+    }
+
+    if (result === "updated") {
+      updated += 1;
+    }
+  });
+
+  closeImportModal();
+  renderItems();
+  resetForm();
+  recordHistory(`Importováno ${parsedItems.items.length} položek do ${getDisplayListName(list)}.`, "import", list);
+  renderHistory();
+  showMessage(getImportMessage(added, updated, parsedItems.skipped));
+  await saveState();
+}
+
+function parseImportedItems(value) {
+  const items = [];
+  const skipped = [];
+  const lines = value
+    .split(/\r?\n|;/)
+    .map((line) => tidyName(line))
+    .filter(Boolean);
+
+  lines.forEach((line) => {
+    const parsed = parseImportLine(line);
+
+    if (parsed) {
+      items.push(parsed);
+    } else {
+      skipped.push(line);
+    }
+  });
+
+  return { items, skipped };
+}
+
+function parseImportLine(line) {
+  return parseNameFirstImportLine(line) || parseAmountFirstImportLine(line);
+}
+
+function parseNameFirstImportLine(line) {
+  const match = line.match(/^(.+?)\s+(\d+(?:[,.]\d+)?)\s*([^\d\s]+(?:\s+[^\d\s]+)?)?$/u);
+
+  if (!match) {
+    return null;
+  }
+
+  const name = tidyName(match[1]);
+  const amount = parseImportAmount(match[2]);
+  const unit = normalizeImportUnit(match[3] || unitSelect.value);
+
+  if (!name || !amount || !unit) {
+    return null;
+  }
+
+  return { name, amount, unit };
+}
+
+function parseAmountFirstImportLine(line) {
+  const match = line.match(/^(\d+(?:[,.]\d+)?)\s*([^\d\s]+)?\s+(.+)$/u);
+
+  if (!match) {
+    return null;
+  }
+
+  const amount = parseImportAmount(match[1]);
+  const unit = normalizeImportUnit(match[2] || unitSelect.value);
+  const name = tidyName(match[3]);
+
+  if (!name || !amount || !unit) {
+    return null;
+  }
+
+  return { name, amount, unit };
+}
+
+function parseImportAmount(value) {
+  const amount = Number(String(value).replace(",", "."));
+  return Number.isFinite(amount) && amount > 0 ? roundAmount(amount) : null;
+}
+
+function normalizeImportUnit(value) {
+  const normalizedUnit = tidyName(String(value || "")).toLocaleLowerCase("cs");
+  const unitMap = {
+    g: "gramů",
+    gr: "gramů",
+    gram: "gramů",
+    gramy: "gramů",
+    gramu: "gramů",
+    ks: "kusů",
+    kus: "kusů",
+    kusy: "kusů",
+    baleni: "balení",
+    plechovka: "plechovek",
+    plechovky: "plechovek"
+  };
+  const mappedUnit = unitMap[normalize(normalizedUnit)] || normalizedUnit;
+
+  if (IMPORT_UNITS.includes(mappedUnit)) {
+    return mappedUnit;
+  }
+
+  return unitSelect.value;
+}
+
+function getImportMessage(added, updated, skipped) {
+  const parts = [];
+
+  if (added) {
+    parts.push(`nových ${added}`);
+  }
+
+  if (updated) {
+    parts.push(`upravených ${updated}`);
+  }
+
+  if (skipped.length) {
+    parts.push(`přeskočeno ${skipped.length}`);
+  }
+
+  return `Import hotový: ${parts.join(", ")}.`;
 }
 
 function toggleAdminPanel() {
@@ -610,6 +842,7 @@ async function updateAllowedUserAdmin(email, isAdmin) {
 function setState(state) {
   lists = state.lists;
   activeListId = state.activeListId;
+  history = state.history || [];
 }
 
 function createDefaultState() {
@@ -617,14 +850,16 @@ function createDefaultState() {
 
   return {
     lists: [list],
-    activeListId: list.id
+    activeListId: list.id,
+    history: []
   };
 }
 
 function serializeState() {
   return {
     lists,
-    activeListId
+    activeListId,
+    history
   };
 }
 
@@ -651,7 +886,7 @@ function sanitizeState(state) {
               return {
                 id: typeof item.id === "string" ? item.id : createId(),
                 name: item.name,
-                amount: Math.max(1, Math.trunc(Number(item.amount))),
+                amount: Math.max(0.01, roundAmount(Number(item.amount))),
                 unit: item.unit
               };
             })
@@ -666,10 +901,29 @@ function sanitizeState(state) {
   const activeId = sanitizedLists.some((list) => list.id === state.activeListId)
     ? state.activeListId
     : sanitizedLists[0].id;
+  const sanitizedHistory = Array.isArray(state.history)
+    ? state.history
+      .filter((entry) => {
+        return entry
+          && typeof entry.text === "string"
+          && typeof entry.createdAt === "string";
+      })
+      .map((entry) => {
+        return {
+          id: typeof entry.id === "string" ? entry.id : createId(),
+          text: entry.text,
+          type: typeof entry.type === "string" ? entry.type : "info",
+          listName: typeof entry.listName === "string" ? entry.listName : "",
+          createdAt: entry.createdAt
+        };
+      })
+      .slice(0, HISTORY_LIMIT)
+    : [];
 
   return {
     lists: sanitizedLists,
-    activeListId: activeId
+    activeListId: activeId,
+    history: sanitizedHistory
   };
 }
 
@@ -696,6 +950,8 @@ async function addList() {
   resetForm();
   renderLists();
   renderItems();
+  recordHistory(`Přidán seznam ${getDisplayListName(list)}.`, "list", list);
+  renderHistory();
   showMessage("Nový seznam přidán.");
   listNameInput.focus();
   listNameInput.select();
@@ -797,30 +1053,75 @@ async function confirmDeleteActiveList() {
   resetForm();
   renderLists();
   renderItems();
+  recordHistory(`Odebrán seznam ${getDisplayListName(removedList)}.`, "list", removedList);
+  renderHistory();
   showMessage(`Seznam ${getDisplayListName(removedList)} odebrán.`);
   await saveState();
 }
 
 async function confirmDeleteAllLists() {
+  const removedCount = lists.length;
+  const previousHistory = history;
   setState(createDefaultState());
+  history = previousHistory;
   closeDeleteAllModal();
   resetForm();
   renderLists();
   renderItems();
+  recordHistory(`Smazány všechny seznamy (${removedCount}).`, "list");
+  renderHistory();
   showMessage("Všechny seznamy byly smazány.");
   await saveState();
 }
 
 async function applyItemChange({ name, amount, unit, action }) {
+  const existingItem = findItemByName(name);
+  const matchedDifferentName = existingItem && normalize(existingItem.name) !== normalize(name);
+  const result = upsertItemAmount({ name, amount, unit, action });
+  const itemName = existingItem ? existingItem.name : name;
+
+  if (result === "missing") {
+    showMessage("Položka v seznamu ještě není.", true);
+    return;
+  }
+
+  if (result === "created") {
+    showMessage("Položka přidána.");
+  }
+
+  if (result === "removed") {
+    showMessage("Položka odebrána.");
+  }
+
+  if (result === "set") {
+    showMessage(matchedDifferentName
+      ? `Rozpoznáno jako ${itemName}, počet nastaven.`
+      : "Počet nastaven.");
+  }
+
+  if (result === "updated") {
+    if (matchedDifferentName) {
+      showMessage(`Rozpoznáno jako ${itemName}, počet ${action === "add" ? "navýšen" : "snížen"}.`);
+    } else {
+      showMessage(action === "add" ? "Počet navýšen." : "Počet snížen.");
+    }
+  }
+
+  recordHistory(getItemHistoryText(itemName, amount, unit, action, result), "item");
+  renderHistory();
+  renderItems();
+  resetForm();
+  await saveState();
+}
+
+function upsertItemAmount({ name, amount, unit, action }) {
   const list = getActiveList();
   const items = list.items;
   const existingItem = findItemByName(name);
-  const matchedDifferentName = existingItem && normalize(existingItem.name) !== normalize(name);
 
   if (!existingItem) {
     if (action === "subtract") {
-      showMessage("Položka v seznamu ještě není.", true);
-      return;
+      return "missing";
     }
 
     items.push({
@@ -829,29 +1130,46 @@ async function applyItemChange({ name, amount, unit, action }) {
       amount,
       unit
     });
-    showMessage("Položka přidána.");
-  } else {
-    const nextAmount = action === "add"
-      ? existingItem.amount + amount
-      : existingItem.amount - amount;
-
-    if (nextAmount <= 0) {
-      list.items = items.filter((item) => item.id !== existingItem.id);
-      showMessage("Položka odebrána.");
-    } else {
-      existingItem.amount = roundAmount(nextAmount);
-
-      if (matchedDifferentName) {
-        showMessage(`Rozpoznáno jako ${existingItem.name}, počet ${action === "add" ? "navýšen" : "snížen"}.`);
-      } else {
-        showMessage(action === "add" ? "Počet navýšen." : "Počet snížen.");
-      }
-    }
+    return "created";
   }
 
-  renderItems();
-  resetForm();
-  await saveState();
+  if (action === "set") {
+    existingItem.amount = roundAmount(amount);
+    existingItem.unit = unit;
+    return "set";
+  }
+
+  const nextAmount = action === "add"
+    ? existingItem.amount + amount
+    : existingItem.amount - amount;
+
+  if (nextAmount <= 0) {
+    list.items = items.filter((item) => item.id !== existingItem.id);
+    return "removed";
+  }
+
+  existingItem.amount = roundAmount(nextAmount);
+  return "updated";
+}
+
+function getItemHistoryText(name, amount, unit, action, result) {
+  if (result === "removed") {
+    return `Odebrána položka ${name}.`;
+  }
+
+  if (result === "set") {
+    return `Nastaveno ${name}: ${formatAmount(amount)} ${unit}.`;
+  }
+
+  if (action === "subtract") {
+    return `Sníženo ${name} o ${formatAmount(amount)} ${unit}.`;
+  }
+
+  if (result === "created") {
+    return `Přidána položka ${name}: ${formatAmount(amount)} ${unit}.`;
+  }
+
+  return `Navýšeno ${name} o ${formatAmount(amount)} ${unit}.`;
 }
 
 async function updateEditedItem(name, amount, unit) {
@@ -881,6 +1199,8 @@ async function updateEditedItem(name, amount, unit) {
 
   renderItems();
   resetForm();
+  recordHistory(`Upravena položka ${name}: ${formatAmount(amount)} ${unit}.`, "item");
+  renderHistory();
   showMessage("Položka upravena.");
   await saveState();
 }
@@ -906,6 +1226,7 @@ function startEdit(id) {
 
 async function removeItem(id) {
   const list = getActiveList();
+  const removedItem = list.items.find((item) => item.id === id);
   list.items = list.items.filter((item) => item.id !== id);
   renderItems();
 
@@ -914,6 +1235,10 @@ async function removeItem(id) {
   }
 
   showMessage("Položka smazána.");
+  if (removedItem) {
+    recordHistory(`Smazána položka ${removedItem.name}.`, "item", list);
+    renderHistory();
+  }
   await saveState();
 }
 
@@ -968,12 +1293,56 @@ function renderProductOptions() {
     });
 }
 
+function recordHistory(text, type = "info", list = getActiveList()) {
+  history.unshift({
+    id: createId(),
+    text,
+    type,
+    listName: list ? getDisplayListName(list) : "",
+    createdAt: new Date().toISOString()
+  });
+  history = history.slice(0, HISTORY_LIMIT);
+}
+
+function renderHistory() {
+  historyList.replaceChildren();
+  toggleHistoryButton.textContent = history.length ? `Historie (${history.length})` : "Historie";
+
+  if (!history.length) {
+    const empty = document.createElement("p");
+    empty.className = "message";
+    empty.textContent = "Historie je zatím prázdná.";
+    historyList.append(empty);
+    return;
+  }
+
+  history.slice(0, 40).forEach((entry) => {
+    const row = document.createElement("article");
+    const text = document.createElement("strong");
+    const time = document.createElement("time");
+    const date = new Date(entry.createdAt);
+
+    row.className = "history-entry";
+    text.textContent = entry.text;
+    time.dateTime = entry.createdAt;
+    time.textContent = Number.isNaN(date.getTime())
+      ? ""
+      : date.toLocaleString("cs-CZ", {
+        dateStyle: "short",
+        timeStyle: "short"
+      });
+
+    row.append(text, time);
+    historyList.append(row);
+  });
+}
+
 function resetForm() {
   editingId = null;
   form.reset();
   setActionState("add");
   setActionButtonsDisabled(false);
-  submitButton.textContent = "Přidat";
+  updateSubmitButtonText();
   cancelEditButton.hidden = true;
   productInput.focus();
 }
@@ -991,6 +1360,8 @@ function setActionState(action) {
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-pressed", String(isActive));
   });
+
+  updateSubmitButtonText();
 }
 
 function setActionButtonsDisabled(disabled) {
@@ -999,13 +1370,28 @@ function setActionButtonsDisabled(disabled) {
   });
 }
 
+function updateSubmitButtonText() {
+  if (editingId) {
+    submitButton.textContent = "Uložit";
+    return;
+  }
+
+  const labels = {
+    add: "Přidat",
+    subtract: "Odebrat",
+    set: "Nastavit"
+  };
+
+  submitButton.textContent = labels[actionSelect.value] || "Přidat";
+}
+
 function stepAmount(direction) {
   const min = Number(amountInput.min) || 1;
   const currentValue = Number(amountInput.value);
   const current = Number.isFinite(currentValue) && currentValue >= min
     ? currentValue
     : min;
-  const next = Math.max(min, Math.trunc(current) + direction);
+  const next = Math.max(min, roundAmount(current + direction));
 
   amountInput.value = String(next);
   amountInput.dispatchEvent(new Event("input", { bubbles: true }));
