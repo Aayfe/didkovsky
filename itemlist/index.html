@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=homebase2">
+    <link rel="stylesheet" href="styles.css?v=ux4">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -24,6 +24,11 @@
           <p class="eyebrow">Domácí zásoby</p>
           <strong id="current-view-label">Lednice</strong>
         </div>
+        <label class="theme-switch" title="Tmavé zobrazení">
+          <input id="dark-mode-toggle" type="checkbox">
+          <span aria-hidden="true"></span>
+          <strong>Tmavý režim</strong>
+        </label>
       </header>
 
       <aside class="menu-panel" id="menu-panel" hidden>
@@ -136,8 +141,24 @@
             <input id="shopping-subtract-stock" type="checkbox">
             <span>Odečítat od nákupního listu to, co už je v lednici</span>
           </label>
-          <form class="compact-form" id="shopping-form" autocomplete="off">
-            <input id="shopping-input" type="text" placeholder="Např. máslo 1 ks">
+          <form class="shopping-form" id="shopping-form" autocomplete="off">
+            <label class="field">
+              <span>Potravina</span>
+              <input id="shopping-product" type="text" list="product-options" placeholder="Např. máslo">
+            </label>
+            <label class="field">
+              <span>Množství</span>
+              <input id="shopping-amount" type="number" min="0.01" step="any" inputmode="decimal" placeholder="1">
+            </label>
+            <label class="field">
+              <span>Jednotka</span>
+              <select id="shopping-unit">
+                <option value="g">g</option>
+                <option value="ml">ml</option>
+                <option value="ks">ks</option>
+                <option value="Kč">Kč</option>
+              </select>
+            </label>
             <button class="primary-button" type="submit">Přidat</button>
           </form>
           <div class="card-list" id="shopping-list"></div>
@@ -211,10 +232,8 @@
               <span>Název kombinace</span>
               <input id="combo-name" type="text" placeholder="Rohlík se šunkou">
             </label>
-            <label class="field">
-              <span>Položky v kombinaci</span>
-              <textarea id="combo-items" rows="5" placeholder="Rohlík 1 ks&#10;Šunka 30 g"></textarea>
-            </label>
+            <div class="combo-items-builder" id="combo-items-list" aria-label="Položky v kombinaci"></div>
+            <button class="ghost-button combo-add-button" id="add-combo-item" type="button">Přidat další položku</button>
             <button class="primary-button" type="submit">Uložit kombinaci</button>
           </form>
           <div class="combo-runner">
@@ -271,10 +290,6 @@
             </div>
           </div>
           <div class="settings-grid">
-            <label class="admin-checkbox">
-              <input id="dark-mode-toggle" type="checkbox">
-              <span>Tmavé zobrazení</span>
-            </label>
             <label class="admin-checkbox">
               <input id="settings-shopping-subtract-stock" type="checkbox">
               <span>Nákupní list odečítá aktuální zásoby</span>
@@ -354,6 +369,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=homebase2"></script>
+    <script src="app.js?v=ux4"></script>
   </body>
 </html>

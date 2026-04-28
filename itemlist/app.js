@@ -71,12 +71,15 @@ const catalogName = document.querySelector("#catalog-name");
 const catalogCategory = document.querySelector("#catalog-category");
 const catalogUnit = document.querySelector("#catalog-unit");
 const shoppingForm = document.querySelector("#shopping-form");
-const shoppingInput = document.querySelector("#shopping-input");
+const shoppingProduct = document.querySelector("#shopping-product");
+const shoppingAmount = document.querySelector("#shopping-amount");
+const shoppingUnit = document.querySelector("#shopping-unit");
 const shoppingList = document.querySelector("#shopping-list");
 const shoppingSubtractStock = document.querySelector("#shopping-subtract-stock");
 const comboForm = document.querySelector("#combo-form");
 const comboName = document.querySelector("#combo-name");
-const comboItems = document.querySelector("#combo-items");
+const comboItemsList = document.querySelector("#combo-items-list");
+const addComboItemButton = document.querySelector("#add-combo-item");
 const comboSelect = document.querySelector("#combo-select");
 const useComboButton = document.querySelector("#use-combo-button");
 const comboList = document.querySelector("#combo-list");
@@ -169,8 +172,14 @@ function setupEvents() {
   settingsShoppingSubtractStock.addEventListener("change", updateShoppingSubtractSetting);
   catalogForm.addEventListener("submit", saveCatalogItem);
   shoppingForm.addEventListener("submit", addShoppingItem);
+  shoppingProduct.addEventListener("input", syncShoppingUnitFromProduct);
+  shoppingProduct.addEventListener("change", syncShoppingUnitFromProduct);
   shoppingList.addEventListener("click", handleShoppingClick);
   comboForm.addEventListener("submit", saveCombo);
+  addComboItemButton.addEventListener("click", () => addComboItemRow());
+  comboItemsList.addEventListener("click", handleComboBuilderClick);
+  comboItemsList.addEventListener("input", handleComboBuilderInput);
+  comboItemsList.addEventListener("change", handleComboBuilderInput);
   useComboButton.addEventListener("click", useSelectedCombo);
   comboList.addEventListener("click", handleComboClick);
 
@@ -1146,6 +1155,7 @@ function setState(state) {
   appSettings = {
     subtractStockFromShopping: Boolean(state.appSettings?.subtractStockFromShopping)
   };
+  ensureComboBuilderRows();
 }
 
 function createDefaultState() {
@@ -1683,11 +1693,21 @@ async function removeItem(id) {
 
 async function addShoppingItem(event) {
   event.preventDefault();
-  const name = tidyName(shoppingInput.value);
+  const product = tidyName(shoppingProduct.value);
+  const amount = Number(shoppingAmount.value);
+  const unit = shoppingUnit.value;
 
-  if (!name) {
+  if (!product) {
+    shoppingProduct.focus();
     return;
   }
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    shoppingAmount.focus();
+    return;
+  }
+
+  const name = `${product} ${formatAmount(amount)} ${unit}`;
 
   shoppingItems.unshift({
     id: createId(),
@@ -1695,11 +1715,20 @@ async function addShoppingItem(event) {
     done: false,
     createdAt: new Date().toISOString()
   });
-  shoppingInput.value = "";
+  shoppingForm.reset();
+  shoppingUnit.value = unit;
   recordHistory(`Do nákupního listu přidáno: ${name}.`, "shopping");
   renderShoppingList();
   renderHistory();
   await saveState();
+}
+
+function syncShoppingUnitFromProduct() {
+  const item = findCatalogItemByName(shoppingProduct.value) || findItemByName(shoppingProduct.value);
+
+  if (item) {
+    shoppingUnit.value = item.unit;
+  }
 }
 
 async function updateShoppingSubtractSetting(event) {
@@ -1831,9 +1860,9 @@ function getShoppingItemMeta(item) {
 async function saveCombo(event) {
   event.preventDefault();
   const name = tidyName(comboName.value);
-  const parsed = parseImportedItems(comboItems.value);
+  const items = getComboBuilderItems();
 
-  if (!name || !parsed.items.length) {
+  if (!name || !items.length) {
     showMessage("Vyplň název kombinace a aspoň jednu položku.", true);
     return;
   }
@@ -1841,21 +1870,132 @@ async function saveCombo(event) {
   const existing = combos.find((combo) => normalize(combo.name) === normalize(name));
 
   if (existing) {
-    existing.items = parsed.items;
+    existing.items = items;
   } else {
     combos.unshift({
       id: createId(),
       name,
-      items: parsed.items
+      items
     });
   }
 
   comboForm.reset();
+  resetComboBuilderRows();
   recordHistory(`Uložena kombinace ${name}.`, "combo");
   renderCombos();
   renderCatalog();
   renderHistory();
   await saveState();
+}
+
+function ensureComboBuilderRows() {
+  if (!comboItemsList || comboItemsList.children.length) {
+    return;
+  }
+
+  addComboItemRow();
+  addComboItemRow();
+}
+
+function resetComboBuilderRows() {
+  comboItemsList.replaceChildren();
+  addComboItemRow();
+  addComboItemRow();
+}
+
+function addComboItemRow(item = {}) {
+  const row = document.createElement("div");
+  row.className = "combo-item-row";
+  row.innerHTML = `
+    <label class="field">
+      <span>Potravina</span>
+      <input class="combo-product" type="text" list="product-options" placeholder="Rohlík">
+    </label>
+    <label class="field">
+      <span>Množství</span>
+      <input class="combo-amount" type="number" min="0.01" step="any" inputmode="decimal" placeholder="1">
+    </label>
+    <label class="field">
+      <span>Jednotka</span>
+      <select class="combo-unit">
+        <option value="g">g</option>
+        <option value="ml">ml</option>
+        <option value="ks">ks</option>
+        <option value="Kč">Kč</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>Kategorie</span>
+      <input class="combo-category" type="text" list="category-options" placeholder="Ostatní">
+    </label>
+    <button class="ghost-button combo-remove-button" type="button" data-combo-builder-action="remove">Odebrat</button>
+  `;
+
+  row.querySelector(".combo-product").value = item.name || "";
+  row.querySelector(".combo-amount").value = item.amount ? String(item.amount) : "";
+  row.querySelector(".combo-unit").value = item.unit || "ks";
+  row.querySelector(".combo-category").value = item.category || "";
+  comboItemsList.append(row);
+  updateComboRemoveButtons();
+}
+
+function handleComboBuilderClick(event) {
+  const button = event.target.closest("[data-combo-builder-action='remove']");
+
+  if (!button) {
+    return;
+  }
+
+  button.closest(".combo-item-row")?.remove();
+  updateComboRemoveButtons();
+}
+
+function handleComboBuilderInput(event) {
+  const input = event.target.closest(".combo-product");
+
+  if (!input) {
+    return;
+  }
+
+  const row = input.closest(".combo-item-row");
+  const item = findCatalogItemByName(input.value) || findItemByName(input.value);
+
+  if (!row || !item) {
+    return;
+  }
+
+  row.querySelector(".combo-unit").value = item.unit;
+  row.querySelector(".combo-category").value = item.category || "Ostatní";
+}
+
+function updateComboRemoveButtons() {
+  const rows = comboItemsList.querySelectorAll(".combo-item-row");
+
+  rows.forEach((row) => {
+    row.querySelector(".combo-remove-button").disabled = rows.length <= 1;
+  });
+}
+
+function getComboBuilderItems() {
+  return [...comboItemsList.querySelectorAll(".combo-item-row")]
+    .map((row) => {
+      const name = tidyName(row.querySelector(".combo-product").value);
+      const amount = Number(row.querySelector(".combo-amount").value);
+      const unit = row.querySelector(".combo-unit").value;
+      const category = tidyName(row.querySelector(".combo-category").value) || "Ostatní";
+
+      if (!name || !Number.isFinite(amount) || amount <= 0) {
+        return null;
+      }
+
+      return {
+        name,
+        amount: roundAmount(amount),
+        unit,
+        category
+      };
+    })
+    .filter(Boolean);
 }
 
 async function useSelectedCombo() {
@@ -1931,6 +2071,7 @@ function renderCombos() {
   combos.forEach((combo) => {
     const option = document.createElement("option");
     const row = document.createElement("article");
+    const content = document.createElement("div");
     const text = document.createElement("strong");
     const meta = document.createElement("span");
     const remove = document.createElement("button");
@@ -1940,6 +2081,7 @@ function renderCombos() {
     comboSelect.append(option);
 
     row.className = "card-row";
+    content.className = "row-content";
     text.textContent = combo.name;
     meta.className = "muted-text";
     meta.textContent = combo.items.map((item) => `${item.name} ${formatAmount(item.amount)} ${item.unit}`).join(", ");
@@ -1949,7 +2091,8 @@ function renderCombos() {
     remove.dataset.id = combo.id;
     remove.textContent = "Smazat";
 
-    row.append(text, meta, remove);
+    content.append(text, meta);
+    row.append(content, remove);
     comboList.append(row);
   });
 }
