@@ -88,6 +88,19 @@ const SUPABASE_TABLE = "shopping_app_state";
 const ALLOWED_USERS_TABLE = "allowed_users";
 const HISTORY_LIMIT = 120;
 const IMPORT_UNITS = ["g", "ml", "ks", "Kč", "kč"];
+const DEFAULT_CATEGORIES = [
+  "Pečivo",
+  "Mléčné",
+  "Maso",
+  "Ovoce a zelenina",
+  "Nápoje",
+  "Sladké",
+  "Mražené",
+  "Trvanlivé",
+  "Drogerie",
+  "Kombinace",
+  "Ostatní"
+];
 
 let lists = [];
 let activeListId = null;
@@ -180,6 +193,13 @@ function setupEvents() {
     if (!Number.isFinite(amount) || amount <= 0) {
       showMessage("Počet musí být číslo větší než nula.", true);
       amountInput.focus();
+      return;
+    }
+
+    const combo = findComboByName(name);
+
+    if (combo && !editingId) {
+      await applyComboChange(combo, amount, action);
       return;
     }
 
@@ -1461,6 +1481,43 @@ async function applyItemChange({ name, amount, unit, action, category }) {
   await saveState();
 }
 
+async function applyComboChange(combo, multiplier, action) {
+  if (action === "set") {
+    showMessage("Kombinaci nejde nastavit na pevný počet. Použij nákup, snězeno nebo korekci.", true);
+    return;
+  }
+
+  let changed = 0;
+  let missing = 0;
+
+  combo.items.forEach((item) => {
+    const result = upsertItemAmount({
+      ...item,
+      amount: roundAmount(item.amount * multiplier),
+      action
+    });
+
+    if (result === "missing") {
+      missing += 1;
+    } else {
+      changed += 1;
+    }
+  });
+
+  if (!changed) {
+    showMessage("Žádná položka z kombinace v zásobách není.", true);
+    return;
+  }
+
+  const suffix = missing ? `, ${missing} položek chybělo` : "";
+  recordHistory(`Kombinace ${combo.name}: provedena akce ${getActionLabel(action)} ${formatAmount(multiplier)}x${suffix}.`, "combo");
+  renderHistory();
+  renderItems();
+  resetForm();
+  showMessage(`Kombinace ${combo.name} zapsána.`);
+  await saveState();
+}
+
 function upsertItemAmount({ name, amount, unit, action, category = "Ostatní" }) {
   const list = getActiveList();
   const items = list.items;
@@ -1534,6 +1591,22 @@ function getItemHistoryText(name, amount, unit, action, result) {
   }
 
   return `${labels[action] || "Přidáno"}: ${name} +${formatAmount(amount)} ${unit}.`;
+}
+
+function getActionLabel(action) {
+  const labels = {
+    purchase: "Nákup",
+    gift: "Dar",
+    eaten: "Snězeno",
+    discarded: "Vyhozeno",
+    adjustPlus: "Korekce +",
+    adjustMinus: "Korekce -",
+    add: "Přidat",
+    subtract: "Odebrat",
+    set: "Nastavit"
+  };
+
+  return labels[action] || "Akce";
 }
 
 async function updateEditedItem(name, amount, unit) {
@@ -1798,7 +1871,7 @@ async function useSelectedCombo() {
   combo.items.forEach((item) => {
     const result = upsertItemAmount({
       ...item,
-      action: "eaten"
+      action: "purchase"
     });
 
     if (result !== "missing") {
@@ -1806,11 +1879,11 @@ async function useSelectedCombo() {
     }
   });
 
-  recordHistory(`Použita kombinace ${combo.name}, odečteno ${changed} položek.`, "combo");
+  recordHistory(`Použita kombinace ${combo.name}, přidáno ${changed} položek do zásob.`, "combo");
   renderItems();
   renderCombos();
   renderHistory();
-  showMessage(`Kombinace ${combo.name} použita.`);
+  showMessage(`Kombinace ${combo.name} přidána do lednice.`);
   await saveState();
 }
 
@@ -1841,6 +1914,7 @@ async function handleComboClick(event) {
 function renderCombos() {
   comboList.replaceChildren();
   comboSelect.replaceChildren();
+  renderProductOptions();
 
   if (!combos.length) {
     const option = document.createElement("option");
@@ -1928,15 +2002,26 @@ function renderItems() {
 
 function renderProductOptions() {
   productOptions.innerHTML = "";
+  const options = [
+    ...getCatalogItems().map((item) => ({
+      value: item.name,
+      label: `${item.category || "Ostatní"} | ${item.unit}`,
+      text: item.unit
+    })),
+    ...combos.map((combo) => ({
+      value: combo.name,
+      label: "Kombinace",
+      text: combo.items.map((item) => item.name).join(", ")
+    }))
+  ];
 
-  getCatalogItems()
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name, "cs"))
+  options
+    .sort((a, b) => a.value.localeCompare(b.value, "cs"))
     .forEach((item) => {
       const option = document.createElement("option");
-      option.value = item.name;
-      option.label = item.unit;
-      option.textContent = item.unit;
+      option.value = item.value;
+      option.label = item.label;
+      option.textContent = item.text;
       productOptions.append(option);
     });
 }
@@ -1946,7 +2031,12 @@ function renderCategoryOptions() {
     return;
   }
 
-  const categories = [...new Set(getCatalogItems().map((item) => item.category || "Ostatní"))].sort((a, b) => a.localeCompare(b, "cs"));
+  const categories = [
+    ...new Set([
+      ...DEFAULT_CATEGORIES,
+      ...getCatalogItems().map((item) => item.category || "Ostatní")
+    ])
+  ].sort((a, b) => a.localeCompare(b, "cs"));
   categoryOptions.replaceChildren();
 
   categories.forEach((category) => {
@@ -2360,6 +2450,13 @@ function stepAmount(direction) {
 }
 
 function syncUnitFromProduct() {
+  const combo = findComboByName(productInput.value);
+
+  if (combo) {
+    unitSelect.value = "ks";
+    return;
+  }
+
   const item = findCatalogItemByName(productInput.value) || findItemByName(productInput.value);
 
   if (item) {
@@ -2368,11 +2465,28 @@ function syncUnitFromProduct() {
 }
 
 function syncCategoryFromProduct() {
+  const combo = findComboByName(productInput.value);
+
+  if (combo) {
+    categoryInput.value = "Kombinace";
+    return;
+  }
+
   const item = findCatalogItemByName(productInput.value) || findItemByName(productInput.value);
 
   if (item) {
     categoryInput.value = item.category || "Ostatní";
   }
+}
+
+function findComboByName(name) {
+  const normalizedName = normalize(name);
+
+  if (!normalizedName) {
+    return null;
+  }
+
+  return combos.find((combo) => normalize(combo.name) === normalizedName) || null;
 }
 
 function findCatalogItemByName(name) {
