@@ -5,9 +5,19 @@ const authMessage = document.querySelector("#auth-message");
 const googleLoginButton = document.querySelector("#google-login-button");
 const userEmail = document.querySelector("#user-email");
 const logoutButton = document.querySelector("#logout-button");
+const menuButton = document.querySelector("#menu-button");
+const menuPanel = document.querySelector("#menu-panel");
+const currentViewLabel = document.querySelector("#current-view-label");
+const menuLinks = document.querySelectorAll("[data-view]");
+const viewPanels = document.querySelectorAll("[data-view-panel]");
 const importButton = document.querySelector("#import-button");
 const exportButton = document.querySelector("#export-button");
-const toggleHistoryButton = document.querySelector("#toggle-history-button");
+const exportFridgeButton = document.querySelector("#export-fridge-button");
+const exportCatalogButton = document.querySelector("#export-catalog-button");
+const anonymousExportButton = document.querySelector("#anonymous-export-button");
+const receiptImportButton = document.querySelector("#receipt-import-button");
+const eanImportButton = document.querySelector("#ean-import-button");
+const xmlImportButton = document.querySelector("#xml-import-button");
 const toggleAdminPanelButton = document.querySelector("#toggle-admin-panel");
 const adminPanel = document.querySelector("#admin-panel");
 const adminForm = document.querySelector("#admin-form");
@@ -20,6 +30,8 @@ const listNameInput = document.querySelector("#list-name-input");
 const pageTitle = document.querySelector("#page-title");
 const productInput = document.querySelector("#product-input");
 const productOptions = document.querySelector("#product-options");
+const categoryInput = document.querySelector("#category-input");
+const categoryOptions = document.querySelector("#category-options");
 const actionSelect = document.querySelector("#action-select");
 const actionButtons = document.querySelectorAll("[data-action-choice]");
 const amountInput = document.querySelector("#amount-input");
@@ -43,18 +55,32 @@ const cancelImport = document.querySelector("#cancel-import");
 const confirmImport = document.querySelector("#confirm-import");
 const itemsBody = document.querySelector("#items-body");
 const tableWrap = document.querySelector(".table-wrap");
-const historyPanel = document.querySelector("#history-panel");
 const historyList = document.querySelector("#history-list");
+const historyDateFilter = document.querySelector("#history-date-filter");
+const catalogBody = document.querySelector("#catalog-body");
+const shoppingForm = document.querySelector("#shopping-form");
+const shoppingInput = document.querySelector("#shopping-input");
+const shoppingList = document.querySelector("#shopping-list");
+const comboForm = document.querySelector("#combo-form");
+const comboName = document.querySelector("#combo-name");
+const comboItems = document.querySelector("#combo-items");
+const comboSelect = document.querySelector("#combo-select");
+const useComboButton = document.querySelector("#use-combo-button");
+const comboList = document.querySelector("#combo-list");
+const darkModeToggle = document.querySelector("#dark-mode-toggle");
 const message = document.querySelector("#message");
 
 const SUPABASE_TABLE = "shopping_app_state";
 const ALLOWED_USERS_TABLE = "allowed_users";
 const HISTORY_LIMIT = 120;
-const IMPORT_UNITS = ["kusů", "ks", "kg", "gramů", "g", "l", "ml", "balení", "plechovek"];
+const IMPORT_UNITS = ["g", "ml", "ks", "Kč", "kč"];
 
 let lists = [];
 let activeListId = null;
 let history = [];
+let shoppingItems = [];
+let combos = [];
+let activeView = "pantry";
 let editingId = null;
 let supabaseClient = null;
 let saveTimer = null;
@@ -86,18 +112,37 @@ initializeApp();
 function setupEvents() {
   googleLoginButton.addEventListener("click", signInWithGoogle);
   logoutButton.addEventListener("click", signOut);
-  importButton.addEventListener("click", openImportModal);
+  menuButton.addEventListener("click", toggleMenu);
+  menuLinks.forEach((button) => {
+    button.addEventListener("click", () => {
+      switchView(button.dataset.view);
+    });
+  });
+  importButton.addEventListener("click", () => openImportModal());
   exportButton.addEventListener("click", exportData);
-  toggleHistoryButton.addEventListener("click", toggleHistoryPanel);
+  exportFridgeButton.addEventListener("click", exportFridge);
+  exportCatalogButton.addEventListener("click", exportCatalog);
+  anonymousExportButton.addEventListener("click", exportAnonymousData);
+  receiptImportButton.addEventListener("click", openReceiptImport);
+  eanImportButton.addEventListener("click", openEanImport);
+  xmlImportButton.addEventListener("click", openXmlImport);
   toggleAdminPanelButton.addEventListener("click", toggleAdminPanel);
   adminForm.addEventListener("submit", saveAllowedUser);
   allowedUsersList.addEventListener("click", handleAllowedUsersClick);
+  historyDateFilter.addEventListener("input", renderHistory);
+  darkModeToggle.addEventListener("change", toggleDarkMode);
+  shoppingForm.addEventListener("submit", addShoppingItem);
+  shoppingList.addEventListener("click", handleShoppingClick);
+  comboForm.addEventListener("submit", saveCombo);
+  useComboButton.addEventListener("click", useSelectedCombo);
+  comboList.addEventListener("click", handleComboClick);
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const name = tidyName(productInput.value);
     const amount = Number(amountInput.value);
+    const category = tidyName(categoryInput.value) || "Ostatní";
     const existingProduct = findItemByName(name);
     const action = actionSelect.value;
     const unit = existingProduct && action !== "set" ? existingProduct.unit : unitSelect.value;
@@ -121,7 +166,7 @@ function setupEvents() {
       return;
     }
 
-    await applyItemChange({ name, amount, unit, action });
+    await applyItemChange({ name, amount, unit, action, category });
   });
 
   amountInput.addEventListener("input", () => {
@@ -132,6 +177,8 @@ function setupEvents() {
 
   productInput.addEventListener("input", syncUnitFromProduct);
   productInput.addEventListener("change", syncUnitFromProduct);
+  productInput.addEventListener("input", syncCategoryFromProduct);
+  productInput.addEventListener("change", syncCategoryFromProduct);
   addListButton.addEventListener("click", addList);
 
   listTabs.addEventListener("click", (event) => {
@@ -178,6 +225,9 @@ function setupEvents() {
     button.addEventListener("click", () => {
       setActionState(button.dataset.actionChoice);
     });
+  });
+  actionSelect.addEventListener("change", () => {
+    setActionState(actionSelect.value);
   });
 
   amountStepButtons.forEach((button) => {
@@ -239,6 +289,11 @@ async function initializeApp() {
   renderLists();
   renderItems();
   renderHistory();
+  renderCatalog();
+  renderShoppingList();
+  renderCombos();
+  applyTheme();
+  switchView(activeView, { keepMenu: true });
   setActionState(actionSelect.value);
   showSignedOut("Kontroluji přihlášení...");
 
@@ -354,6 +409,8 @@ function showApp() {
   if (!currentAccess?.is_admin) {
     adminPanel.hidden = true;
   }
+
+  switchView(activeView, { keepMenu: true });
 }
 
 function showAuthMessage(text, isError = false) {
@@ -376,6 +433,9 @@ async function handleSession(session) {
     renderLists();
     renderItems();
     renderHistory();
+    renderCatalog();
+    renderShoppingList();
+    renderCombos();
     showSignedOut("Přihlas se Google účtem.");
     return;
   }
@@ -397,6 +457,9 @@ async function handleSession(session) {
   renderLists();
   renderItems();
   renderHistory();
+  renderCatalog();
+  renderShoppingList();
+  renderCombos();
   showMessage("Data načtená.");
 
   if (currentAccess.is_admin) {
@@ -461,6 +524,43 @@ async function saveState() {
   }
 }
 
+function toggleMenu() {
+  const nextHidden = !menuPanel.hidden;
+  menuPanel.hidden = nextHidden;
+  menuButton.setAttribute("aria-expanded", String(!nextHidden));
+}
+
+function switchView(view, options = {}) {
+  activeView = view || "pantry";
+
+  viewPanels.forEach((panel) => {
+    const isActive = panel.dataset.viewPanel === activeView;
+    panel.hidden = !isActive;
+    panel.classList.toggle("is-active", isActive);
+  });
+
+  menuLinks.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.view === activeView);
+  });
+
+  const labels = {
+    pantry: "Lednice",
+    shopping: "Nákupní list",
+    history: "Změny",
+    catalog: "Číselník",
+    combos: "Kombinace",
+    tools: "Import / export",
+    settings: "Nastavení"
+  };
+
+  currentViewLabel.textContent = labels[activeView] || "Lednice";
+
+  if (!options.keepMenu) {
+    menuPanel.hidden = true;
+    menuButton.setAttribute("aria-expanded", "false");
+  }
+}
+
 function exportData() {
   const exportedState = {
     exportedAt: new Date().toISOString(),
@@ -485,14 +585,100 @@ function exportData() {
   showMessage("Export připraven.");
 }
 
-function toggleHistoryPanel() {
-  historyPanel.hidden = !historyPanel.hidden;
+function exportFridge() {
+  downloadJson("lednice", getActiveItems());
+  recordHistory("Export lednice.", "export");
   renderHistory();
+  queueSaveState();
 }
 
-function openImportModal() {
+function exportCatalog() {
+  downloadJson("ciselnik-potravin", getCatalogItems());
+  recordHistory("Export číselníku potravin.", "export");
+  renderHistory();
+  queueSaveState();
+}
+
+function exportAnonymousData() {
+  const anonymized = {
+    exportedAt: new Date().toISOString(),
+    user: "anonymous",
+    lists: lists.map((list) => {
+      return {
+        ...list,
+        id: anonymizeValue(list.id),
+        items: list.items.map((item) => ({
+          ...item,
+          id: anonymizeValue(item.id)
+        }))
+      };
+    }),
+    shoppingItems: shoppingItems.map((item) => ({
+      ...item,
+      id: anonymizeValue(item.id)
+    })),
+    combos: combos.map((combo) => ({
+      ...combo,
+      id: anonymizeValue(combo.id)
+    })),
+    history: history.map((entry) => ({
+      ...entry,
+      id: anonymizeValue(entry.id)
+    }))
+  };
+
+  downloadJson("itemlist-anonymizovano", anonymized);
+  recordHistory("Anonymizovaný export dat.", "export");
+  renderHistory();
+  queueSaveState();
+}
+
+function downloadJson(name, data) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: "application/json"
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = `${name}-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function anonymizeValue(value) {
+  let hash = 0;
+  const text = String(value || "");
+
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash << 5) - hash) + text.charCodeAt(index);
+    hash |= 0;
+  }
+
+  return `anon-${Math.abs(hash).toString(16)}`;
+}
+
+function openReceiptImport() {
+  openImportModal("Vlož text z účtenky", "Rohlík 4 ks\nŠunka 100 g\nJogurt 2 ks");
+  importError.textContent = "OCR z fotky je připravené jako další krok. Teď sem vlož přečtené položky z účtenky.";
+}
+
+function openEanImport() {
+  openImportModal("Import EAN", "EAN 8594000000000\nMléko 1000 ml");
+  importError.textContent = "EAN sken potřebuje databázi potravin nebo API. Teď umím uložit ručně doplněnou položku.";
+}
+
+function openXmlImport() {
+  openImportModal("Import XML", "<items>\n  <item name=\"Mléko\" amount=\"1000\" unit=\"ml\" category=\"Mléčné\" />\n</items>");
+}
+
+function openImportModal(title = "Import", placeholder = "Rohlík 4 ks\nŠunka 100 g\nMléko 1000 ml") {
   importModal.hidden = false;
+  importModal.querySelector("#import-title").textContent = title;
   importText.value = "";
+  importText.placeholder = placeholder;
   importError.textContent = "";
   importText.focus();
 }
@@ -505,7 +691,9 @@ function closeImportModal() {
 }
 
 async function importShoppingList() {
-  const parsedItems = parseImportedItems(importText.value);
+  const parsedItems = importText.value.trim().startsWith("<")
+    ? parseXmlItems(importText.value)
+    : parseImportedItems(importText.value);
 
   if (!parsedItems.items.length) {
     importError.textContent = "Nenašel jsem žádnou použitelnou položku.";
@@ -522,7 +710,8 @@ async function importShoppingList() {
       name: importedItem.name,
       amount: importedItem.amount,
       unit: importedItem.unit,
-      action: "add"
+      action: "purchase",
+      category: importedItem.category || "Ostatní"
     });
 
     if (result === "created") {
@@ -564,6 +753,32 @@ function parseImportedItems(value) {
   return { items, skipped };
 }
 
+function parseXmlItems(value) {
+  const items = [];
+  const skipped = [];
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(value, "application/xml");
+
+  if (doc.querySelector("parsererror")) {
+    return { items, skipped: [value] };
+  }
+
+  doc.querySelectorAll("item").forEach((node) => {
+    const name = tidyName(node.getAttribute("name") || node.querySelector("name")?.textContent || "");
+    const rawAmount = parseImportAmount(node.getAttribute("amount") || node.querySelector("amount")?.textContent || "1");
+    const normalized = normalizeImportAmountAndUnit(rawAmount, node.getAttribute("unit") || node.querySelector("unit")?.textContent || unitSelect.value);
+    const amount = normalized.amount;
+    const unit = normalized.unit;
+    const category = tidyName(node.getAttribute("category") || node.querySelector("category")?.textContent || "Ostatní");
+
+    if (name && amount && unit) {
+      items.push({ name, amount, unit, category });
+    }
+  });
+
+  return { items, skipped };
+}
+
 function parseImportLine(line) {
   return parseNameFirstImportLine(line) || parseAmountFirstImportLine(line);
 }
@@ -576,14 +791,16 @@ function parseNameFirstImportLine(line) {
   }
 
   const name = tidyName(match[1]);
-  const amount = parseImportAmount(match[2]);
-  const unit = normalizeImportUnit(match[3] || unitSelect.value);
+  const parsedAmount = parseImportAmount(match[2]);
+  const normalized = normalizeImportAmountAndUnit(parsedAmount, match[3] || unitSelect.value);
+  const amount = normalized.amount;
+  const unit = normalized.unit;
 
   if (!name || !amount || !unit) {
     return null;
   }
 
-  return { name, amount, unit };
+  return { name, amount, unit, category: "Ostatní" };
 }
 
 function parseAmountFirstImportLine(line) {
@@ -593,15 +810,17 @@ function parseAmountFirstImportLine(line) {
     return null;
   }
 
-  const amount = parseImportAmount(match[1]);
-  const unit = normalizeImportUnit(match[2] || unitSelect.value);
+  const parsedAmount = parseImportAmount(match[1]);
+  const normalized = normalizeImportAmountAndUnit(parsedAmount, match[2] || unitSelect.value);
+  const amount = normalized.amount;
+  const unit = normalized.unit;
   const name = tidyName(match[3]);
 
   if (!name || !amount || !unit) {
     return null;
   }
 
-  return { name, amount, unit };
+  return { name, amount, unit, category: "Ostatní" };
 }
 
 function parseImportAmount(value) {
@@ -609,28 +828,53 @@ function parseImportAmount(value) {
   return Number.isFinite(amount) && amount > 0 ? roundAmount(amount) : null;
 }
 
+function normalizeImportAmountAndUnit(amount, unitValue) {
+  const normalized = normalize(String(unitValue || ""));
+
+  if (normalized === "kg") {
+    return { amount: roundAmount(amount * 1000), unit: "g" };
+  }
+
+  if (normalized === "l") {
+    return { amount: roundAmount(amount * 1000), unit: "ml" };
+  }
+
+  return {
+    amount,
+    unit: normalizeImportUnit(unitValue)
+  };
+}
+
 function normalizeImportUnit(value) {
   const normalizedUnit = tidyName(String(value || "")).toLocaleLowerCase("cs");
   const unitMap = {
-    g: "gramů",
-    gr: "gramů",
-    gram: "gramů",
-    gramy: "gramů",
-    gramu: "gramů",
-    ks: "kusů",
-    kus: "kusů",
-    kusy: "kusů",
-    baleni: "balení",
-    plechovka: "plechovek",
-    plechovky: "plechovek"
+    gramů: "g",
+    gramu: "g",
+    gramy: "g",
+    gram: "g",
+    gr: "g",
+    g: "g",
+    kusů: "ks",
+    ks: "ks",
+    kusu: "ks",
+    kus: "ks",
+    kusy: "ks",
+    ml: "ml",
+    mililitru: "ml",
+    mililitrů: "ml",
+    kc: "Kč",
+    kč: "Kč",
+    czk: "Kč",
+    kg: "g",
+    l: "ml"
   };
   const mappedUnit = unitMap[normalize(normalizedUnit)] || normalizedUnit;
 
   if (IMPORT_UNITS.includes(mappedUnit)) {
-    return mappedUnit;
+    return mappedUnit === "kč" ? "Kč" : mappedUnit;
   }
 
-  return unitSelect.value;
+  return unitSelect.value || "ks";
 }
 
 function getImportMessage(added, updated, skipped) {
@@ -843,6 +1087,8 @@ function setState(state) {
   lists = state.lists;
   activeListId = state.activeListId;
   history = state.history || [];
+  shoppingItems = state.shoppingItems || [];
+  combos = state.combos || [];
 }
 
 function createDefaultState() {
@@ -851,7 +1097,9 @@ function createDefaultState() {
   return {
     lists: [list],
     activeListId: list.id,
-    history: []
+    history: [],
+    shoppingItems: [],
+    combos: []
   };
 }
 
@@ -859,7 +1107,9 @@ function serializeState() {
   return {
     lists,
     activeListId,
-    history
+    history,
+    shoppingItems,
+    combos
   };
 }
 
@@ -887,7 +1137,8 @@ function sanitizeState(state) {
                 id: typeof item.id === "string" ? item.id : createId(),
                 name: item.name,
                 amount: Math.max(0.01, roundAmount(Number(item.amount))),
-                unit: item.unit
+                unit: normalizeImportUnit(item.unit),
+                category: typeof item.category === "string" ? item.category : "Ostatní"
               };
             })
           : []
@@ -923,8 +1174,42 @@ function sanitizeState(state) {
   return {
     lists: sanitizedLists,
     activeListId: activeId,
-    history: sanitizedHistory
+    history: sanitizedHistory,
+    shoppingItems: sanitizeShoppingItems(state.shoppingItems),
+    combos: sanitizeCombos(state.combos)
   };
+}
+
+function sanitizeShoppingItems(items) {
+  return Array.isArray(items)
+    ? items
+      .filter((item) => item && typeof item.name === "string")
+      .map((item) => ({
+        id: typeof item.id === "string" ? item.id : createId(),
+        name: item.name,
+        done: Boolean(item.done),
+        createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString()
+      }))
+    : [];
+}
+
+function sanitizeCombos(items) {
+  return Array.isArray(items)
+    ? items
+      .filter((combo) => combo && typeof combo.name === "string" && Array.isArray(combo.items))
+      .map((combo) => ({
+        id: typeof combo.id === "string" ? combo.id : createId(),
+        name: combo.name,
+        items: combo.items
+          .filter((item) => item && typeof item.name === "string")
+          .map((item) => ({
+            name: item.name,
+            amount: Math.max(0.01, roundAmount(Number(item.amount) || 1)),
+            unit: normalizeImportUnit(item.unit || "ks"),
+            category: typeof item.category === "string" ? item.category : "Ostatní"
+          }))
+      }))
+    : [];
 }
 
 function createList(name) {
@@ -1074,10 +1359,10 @@ async function confirmDeleteAllLists() {
   await saveState();
 }
 
-async function applyItemChange({ name, amount, unit, action }) {
+async function applyItemChange({ name, amount, unit, action, category }) {
   const existingItem = findItemByName(name);
   const matchedDifferentName = existingItem && normalize(existingItem.name) !== normalize(name);
-  const result = upsertItemAmount({ name, amount, unit, action });
+  const result = upsertItemAmount({ name, amount, unit, action, category });
   const itemName = existingItem ? existingItem.name : name;
 
   if (result === "missing") {
@@ -1114,13 +1399,16 @@ async function applyItemChange({ name, amount, unit, action }) {
   await saveState();
 }
 
-function upsertItemAmount({ name, amount, unit, action }) {
+function upsertItemAmount({ name, amount, unit, action, category = "Ostatní" }) {
   const list = getActiveList();
   const items = list.items;
   const existingItem = findItemByName(name);
 
+  const negativeActions = ["eaten", "discarded", "adjustMinus", "subtract"];
+  const positiveActions = ["purchase", "gift", "adjustPlus", "add"];
+
   if (!existingItem) {
-    if (action === "subtract") {
+    if (negativeActions.includes(action)) {
       return "missing";
     }
 
@@ -1128,7 +1416,8 @@ function upsertItemAmount({ name, amount, unit, action }) {
       id: createId(),
       name,
       amount,
-      unit
+      unit,
+      category
     });
     return "created";
   }
@@ -1136,10 +1425,11 @@ function upsertItemAmount({ name, amount, unit, action }) {
   if (action === "set") {
     existingItem.amount = roundAmount(amount);
     existingItem.unit = unit;
+    existingItem.category = category || existingItem.category || "Ostatní";
     return "set";
   }
 
-  const nextAmount = action === "add"
+  const nextAmount = positiveActions.includes(action)
     ? existingItem.amount + amount
     : existingItem.amount - amount;
 
@@ -1149,27 +1439,39 @@ function upsertItemAmount({ name, amount, unit, action }) {
   }
 
   existingItem.amount = roundAmount(nextAmount);
+  existingItem.category = category || existingItem.category || "Ostatní";
   return "updated";
 }
 
 function getItemHistoryText(name, amount, unit, action, result) {
+  const labels = {
+    purchase: "Nákup",
+    gift: "Dar",
+    eaten: "Snězeno",
+    discarded: "Vyhozeno",
+    adjustPlus: "Korekce +",
+    adjustMinus: "Korekce -",
+    add: "Přidáno",
+    subtract: "Odebráno"
+  };
+
   if (result === "removed") {
-    return `Odebrána položka ${name}.`;
+    return `${labels[action] || "Odebráno"}: ${name} do nuly.`;
   }
 
   if (result === "set") {
     return `Nastaveno ${name}: ${formatAmount(amount)} ${unit}.`;
   }
 
-  if (action === "subtract") {
-    return `Sníženo ${name} o ${formatAmount(amount)} ${unit}.`;
+  if (["eaten", "discarded", "adjustMinus", "subtract"].includes(action)) {
+    return `${labels[action]}: ${name} -${formatAmount(amount)} ${unit}.`;
   }
 
   if (result === "created") {
-    return `Přidána položka ${name}: ${formatAmount(amount)} ${unit}.`;
+    return `${labels[action] || "Přidáno"}: ${name} ${formatAmount(amount)} ${unit}.`;
   }
 
-  return `Navýšeno ${name} o ${formatAmount(amount)} ${unit}.`;
+  return `${labels[action] || "Přidáno"}: ${name} +${formatAmount(amount)} ${unit}.`;
 }
 
 async function updateEditedItem(name, amount, unit) {
@@ -1195,6 +1497,7 @@ async function updateEditedItem(name, amount, unit) {
     editedItem.name = name;
     editedItem.amount = roundAmount(amount);
     editedItem.unit = unit;
+    editedItem.category = tidyName(categoryInput.value) || editedItem.category || "Ostatní";
   }
 
   renderItems();
@@ -1216,7 +1519,8 @@ function startEdit(id) {
   productInput.value = item.name;
   amountInput.value = String(item.amount);
   unitSelect.value = item.unit;
-  setActionState("add");
+  categoryInput.value = item.category || "Ostatní";
+  setActionState("set");
   setActionButtonsDisabled(true);
   submitButton.textContent = "Uložit";
   cancelEditButton.hidden = false;
@@ -1242,10 +1546,235 @@ async function removeItem(id) {
   await saveState();
 }
 
+async function addShoppingItem(event) {
+  event.preventDefault();
+  const name = tidyName(shoppingInput.value);
+
+  if (!name) {
+    return;
+  }
+
+  shoppingItems.unshift({
+    id: createId(),
+    name,
+    done: false,
+    createdAt: new Date().toISOString()
+  });
+  shoppingInput.value = "";
+  recordHistory(`Do nákupního listu přidáno: ${name}.`, "shopping");
+  renderShoppingList();
+  renderHistory();
+  await saveState();
+}
+
+async function handleShoppingClick(event) {
+  const button = event.target.closest("button[data-shopping-action]");
+
+  if (!button) {
+    return;
+  }
+
+  const item = shoppingItems.find((currentItem) => currentItem.id === button.dataset.id);
+
+  if (!item) {
+    return;
+  }
+
+  if (button.dataset.shoppingAction === "toggle") {
+    item.done = !item.done;
+    recordHistory(`${item.done ? "Nakoupeno" : "Vráceno do nákupu"}: ${item.name}.`, "shopping");
+  }
+
+  if (button.dataset.shoppingAction === "remove") {
+    shoppingItems = shoppingItems.filter((currentItem) => currentItem.id !== item.id);
+    recordHistory(`Z nákupního listu odebráno: ${item.name}.`, "shopping");
+  }
+
+  renderShoppingList();
+  renderHistory();
+  await saveState();
+}
+
+function renderShoppingList() {
+  shoppingList.replaceChildren();
+
+  if (!shoppingItems.length) {
+    const empty = document.createElement("p");
+    empty.className = "message";
+    empty.textContent = "Nákupní list je prázdný.";
+    shoppingList.append(empty);
+    return;
+  }
+
+  shoppingItems.forEach((item) => {
+    const row = document.createElement("article");
+    const text = document.createElement("strong");
+    const actions = document.createElement("div");
+    const toggle = document.createElement("button");
+    const remove = document.createElement("button");
+
+    row.className = `card-row${item.done ? " is-done" : ""}`;
+    text.textContent = item.name;
+    actions.className = "row-actions";
+    toggle.className = "ghost-button";
+    toggle.type = "button";
+    toggle.dataset.shoppingAction = "toggle";
+    toggle.dataset.id = item.id;
+    toggle.textContent = item.done ? "Vrátit" : "Hotovo";
+    remove.className = "danger-button";
+    remove.type = "button";
+    remove.dataset.shoppingAction = "remove";
+    remove.dataset.id = item.id;
+    remove.textContent = "Smazat";
+
+    actions.append(toggle, remove);
+    row.append(text, actions);
+    shoppingList.append(row);
+  });
+}
+
+async function saveCombo(event) {
+  event.preventDefault();
+  const name = tidyName(comboName.value);
+  const parsed = parseImportedItems(comboItems.value);
+
+  if (!name || !parsed.items.length) {
+    showMessage("Vyplň název kombinace a aspoň jednu položku.", true);
+    return;
+  }
+
+  const existing = combos.find((combo) => normalize(combo.name) === normalize(name));
+
+  if (existing) {
+    existing.items = parsed.items;
+  } else {
+    combos.unshift({
+      id: createId(),
+      name,
+      items: parsed.items
+    });
+  }
+
+  comboForm.reset();
+  recordHistory(`Uložena kombinace ${name}.`, "combo");
+  renderCombos();
+  renderCatalog();
+  renderHistory();
+  await saveState();
+}
+
+async function useSelectedCombo() {
+  const combo = combos.find((currentCombo) => currentCombo.id === comboSelect.value);
+
+  if (!combo) {
+    showMessage("Vyber kombinaci.", true);
+    return;
+  }
+
+  let changed = 0;
+
+  combo.items.forEach((item) => {
+    const result = upsertItemAmount({
+      ...item,
+      action: "eaten"
+    });
+
+    if (result !== "missing") {
+      changed += 1;
+    }
+  });
+
+  recordHistory(`Použita kombinace ${combo.name}, odečteno ${changed} položek.`, "combo");
+  renderItems();
+  renderCombos();
+  renderHistory();
+  showMessage(`Kombinace ${combo.name} použita.`);
+  await saveState();
+}
+
+async function handleComboClick(event) {
+  const button = event.target.closest("button[data-combo-action]");
+
+  if (!button) {
+    return;
+  }
+
+  const combo = combos.find((currentCombo) => currentCombo.id === button.dataset.id);
+
+  if (!combo) {
+    return;
+  }
+
+  if (button.dataset.comboAction === "remove") {
+    combos = combos.filter((currentCombo) => currentCombo.id !== combo.id);
+    recordHistory(`Smazána kombinace ${combo.name}.`, "combo");
+  }
+
+  renderCombos();
+  renderCatalog();
+  renderHistory();
+  await saveState();
+}
+
+function renderCombos() {
+  comboList.replaceChildren();
+  comboSelect.replaceChildren();
+
+  if (!combos.length) {
+    const option = document.createElement("option");
+    option.textContent = "Zatím žádná kombinace";
+    option.value = "";
+    comboSelect.append(option);
+    const empty = document.createElement("p");
+    empty.className = "message";
+    empty.textContent = "Ulož si třeba kombinaci Rohlík se šunkou.";
+    comboList.append(empty);
+    return;
+  }
+
+  combos.forEach((combo) => {
+    const option = document.createElement("option");
+    const row = document.createElement("article");
+    const text = document.createElement("strong");
+    const meta = document.createElement("span");
+    const remove = document.createElement("button");
+
+    option.value = combo.id;
+    option.textContent = combo.name;
+    comboSelect.append(option);
+
+    row.className = "card-row";
+    text.textContent = combo.name;
+    meta.className = "muted-text";
+    meta.textContent = combo.items.map((item) => `${item.name} ${formatAmount(item.amount)} ${item.unit}`).join(", ");
+    remove.className = "danger-button";
+    remove.type = "button";
+    remove.dataset.comboAction = "remove";
+    remove.dataset.id = combo.id;
+    remove.textContent = "Smazat";
+
+    row.append(text, meta, remove);
+    comboList.append(row);
+  });
+}
+
+function toggleDarkMode() {
+  document.body.classList.toggle("dark-mode", darkModeToggle.checked);
+  localStorage.setItem("itemlist-dark-mode", darkModeToggle.checked ? "1" : "0");
+}
+
+function applyTheme() {
+  const isDark = localStorage.getItem("itemlist-dark-mode") === "1";
+  darkModeToggle.checked = isDark;
+  document.body.classList.toggle("dark-mode", isDark);
+}
+
 function renderItems() {
   const items = getActiveItems();
   itemsBody.innerHTML = "";
   renderProductOptions();
+  renderCategoryOptions();
+  renderCatalog();
 
   tableWrap.classList.toggle("has-items", items.length > 0);
 
@@ -1257,6 +1786,7 @@ function renderItems() {
 
       row.innerHTML = `
         <td><span class="product-name"></span></td>
+        <td class="category-cell"></td>
         <td class="number-cell">${formatAmount(item.amount)}</td>
         <td class="unit-cell"></td>
         <td class="icon-cell">
@@ -1272,6 +1802,7 @@ function renderItems() {
       `;
 
       row.querySelector(".product-name").textContent = item.name;
+      row.querySelector(".category-cell").textContent = item.category || "Ostatní";
       row.querySelector(".unit-cell").textContent = item.unit;
       itemsBody.append(row);
     });
@@ -1293,6 +1824,76 @@ function renderProductOptions() {
     });
 }
 
+function renderCategoryOptions() {
+  if (!categoryOptions) {
+    return;
+  }
+
+  const categories = [...new Set(getActiveItems().map((item) => item.category || "Ostatní"))].sort((a, b) => a.localeCompare(b, "cs"));
+  categoryOptions.replaceChildren();
+
+  categories.forEach((category) => {
+    const option = document.createElement("option");
+    option.value = category;
+    categoryOptions.append(option);
+  });
+}
+
+function renderCatalog() {
+  if (!catalogBody) {
+    return;
+  }
+
+  catalogBody.replaceChildren();
+
+  getCatalogItems().forEach((item) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td></td>
+      <td></td>
+      <td></td>
+    `;
+    row.children[0].textContent = item.name;
+    row.children[1].textContent = item.category;
+    row.children[2].textContent = item.unit;
+    catalogBody.append(row);
+  });
+}
+
+function getCatalogItems() {
+  const map = new Map();
+
+  lists.forEach((list) => {
+    list.items.forEach((item) => {
+      const key = normalize(item.name);
+
+      if (!map.has(key)) {
+        map.set(key, {
+          name: item.name,
+          category: item.category || "Ostatní",
+          unit: item.unit
+        });
+      }
+    });
+  });
+
+  combos.forEach((combo) => {
+    combo.items.forEach((item) => {
+      const key = normalize(item.name);
+
+      if (!map.has(key)) {
+        map.set(key, {
+          name: item.name,
+          category: item.category || "Ostatní",
+          unit: item.unit
+        });
+      }
+    });
+  });
+
+  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "cs"));
+}
+
 function recordHistory(text, type = "info", list = getActiveList()) {
   history.unshift({
     id: createId(),
@@ -1306,17 +1907,20 @@ function recordHistory(text, type = "info", list = getActiveList()) {
 
 function renderHistory() {
   historyList.replaceChildren();
-  toggleHistoryButton.textContent = history.length ? `Historie (${history.length})` : "Historie";
+  const selectedDate = historyDateFilter?.value || "";
+  const visibleHistory = selectedDate
+    ? history.filter((entry) => entry.createdAt.slice(0, 10) === selectedDate)
+    : history;
 
-  if (!history.length) {
+  if (!visibleHistory.length) {
     const empty = document.createElement("p");
     empty.className = "message";
-    empty.textContent = "Historie je zatím prázdná.";
+    empty.textContent = selectedDate ? "Pro vybrané datum nejsou žádné změny." : "Historie je zatím prázdná.";
     historyList.append(empty);
     return;
   }
 
-  history.slice(0, 40).forEach((entry) => {
+  visibleHistory.slice(0, 80).forEach((entry) => {
     const row = document.createElement("article");
     const text = document.createElement("strong");
     const time = document.createElement("time");
@@ -1377,12 +1981,18 @@ function updateSubmitButtonText() {
   }
 
   const labels = {
+    purchase: "Zapsat nákup",
+    gift: "Zapsat dar",
+    eaten: "Odečíst snězené",
+    discarded: "Odečíst vyhozené",
+    adjustPlus: "Korekce +",
+    adjustMinus: "Korekce -",
     add: "Přidat",
     subtract: "Odebrat",
     set: "Nastavit"
   };
 
-  submitButton.textContent = labels[actionSelect.value] || "Přidat";
+  submitButton.textContent = labels[actionSelect.value] || "Zapsat";
 }
 
 function stepAmount(direction) {
@@ -1403,6 +2013,14 @@ function syncUnitFromProduct() {
 
   if (item) {
     unitSelect.value = item.unit;
+  }
+}
+
+function syncCategoryFromProduct() {
+  const item = findItemByName(productInput.value);
+
+  if (item) {
+    categoryInput.value = item.category || "Ostatní";
   }
 }
 
