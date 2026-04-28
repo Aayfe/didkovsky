@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="cs">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Jednoduchý seznam</title>
+    <link rel="stylesheet" href="styles.css?v=auth">
+  </head>
+  <body>
+    <section class="auth-screen" id="auth-screen">
+      <div class="auth-card">
+        <p class="eyebrow">Přístup</p>
+        <h1>Přihlášení Google účtem</h1>
+        <p id="auth-copy">Každý přihlášený účet má svoje vlastní seznamy. Přístup musí být povolený adminem.</p>
+        <button class="primary-button" id="google-login-button" type="button">Přihlásit přes Google</button>
+        <p class="message" id="auth-message" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <main class="app-shell" id="app-shell" hidden>
+      <section class="list-panel" aria-labelledby="page-title">
+        <div class="user-bar">
+          <div class="user-meta">
+            <span>Přihlášeno jako</span>
+            <strong id="user-email"></strong>
+          </div>
+          <div class="user-actions">
+            <button class="ghost-button" id="toggle-admin-panel" type="button" hidden>Správa účtů</button>
+            <button class="ghost-button" id="logout-button" type="button">Odhlásit</button>
+          </div>
+        </div>
+
+        <section class="admin-panel" id="admin-panel" aria-label="Správa povolených účtů" hidden>
+          <form class="admin-form" id="admin-form" autocomplete="off">
+            <label class="field admin-email-field">
+              <span>Google email</span>
+              <input id="admin-email-input" type="email" placeholder="ucet@gmail.com" required>
+            </label>
+            <label class="admin-checkbox">
+              <input id="admin-is-admin" type="checkbox">
+              <span>Admin</span>
+            </label>
+            <button class="primary-button" type="submit">Povolit účet</button>
+          </form>
+          <div class="allowed-users-list" id="allowed-users-list" aria-live="polite"></div>
+        </section>
+
+        <div class="tabs-row">
+          <div class="list-tabs" id="list-tabs" role="tablist" aria-label="Seznamy"></div>
+          <button class="tab-add-button" id="add-list-button" type="button" aria-label="Přidat seznam">+</button>
+        </div>
+
+        <div class="title-row">
+          <div class="list-title-field">
+            <p class="eyebrow">Seznam</p>
+            <label class="visually-hidden" for="list-name-input">Název seznamu</label>
+            <input class="list-name-input" id="list-name-input" type="text" value="Produkty" aria-labelledby="page-title">
+            <h1 class="visually-hidden" id="page-title">Produkty</h1>
+          </div>
+          <div class="title-actions">
+            <button class="ghost-button" id="cancel-edit" type="button" hidden>Zrušit úpravu</button>
+            <button class="danger-button" id="delete-list-button" type="button">Odebrat seznam</button>
+          </div>
+        </div>
+
+        <form class="entry-form" id="entry-form" autocomplete="off">
+          <label class="field product-field">
+            <span>Položka</span>
+            <input id="product-input" name="product" type="text" list="product-options" placeholder="Např. mouka" required>
+            <datalist id="product-options"></datalist>
+          </label>
+
+          <div class="field action-field">
+            <span>Akce</span>
+            <input id="action-select" name="action" type="hidden" value="add">
+            <div class="action-toggle" role="group" aria-label="Akce">
+              <button class="action-choice is-active" type="button" data-action-choice="add" aria-pressed="true">+</button>
+              <button class="action-choice" type="button" data-action-choice="subtract" aria-pressed="false">-</button>
+            </div>
+          </div>
+
+          <div class="field amount-field">
+            <span id="amount-label">Počet</span>
+            <div class="number-control">
+              <input id="amount-input" name="amount" type="number" min="1" step="1" inputmode="numeric" placeholder="1" aria-labelledby="amount-label" required>
+              <div class="number-buttons">
+                <button class="number-step" type="button" data-amount-step="up" aria-label="Zvýšit počet">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m7 14 5-5 5 5"></path>
+                  </svg>
+                </button>
+                <button class="number-step" type="button" data-amount-step="down" aria-label="Snížit počet">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m7 10 5 5 5-5"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <label class="field unit-field">
+            <span>Jednotka</span>
+            <select id="unit-select" name="unit">
+              <option value="kusů">kusů</option>
+              <option value="kg">kg</option>
+              <option value="gramů">gramů</option>
+              <option value="l">l</option>
+              <option value="ml">ml</option>
+              <option value="balení">balení</option>
+              <option value="plechovek">plechovek</option>
+            </select>
+          </label>
+
+          <button class="primary-button" id="submit-button" type="submit">Přidat</button>
+        </form>
+
+        <p class="message" id="message" role="status" aria-live="polite"></p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Položka</th>
+                <th scope="col">Počet</th>
+                <th scope="col">Jednotka</th>
+                <th scope="col" class="icon-heading">Úprava</th>
+                <th scope="col" class="icon-heading">Koš</th>
+              </tr>
+            </thead>
+            <tbody id="items-body"></tbody>
+          </table>
+
+          <div class="empty-state" id="empty-state">
+            Zatím tu nic není.
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <button class="danger-float-button" id="delete-all-button" type="button" hidden>
+      Smazat vše
+    </button>
+
+    <div class="modal-backdrop" id="delete-list-modal" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-list-title">
+        <h2 id="delete-list-title">Odebrat seznam</h2>
+        <p id="delete-list-description">Opravdu chceš odebrat tenhle seznam?</p>
+        <div class="modal-actions">
+          <button class="ghost-button" id="cancel-delete-list" type="button">Zrušit</button>
+          <button class="danger-button" id="confirm-delete-list" type="button">Odebrat</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="delete-all-modal" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-all-title">
+        <h2 id="delete-all-title">Smazat všechny seznamy</h2>
+        <p>Tohle smaže všechny tvoje seznamy i položky a nechá jen čistý seznam.</p>
+        <div class="modal-actions">
+          <button class="ghost-button" id="cancel-delete-all" type="button">Zrušit</button>
+          <button class="danger-button" id="confirm-delete-all" type="button">Smazat vše</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="app.js?v=auth"></script>
+  </body>
+</html>
