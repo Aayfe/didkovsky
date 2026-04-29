@@ -141,6 +141,14 @@ const DEFAULT_CATEGORIES = [
   "Drogerie",
   "Ostatní"
 ];
+const ACTION_COMBOBOX_OPTIONS = [
+  { value: "Nákup", optionValue: "purchase", meta: "Přidat do zásob" },
+  { value: "Snězeno", optionValue: "eaten", meta: "Odečíst ze zásob" },
+  { value: "Korekce +", optionValue: "adjustPlus", meta: "Ruční navýšení" },
+  { value: "Korekce -", optionValue: "adjustMinus", meta: "Ruční snížení" },
+  { value: "Dar", optionValue: "gift", meta: "Přidat do zásob" },
+  { value: "Vyhozeno", optionValue: "discarded", meta: "Odečíst ze zásob" }
+];
 const CATEGORY_ICONS = {
   "Pečivo": "🥖",
   "Mléčné": "🥛",
@@ -605,6 +613,11 @@ function getComboboxOptions(input) {
   }
 
   const query = input.readOnly ? "" : normalize(input.value);
+
+  if (input.dataset.selectCombobox === "action-select") {
+    return getActionComboboxOptions(query);
+  }
+
   const seen = new Set();
 
   return [...source.options]
@@ -632,6 +645,18 @@ function getComboboxOptions(input) {
     })
     .sort((a, b) => getComboboxOptionScore(a, query) - getComboboxOptionScore(b, query)
       || a.value.localeCompare(b.value, "cs"))
+    .slice(0, 8);
+}
+
+function getActionComboboxOptions(query = "") {
+  return ACTION_COMBOBOX_OPTIONS
+    .filter((item) => {
+      if (!query) {
+        return true;
+      }
+
+      return normalize(item.value).includes(query) || normalize(item.meta).includes(query);
+    })
     .slice(0, 8);
 }
 
