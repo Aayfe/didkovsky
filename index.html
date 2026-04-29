@@ -1,399 +1,141 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="cs">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux14">
-  </head>
-  <body>
-    <section class="auth-screen" id="auth-screen">
-      <div class="auth-card">
-        <p class="eyebrow">Přístup</p>
-        <h1>Přihlášení Google účtem</h1>
-        <p id="auth-copy">Každý přihlášený účet má svoje vlastní zásoby, nákupní seznamy a historii.</p>
-        <button class="primary-button" id="google-login-button" type="button">Přihlásit přes Google</button>
-        <p class="message" id="auth-message" role="status" aria-live="polite"></p>
-      </div>
-    </section>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jakub Didkovský</title>
 
-    <main class="app-shell" id="app-shell" hidden>
-      <header class="app-topbar">
-        <button class="icon-menu-button" id="menu-button" type="button" aria-label="Otevřít menu" aria-expanded="false">☰</button>
-        <div class="topbar-title">
-          <p class="eyebrow">Domácí zásoby</p>
-          <strong id="current-view-label">Lednice</strong>
-        </div>
-        <label class="theme-switch" title="Tmavé zobrazení">
-          <input id="dark-mode-toggle" type="checkbox">
-          <span aria-hidden="true"></span>
-          <strong>Tmavý režim</strong>
-        </label>
-      </header>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 
-      <aside class="menu-panel" id="menu-panel" hidden>
-        <div class="user-meta menu-user">
-          <span>Přihlášeno jako</span>
-          <strong id="user-email"></strong>
-        </div>
-        <nav class="menu-nav" aria-label="Hlavní navigace">
-          <button class="menu-link is-active" type="button" data-view="pantry">Lednice</button>
-          <button class="menu-link" type="button" data-view="shopping">Nákupní list</button>
-          <button class="menu-link" type="button" data-view="history">Změny</button>
-          <button class="menu-link" type="button" data-view="catalog">Číselník potravin</button>
-          <button class="menu-link" type="button" data-view="combos">Kombinace</button>
-          <button class="menu-link" type="button" data-view="tools">Import / export</button>
-          <button class="menu-link" type="button" data-view="settings">Nastavení</button>
-        </nav>
-        <div class="menu-actions">
-          <button class="ghost-button" id="toggle-admin-panel" type="button" hidden>Správa účtů</button>
-          <button class="ghost-button" id="logout-button" type="button">Odhlásit</button>
-        </div>
-      </aside>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-      <section class="list-panel">
-        <section class="app-view is-active" id="view-pantry" data-view-panel="pantry">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Co mám doma</p>
-              <h1 id="page-title">Lednice</h1>
-            </div>
-          </div>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #222222;
+      color: #ffffff;
+      overflow-x: hidden;
+    }
 
-          <form class="entry-form" id="entry-form" autocomplete="off">
-            <label class="field combo-field product-field">
-              <span>Potravina</span>
-              <input id="product-input" name="product" type="text" data-combobox-source="product-options" placeholder="Např. rohlík" required>
-              <datalist id="product-options"></datalist>
-            </label>
+    .navbar {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      padding: 20px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1000;
+      background-color: #222222;
+    }
 
-            <label class="field combo-field category-field">
-              <span>Kategorie</span>
-              <input id="category-input" name="category" type="text" data-combobox-source="category-options" placeholder="Pečivo">
-              <datalist id="category-options"></datalist>
-            </label>
+    .nav-left {
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
 
-            <label class="field combo-field action-field">
-              <span>Akce</span>
-              <input id="action-combo-input" type="text" data-combobox-source="action-options" data-select-combobox="action-select" value="Nákup" readonly>
-              <select class="native-select-source" id="action-select" name="action" tabindex="-1" aria-hidden="true">
-                <option value="purchase">Nákup</option>
-                <option value="gift">Dar</option>
-                <option value="eaten">Snězeno</option>
-                <option value="discarded">Vyhozeno</option>
-                <option value="adjustPlus">Korekce +</option>
-                <option value="adjustMinus">Korekce -</option>
-                <option value="set">Nastavit</option>
-              </select>
-              <datalist id="action-options">
-                <option value="Nákup" data-value="purchase" label="Přidat do zásob"></option>
-                <option value="Dar" data-value="gift" label="Přidat do zásob"></option>
-                <option value="Snězeno" data-value="eaten" label="Odečíst ze zásob"></option>
-                <option value="Vyhozeno" data-value="discarded" label="Odečíst ze zásob"></option>
-                <option value="Korekce +" data-value="adjustPlus" label="Ruční navýšení"></option>
-                <option value="Korekce -" data-value="adjustMinus" label="Ruční snížení"></option>
-                <option value="Nastavit" data-value="set" label="Nastavit přesné množství"></option>
-              </datalist>
-            </label>
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
 
-            <div class="field amount-field">
-              <span id="amount-label">Množství</span>
-              <div class="number-control">
-                <button class="number-step" type="button" data-amount-step="down" aria-label="Snížit množství">-</button>
-                <input id="amount-input" name="amount" type="number" min="1" step="1" inputmode="numeric" placeholder="1" aria-labelledby="amount-label" required>
-                <button class="number-step" type="button" data-amount-step="up" aria-label="Zvýšit množství">+</button>
-              </div>
-            </div>
+    .nav-line {
+      position: absolute;
+      bottom: 0;
+      left: 10%;
+      width: 80%;
+      height: 1px;
+      background-color: #444;
+    }
 
-            <label class="field unit-field">
-              <span>Jednotka</span>
-              <select id="unit-select" name="unit">
-                <option value="g">g</option>
-                <option value="ml">ml</option>
-                <option value="ks">ks</option>
-                <option value="Kč">Kč</option>
-              </select>
-            </label>
+    .loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: #222;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+      color: white;
+      transition: opacity 0.5s ease;
+    }
 
-            <button class="primary-button" id="submit-button" type="submit">Zapsat</button>
-            <button class="ghost-button" id="cancel-edit" type="button" hidden>Zrušit úpravu</button>
-          </form>
+    .progress-bar {
+      width: 300px;
+      height: 12px;
+      background: transparent;
+      border: 2px solid white;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
 
-          <p class="message" id="message" role="status" aria-live="polite"></p>
+    .progress-bar-fill {
+      height: 100%;
+      width: 0;
+      background: white;
+      transition: width 0.5s ease-in-out;
+    }
 
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Potravina</th>
-                  <th scope="col">Kategorie</th>
-                  <th scope="col">Množství</th>
-                  <th scope="col">Jednotka</th>
-                  <th scope="col" class="icon-heading">Akce</th>
-                </tr>
-              </thead>
-              <tbody id="items-body"></tbody>
-            </table>
-            <div class="empty-state" id="empty-state">Lednice je zatím prázdná.</div>
-          </div>
-        </section>
+    #percent {
+      margin-top: 10px;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
 
-        <section class="app-view" id="view-shopping" data-view-panel="shopping" hidden>
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Co koupit</p>
-              <h1>Nákupní list</h1>
-            </div>
-          </div>
-          <label class="admin-checkbox setting-line">
-            <input id="shopping-subtract-stock" type="checkbox">
-            <span>Odečítat od nákupního listu to, co už je v lednici</span>
-          </label>
-          <form class="shopping-form" id="shopping-form" autocomplete="off">
-            <label class="field">
-              <span>Potravina</span>
-              <input id="shopping-product" type="text" data-combobox-source="product-options" placeholder="Např. máslo">
-            </label>
-            <label class="field">
-              <span>Množství</span>
-              <input id="shopping-amount" type="number" min="0.01" step="any" inputmode="decimal" placeholder="1">
-            </label>
-            <label class="field">
-              <span>Jednotka</span>
-              <select id="shopping-unit">
-                <option value="g">g</option>
-                <option value="ml">ml</option>
-                <option value="ks">ks</option>
-                <option value="Kč">Kč</option>
-              </select>
-            </label>
-            <button class="primary-button" type="submit">Přidat</button>
-          </form>
-          <div class="card-list" id="shopping-list"></div>
-        </section>
+<body>
 
-        <section class="app-view" id="view-history" data-view-panel="history" hidden>
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Změny</p>
-              <h1>Historie akcí</h1>
-            </div>
-            <label class="field compact-field">
-              <span>Datum</span>
-              <input id="history-date-filter" type="date">
-            </label>
-          </div>
-          <div class="history-list" id="history-list" aria-live="polite"></div>
-        </section>
+  <nav class="navbar">
+    <div class="nav-left">Jakub Didkovský</div>
+    <div class="nav-right">jakub@didkovsky.cz</div>
+    <div class="nav-line"></div>
+  </nav>
 
-        <section class="app-view" id="view-catalog" data-view-panel="catalog" hidden>
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Číselník</p>
-              <h1>Potraviny</h1>
-            </div>
-            <button class="ghost-button" id="export-catalog-button" type="button">Export číselníku</button>
-          </div>
-          <form class="catalog-form" id="catalog-form" autocomplete="off">
-            <label class="field">
-              <span>Potravina</span>
-              <input id="catalog-name" type="text" placeholder="Např. máslo">
-            </label>
-            <label class="field">
-              <span>Kategorie</span>
-              <input id="catalog-category" type="text" data-combobox-source="category-options" placeholder="Mléčné">
-            </label>
-            <label class="field">
-              <span>Jednotka</span>
-              <select id="catalog-unit">
-                <option value="g">g</option>
-                <option value="ml">ml</option>
-                <option value="ks">ks</option>
-                <option value="Kč">Kč</option>
-              </select>
-            </label>
-            <button class="primary-button" type="submit">Přidat do číselníku</button>
-          </form>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Potravina</th>
-                  <th>Kategorie</th>
-                  <th>Jednotka</th>
-                  <th class="icon-heading">Akce</th>
-                </tr>
-              </thead>
-              <tbody id="catalog-body"></tbody>
-            </table>
-          </div>
-        </section>
-
-        <section class="app-view" id="view-combos" data-view-panel="combos" hidden>
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Více položek najednou</p>
-              <h1>Kombinace</h1>
-            </div>
-          </div>
-          <form class="combo-form" id="combo-form" autocomplete="off">
-            <label class="field">
-              <span>Název kombinace</span>
-              <input id="combo-name" type="text" placeholder="Rohlík se šunkou">
-            </label>
-            <div class="combo-items-builder" id="combo-items-list" aria-label="Položky v kombinaci"></div>
-            <button class="ghost-button combo-add-button" id="add-combo-item" type="button">Přidat další položku</button>
-            <button class="primary-button" type="submit">Uložit kombinaci</button>
-          </form>
-          <div class="combo-runner">
-            <select id="combo-select"></select>
-            <button class="primary-button" id="use-combo-button" type="button">Použít kombinaci</button>
-          </div>
-          <div class="card-list" id="combo-list"></div>
-        </section>
-
-        <section class="app-view" id="view-tools" data-view-panel="tools" hidden>
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Import / export</p>
-              <h1>Nástroje</h1>
-            </div>
-          </div>
-          <div class="tool-grid">
-            <button class="ghost-button" id="import-button" type="button">Hromadný import textem</button>
-            <button class="ghost-button" id="receipt-import-button" type="button">Import účtenky fotkou</button>
-            <button class="ghost-button" id="ean-import-button" type="button">Import EAN / barcode</button>
-            <button class="ghost-button" id="xml-import-button" type="button">Import XML</button>
-            <button class="ghost-button" id="xml-file-button" type="button">Import XML souborem</button>
-            <input class="visually-hidden" id="xml-file-input" type="file" accept=".xml,application/xml,text/xml">
-            <button class="ghost-button" id="xml-export-button" type="button">Export XML</button>
-            <button class="ghost-button" id="export-fridge-button" type="button">Export lednice</button>
-            <button class="ghost-button" id="export-button" type="button">Export všech dat</button>
-            <button class="ghost-button" id="anonymous-export-button" type="button">Anonymizovaný export</button>
-          </div>
-          <div class="tool-card" id="ean-tool" hidden>
-            <h2>EAN / barcode</h2>
-            <div class="compact-form">
-              <input id="ean-input" type="text" inputmode="numeric" placeholder="Zadej EAN nebo barcode">
-              <button class="primary-button" id="ean-lookup-button" type="button">Načíst produkt</button>
-            </div>
-            <label class="file-drop ean-camera-drop">
-              <span class="button-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                  <path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path>
-                  <circle cx="12" cy="13.5" r="3.5"></circle>
-                </svg>
-              </span>
-              <span class="file-drop-copy">
-                <strong>Naskenovat fotoaparátem</strong>
-                <small>Na mobilu otevře kameru, na počítači vybere fotku kódu.</small>
-              </span>
-              <input id="ean-file-input" type="file" accept="image/*" capture="environment">
-            </label>
-            <div class="ean-result" id="ean-result" hidden></div>
-            <p class="message" id="ean-message" role="status" aria-live="polite"></p>
-          </div>
-          <div class="tool-card" id="receipt-tool" hidden>
-            <h2>Účtenka</h2>
-            <label class="file-drop">
-              <span>Vybrat fotku účtenky</span>
-              <input id="receipt-file-input" type="file" accept="image/*" capture="environment">
-            </label>
-            <p class="message" id="receipt-message" role="status" aria-live="polite"></p>
-          </div>
-          <p class="message">EAN / barcode se načítá přes více veřejných databází a vlastní číselník aliasů. OCR účtenky používá knihovnu v prohlížeči, když se načte z internetu.</p>
-        </section>
-
-        <section class="app-view" id="view-settings" data-view-panel="settings" hidden>
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Nastavení</p>
-              <h1>Nastavení a správa</h1>
-            </div>
-          </div>
-          <div class="settings-grid">
-            <label class="admin-checkbox">
-              <input id="settings-shopping-subtract-stock" type="checkbox">
-              <span>Nákupní list odečítá aktuální zásoby</span>
-            </label>
-            <button class="danger-button" id="delete-list-button" type="button">Odebrat aktuální prostor</button>
-          </div>
-
-          <section class="admin-panel" id="admin-panel" aria-label="Správa povolených účtů" hidden>
-            <form class="admin-form" id="admin-form" autocomplete="off">
-              <label class="field admin-email-field">
-                <span>Google email</span>
-                <input id="admin-email-input" type="email" placeholder="ucet@gmail.com" required>
-              </label>
-              <label class="admin-checkbox">
-                <input id="admin-is-admin" type="checkbox">
-                <span>Admin</span>
-              </label>
-              <button class="primary-button" type="submit">Povolit účet</button>
-            </form>
-            <div class="allowed-users-list" id="allowed-users-list" aria-live="polite"></div>
-          </section>
-
-          <details class="list-management">
-            <summary>Správa seznamů</summary>
-            <div class="tabs-row">
-              <div class="list-tabs" id="list-tabs" role="tablist" aria-label="Seznamy"></div>
-              <button class="tab-add-button" id="add-list-button" type="button" aria-label="Přidat seznam">+</button>
-            </div>
-            <label class="field">
-              <span>Název prostoru</span>
-              <input class="list-name-input" id="list-name-input" type="text" value="Lednice">
-            </label>
-          </details>
-
-          <div class="settings-danger-zone">
-            <button class="danger-button settings-danger-small" id="delete-all-button" type="button" hidden>Smazat všechno</button>
-          </div>
-        </section>
-      </section>
-    </main>
-
-    <div class="modal-backdrop" id="delete-list-modal" hidden>
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-list-title">
-        <h2 id="delete-list-title">Odebrat prostor</h2>
-        <p id="delete-list-description">Opravdu chceš odebrat aktuální prostor?</p>
-        <div class="modal-actions">
-          <button class="ghost-button" id="cancel-delete-list" type="button">Zrušit</button>
-          <button class="danger-button" id="confirm-delete-list" type="button">Odebrat</button>
-        </div>
-      </div>
+  <div class="loading-screen">
+    <div class="progress-bar">
+      <div class="progress-bar-fill" id="bar"></div>
     </div>
 
-    <div class="modal-backdrop" id="delete-all-modal" hidden>
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-all-title">
-        <h2 id="delete-all-title">Smazat všechna data</h2>
-        <p>Tohle smaže tvoje zásoby, nákupní list, kombinace i historii.</p>
-        <div class="modal-actions">
-          <button class="ghost-button" id="cancel-delete-all" type="button">Zrušit</button>
-          <button class="danger-button" id="confirm-delete-all" type="button">Smazat vše</button>
-        </div>
-      </div>
-    </div>
+    <div id="percent">0%</div>
+  </div>
 
-    <div class="modal-backdrop" id="import-modal" hidden>
-      <div class="modal import-modal" role="dialog" aria-modal="true" aria-labelledby="import-title">
-        <h2 id="import-title">Import</h2>
-        <label class="field">
-          <span>Položky</span>
-          <textarea id="import-text" rows="9" placeholder="Rohlík 4 ks&#10;Šunka 100 g&#10;Mléko 1000 ml"></textarea>
-        </label>
-        <p class="modal-error" id="import-error" role="status" aria-live="polite"></p>
-        <div class="modal-actions">
-          <button class="ghost-button" id="cancel-import" type="button">Zrušit</button>
-          <button class="primary-button" id="confirm-import" type="button">Importovat</button>
-        </div>
-      </div>
-    </div>
+  <script>
+    let percent = 0;
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux14"></script>
-  </body>
+    const bar = document.getElementById('bar');
+    const percentText = document.getElementById('percent');
+    const loadingScreen = document.querySelector('.loading-screen');
+
+    const interval = setInterval(() => {
+      percent += Math.floor(Math.random() * 10) + 1;
+
+      if (percent >= 100) {
+        percent = 100;
+        clearInterval(interval);
+
+        loadingScreen.style.opacity = '0';
+
+        setTimeout(() => {
+          loadingScreen.style.display = 'none';
+        }, 500);
+      }
+
+      bar.style.width = percent + '%';
+      percentText.innerText = percent + '%';
+    }, 100);
+  </script>
+
+</body>
 </html>
