@@ -18,6 +18,8 @@ const anonymousExportButton = document.querySelector("#anonymous-export-button")
 const receiptImportButton = document.querySelector("#receipt-import-button");
 const eanImportButton = document.querySelector("#ean-import-button");
 const xmlImportButton = document.querySelector("#xml-import-button");
+const xmlFileButton = document.querySelector("#xml-file-button");
+const xmlFileInput = document.querySelector("#xml-file-input");
 const xmlExportButton = document.querySelector("#xml-export-button");
 const eanTool = document.querySelector("#ean-tool");
 const eanInput = document.querySelector("#ean-input");
@@ -42,6 +44,7 @@ const productOptions = document.querySelector("#product-options");
 const categoryInput = document.querySelector("#category-input");
 const categoryOptions = document.querySelector("#category-options");
 const actionSelect = document.querySelector("#action-select");
+const actionComboInput = document.querySelector("#action-combo-input");
 const actionButtons = document.querySelectorAll("[data-action-choice]");
 const amountInput = document.querySelector("#amount-input");
 const amountStepButtons = document.querySelectorAll("[data-amount-step]");
@@ -207,6 +210,8 @@ function setupEvents() {
   receiptImportButton.addEventListener("click", openReceiptImport);
   eanImportButton.addEventListener("click", openEanImport);
   xmlImportButton.addEventListener("click", openXmlImport);
+  xmlFileButton.addEventListener("click", () => xmlFileInput.click());
+  xmlFileInput.addEventListener("change", importXmlFromFile);
   xmlExportButton.addEventListener("click", exportXml);
   eanLookupButton.addEventListener("click", lookupEanProduct);
   eanFileInput.addEventListener("change", scanEanFromFile);
@@ -408,6 +413,14 @@ function setupComboboxes() {
     }
   });
 
+  document.addEventListener("click", (event) => {
+    const input = event.target.closest?.(COMBOBOX_INPUT_SELECTOR);
+
+    if (input && input === activeComboboxInput) {
+      renderComboboxMenu(input);
+    }
+  });
+
   document.addEventListener("keydown", handleComboboxKeydown);
 
   document.addEventListener("pointerdown", (event) => {
@@ -461,6 +474,7 @@ function renderComboboxMenu(input) {
     button.type = "button";
     button.dataset.index = String(index);
     button.dataset.value = item.value;
+    button.dataset.optionValue = item.optionValue;
     button.setAttribute("role", "option");
     text.textContent = item.value;
     button.append(text);
@@ -474,7 +488,7 @@ function renderComboboxMenu(input) {
       event.preventDefault();
     });
     button.addEventListener("click", () => {
-      selectComboboxValue(input, item.value);
+      selectComboboxValue(input, item.value, item.optionValue);
     });
 
     menu.append(button);
@@ -491,13 +505,14 @@ function getComboboxOptions(input) {
     return [];
   }
 
-  const query = normalize(input.value);
+  const query = input.readOnly ? "" : normalize(input.value);
   const seen = new Set();
 
   return [...source.options]
     .map((option) => ({
       value: option.value || option.textContent || "",
-      meta: option.label || option.textContent || ""
+      meta: option.label || option.textContent || "",
+      optionValue: option.dataset.value || option.value || option.textContent || ""
     }))
     .filter((item) => {
       const key = normalize(item.value);
@@ -561,7 +576,7 @@ function handleComboboxKeydown(event) {
 
   if (event.key === "Enter" && options.length && activeComboboxIndex >= 0) {
     event.preventDefault();
-    selectComboboxValue(input, options[activeComboboxIndex].dataset.value);
+    selectComboboxValue(input, options[activeComboboxIndex].dataset.value, options[activeComboboxIndex].dataset.optionValue);
   }
 
   if (event.key === "Escape") {
@@ -586,8 +601,18 @@ function setComboboxIndex(input, index) {
   options[index]?.scrollIntoView({ block: "nearest" });
 }
 
-function selectComboboxValue(input, value) {
+function selectComboboxValue(input, value, optionValue = value) {
   input.value = value;
+
+  if (input.dataset.selectCombobox) {
+    const select = document.getElementById(input.dataset.selectCombobox);
+
+    if (select) {
+      select.value = optionValue;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }
+
   input.dispatchEvent(new Event("input", { bubbles: true }));
   input.dispatchEvent(new Event("change", { bubbles: true }));
   hideComboboxMenu(input);
@@ -1019,6 +1044,27 @@ function openEanImport() {
 
 function openXmlImport() {
   openImportModal("Import XML", getXmlExample());
+  importError.textContent = "Použij stejný formát jako Export XML, nebo vyber XML soubor v nástrojích.";
+}
+
+async function importXmlFromFile(event) {
+  const file = event.target.files?.[0];
+
+  if (!file) {
+    return;
+  }
+
+  try {
+    const text = await file.text();
+    openImportModal("Import XML", getXmlExample());
+    importText.value = text.trim();
+    importError.textContent = "XML soubor je načtený. Zkontroluj položky a potvrď import.";
+    confirmImport.focus();
+  } catch (error) {
+    showMessage("XML soubor se nepodařilo načíst.", true);
+  } finally {
+    xmlFileInput.value = "";
+  }
 }
 
 function openImportModal(title = "Import", placeholder = "Rohlík 4 ks\nŠunka 100 g\nMléko 1000 ml") {
@@ -3169,7 +3215,7 @@ function renderHistory() {
 function resetForm() {
   editingId = null;
   form.reset();
-  setActionState("add");
+  setActionState("purchase");
   setActionButtonsDisabled(false);
   updateSubmitButtonText();
   cancelEditButton.hidden = true;
@@ -3183,6 +3229,11 @@ function showMessage(text, isError = false) {
 
 function setActionState(action) {
   actionSelect.value = action;
+  const selectedOption = [...actionSelect.options].find((option) => option.value === action);
+
+  if (actionComboInput && selectedOption) {
+    actionComboInput.value = selectedOption.textContent;
+  }
 
   actionButtons.forEach((button) => {
     const isActive = button.dataset.actionChoice === action;

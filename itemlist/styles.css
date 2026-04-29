@@ -632,7 +632,7 @@ body.dark-mode .modal {
 
 .number-control {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 34px;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
   width: 100%;
   min-height: 48px;
   overflow: hidden;
@@ -658,6 +658,8 @@ body.dark-mode .modal {
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+  padding-inline: 8px;
+  text-align: center;
 }
 
 .number-control input:focus {
@@ -675,13 +677,6 @@ body.dark-mode .modal {
   appearance: textfield;
 }
 
-.number-buttons {
-  display: grid;
-  grid-template-rows: 1fr 1fr;
-  border-left: 1px solid var(--line);
-  background: var(--panel-strong);
-}
-
 .number-step {
   display: grid;
   place-items: center;
@@ -689,12 +684,18 @@ body.dark-mode .modal {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
+  font-size: 1.2rem;
+  font-weight: 900;
   padding: 0;
   transition: background-color 150ms ease, color 150ms ease;
 }
 
-.number-step + .number-step {
-  border-top: 1px solid var(--soft-line);
+.number-step:first-child {
+  border-right: 1px solid var(--line);
+}
+
+.number-step:last-child {
+  border-left: 1px solid var(--line);
 }
 
 .number-step:hover {
@@ -1452,6 +1453,23 @@ body.dark-mode .list-name-input {
   padding-right: 42px;
 }
 
+.native-select-source {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.combo-field [data-combobox-source] {
+  cursor: pointer;
+}
+
+#action-combo-input {
+  caret-color: transparent;
+}
+
 [data-combobox-source]:focus {
   background-image: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m7 14 5-5 5 5' fill='none' stroke='%23657084' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
@@ -1593,11 +1611,27 @@ body.dark-mode .list-name-input {
 .tool-grid {
   grid-template-columns: minmax(0, 360px);
   align-items: stretch;
+  justify-content: center;
+  margin-inline: auto;
 }
 
 .tool-grid > button {
   width: 100%;
   justify-content: flex-start;
+}
+
+#view-tools .section-heading {
+  justify-content: center;
+  text-align: center;
+}
+
+#view-tools .tool-card {
+  width: min(520px, 100%);
+  margin-inline: auto;
+}
+
+#view-tools > .message {
+  text-align: center;
 }
 
 .card-row,

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux9">
+    <link rel="stylesheet" href="styles.css?v=ux10">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -61,21 +61,22 @@
           </div>
 
           <form class="entry-form" id="entry-form" autocomplete="off">
-            <label class="field product-field">
+            <label class="field combo-field product-field">
               <span>Potravina</span>
               <input id="product-input" name="product" type="text" data-combobox-source="product-options" placeholder="Např. rohlík" required>
               <datalist id="product-options"></datalist>
             </label>
 
-            <label class="field category-field">
+            <label class="field combo-field category-field">
               <span>Kategorie</span>
               <input id="category-input" name="category" type="text" data-combobox-source="category-options" placeholder="Pečivo">
               <datalist id="category-options"></datalist>
             </label>
 
-            <label class="field action-field">
+            <label class="field combo-field action-field">
               <span>Akce</span>
-              <select id="action-select" name="action">
+              <input id="action-combo-input" type="text" data-combobox-source="action-options" data-select-combobox="action-select" value="Nákup" readonly>
+              <select class="native-select-source" id="action-select" name="action" tabindex="-1" aria-hidden="true">
                 <option value="purchase">Nákup</option>
                 <option value="gift">Dar</option>
                 <option value="eaten">Snězeno</option>
@@ -84,16 +85,23 @@
                 <option value="adjustMinus">Korekce -</option>
                 <option value="set">Nastavit</option>
               </select>
+              <datalist id="action-options">
+                <option value="Nákup" data-value="purchase" label="Přidat do zásob"></option>
+                <option value="Dar" data-value="gift" label="Přidat do zásob"></option>
+                <option value="Snězeno" data-value="eaten" label="Odečíst ze zásob"></option>
+                <option value="Vyhozeno" data-value="discarded" label="Odečíst ze zásob"></option>
+                <option value="Korekce +" data-value="adjustPlus" label="Ruční navýšení"></option>
+                <option value="Korekce -" data-value="adjustMinus" label="Ruční snížení"></option>
+                <option value="Nastavit" data-value="set" label="Nastavit přesné množství"></option>
+              </datalist>
             </label>
 
             <div class="field amount-field">
               <span id="amount-label">Množství</span>
               <div class="number-control">
-                <input id="amount-input" name="amount" type="number" min="0.01" step="any" inputmode="decimal" placeholder="1" aria-labelledby="amount-label" required>
-                <div class="number-buttons">
-                  <button class="number-step" type="button" data-amount-step="up" aria-label="Zvýšit množství">⌃</button>
-                  <button class="number-step" type="button" data-amount-step="down" aria-label="Snížit množství">⌄</button>
-                </div>
+                <button class="number-step" type="button" data-amount-step="down" aria-label="Snížit množství">-</button>
+                <input id="amount-input" name="amount" type="number" min="1" step="1" inputmode="numeric" placeholder="1" aria-labelledby="amount-label" required>
+                <button class="number-step" type="button" data-amount-step="up" aria-label="Zvýšit množství">+</button>
               </div>
             </div>
 
@@ -256,6 +264,8 @@
             <button class="ghost-button" id="receipt-import-button" type="button">Import účtenky fotkou</button>
             <button class="ghost-button" id="ean-import-button" type="button">Import EAN skenem</button>
             <button class="ghost-button" id="xml-import-button" type="button">Import XML</button>
+            <button class="ghost-button" id="xml-file-button" type="button">Import XML souborem</button>
+            <input class="visually-hidden" id="xml-file-input" type="file" accept=".xml,application/xml,text/xml">
             <button class="ghost-button" id="xml-export-button" type="button">Export XML</button>
             <button class="ghost-button" id="export-fridge-button" type="button">Export lednice</button>
             <button class="ghost-button" id="export-button" type="button">Export všech dat</button>
@@ -370,6 +380,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux9"></script>
+    <script src="app.js?v=ux10"></script>
   </body>
 </html>
