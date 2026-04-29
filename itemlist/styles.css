@@ -654,6 +654,16 @@ h1 {
   align-items: end;
 }
 
+.combo-runner-field select,
+.combo-change-modal select {
+  padding-left: 16px;
+}
+
+.combo-item-row .combo-product,
+.combo-item-row .combo-category {
+  padding-left: 16px;
+}
+
 .combo-form {
   margin-bottom: 14px;
 }
@@ -843,6 +853,14 @@ body.dark-mode .modal {
   justify-content: center;
   gap: 8px;
   min-width: 76px;
+  border-color: transparent;
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: var(--button-shadow);
+}
+
+.scan-shortcut-button:hover {
+  background: var(--accent-hover);
 }
 
 .scan-shortcut-button .button-icon {
@@ -977,14 +995,25 @@ body.dark-mode .modal {
 }
 
 .history-filters {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(170px, 1fr) minmax(170px, 1fr);
+  align-items: end;
   gap: 10px;
+  margin: 0 0 14px;
 }
 
 .compact-field {
-  width: min(210px, 100%);
+  width: 100%;
+}
+
+.history-combo-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 6px 0 12px;
+}
+
+.changes-entry-form {
+  margin-bottom: 10px;
 }
 
 .field {
@@ -1216,12 +1245,18 @@ body.dark-mode .modal {
 }
 
 .primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 48px;
+  min-width: 0;
   padding: 0 22px;
   background: var(--accent);
   color: #ffffff;
   font-weight: 700;
-  white-space: nowrap;
+  line-height: 1.15;
+  text-align: center;
+  overflow-wrap: anywhere;
   box-shadow: var(--button-shadow);
 }
 
@@ -1239,23 +1274,49 @@ body.dark-mode .modal {
 }
 
 .ghost-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 38px;
+  min-width: 0;
   border: 1px solid var(--line);
   background: var(--field);
   color: var(--ink);
   padding: 0 12px;
+  line-height: 1.15;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .ghost-button:hover {
   background: var(--panel-strong);
 }
 
+.scan-shortcut-button.ghost-button {
+  min-height: 48px;
+  border-color: transparent;
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: var(--button-shadow);
+}
+
+.scan-shortcut-button.ghost-button:hover {
+  background: var(--accent-hover);
+}
+
 .danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 38px;
+  min-width: 0;
   padding: 0 14px;
   background: var(--danger-bg);
   color: var(--danger);
   font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .danger-button:hover {
@@ -1493,6 +1554,7 @@ table {
   place-items: center;
   width: 34px;
   height: 34px;
+  align-self: center;
   flex: 0 0 auto;
   border: 1px solid var(--soft-line);
   border-radius: 8px;
@@ -1712,12 +1774,34 @@ tbody tr:last-child td {
 }
 
 .history-entry-icon {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   border-radius: 999px;
+  line-height: 1;
+  text-align: center;
   font-weight: 900;
+}
+
+.history-entry-icon::before {
+  display: block;
+  font-size: 1.05rem;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.history-entry.is-positive .history-entry-icon::before {
+  content: "+";
+}
+
+.history-entry.is-negative .history-entry-icon::before {
+  content: "-";
+}
+
+.history-entry.is-neutral .history-entry-icon::before {
+  content: "=";
 }
 
 .history-entry.is-positive .history-entry-icon {
@@ -1739,7 +1823,8 @@ tbody tr:last-child td {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .history-entry time {
@@ -1807,7 +1892,7 @@ tbody tr:last-child td {
   display: grid;
   gap: 4px;
   min-width: 0;
-  padding-left: 4px;
+  padding-left: 10px;
 }
 
 .combo-change-product strong {
@@ -2117,7 +2202,7 @@ h1 {
 .field select,
 .field textarea,
 .compact-form > input,
-.combo-runner > select,
+.combo-runner select,
 .list-name-input {
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -2129,7 +2214,7 @@ body.dark-mode .field input,
 body.dark-mode .field select,
 body.dark-mode .field textarea,
 body.dark-mode .compact-form > input,
-body.dark-mode .combo-runner > select,
+body.dark-mode .combo-runner select,
 body.dark-mode .list-name-input {
   box-shadow: none;
 }
@@ -2137,7 +2222,7 @@ body.dark-mode .list-name-input {
 .field input,
 .field select,
 .compact-form > input,
-.combo-runner > select {
+.combo-runner select {
   min-height: 50px;
 }
 
@@ -2146,7 +2231,7 @@ body.dark-mode .list-name-input {
 }
 
 .field select,
-.combo-runner > select {
+.combo-runner select {
   appearance: none;
   -webkit-appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m7 10 5 5 5-5' fill='none' stroke='%23657084' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -2154,6 +2239,16 @@ body.dark-mode .list-name-input {
   background-repeat: no-repeat;
   background-size: 18px;
   padding-right: 42px;
+}
+
+.combo-runner-field select,
+.combo-change-modal select {
+  padding-left: 18px;
+}
+
+.combo-item-row .combo-product,
+.combo-item-row .combo-category {
+  padding-left: 16px;
 }
 
 .native-select-source {

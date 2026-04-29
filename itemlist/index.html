@@ -69,7 +69,84 @@
           </div>
           <div class="category-filter-panel" id="pantry-category-filters" aria-label="Filtr kategorií"></div>
 
-          <form class="entry-form" id="entry-form" autocomplete="off">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Potravina</th>
+                  <th scope="col">Kategorie</th>
+                  <th scope="col">Množství</th>
+                </tr>
+              </thead>
+              <tbody id="items-body"></tbody>
+            </table>
+            <div class="empty-state" id="empty-state">Lednice je zatím prázdná.</div>
+          </div>
+        </section>
+
+        <section class="app-view" id="view-shopping" data-view-panel="shopping" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Co koupit</p>
+              <h1>Nákupní list</h1>
+            </div>
+          </div>
+          <label class="admin-checkbox setting-line">
+            <input id="shopping-subtract-stock" type="checkbox">
+            <span>Odečítat od nákupního listu to, co už je v lednici</span>
+          </label>
+          <form class="shopping-form" id="shopping-form" autocomplete="off">
+            <label class="field">
+              <span>Potravina</span>
+              <input id="shopping-product" type="text" data-combobox-source="product-options" placeholder="Např. máslo">
+            </label>
+            <label class="field">
+              <span>Množství</span>
+              <input id="shopping-amount" type="number" min="0.01" step="any" inputmode="decimal" placeholder="1">
+            </label>
+            <label class="field">
+              <span>Jednotka</span>
+              <select id="shopping-unit">
+                <option value="g">g</option>
+                <option value="ml">ml</option>
+                <option value="ks">ks</option>
+                <option value="kg">kg</option>
+              </select>
+            </label>
+            <button class="primary-button" type="submit">Přidat</button>
+          </form>
+          <div class="card-list" id="shopping-list"></div>
+        </section>
+
+        <section class="app-view" id="view-history" data-view-panel="history" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Změny</p>
+              <h1>Historie akcí</h1>
+            </div>
+          </div>
+          <div class="history-filters">
+            <label class="field compact-field period-field">
+              <span>Období</span>
+              <select id="history-period-filter">
+                <option value="">Vše</option>
+                <option value="today">Dnes</option>
+                <option value="3d">3 dny</option>
+                <option value="week">Týden</option>
+                <option value="month">Měsíc</option>
+                <option value="year">Rok</option>
+              </select>
+            </label>
+            <label class="field compact-field date-filter-field">
+              <span>Od</span>
+              <input id="history-date-from" type="date">
+            </label>
+            <label class="field compact-field date-filter-field">
+              <span>Do</span>
+              <input id="history-date-to" type="date">
+            </label>
+          </div>
+          <form class="entry-form changes-entry-form" id="entry-form" autocomplete="off">
             <label class="field combo-field product-field">
               <span>Potravina</span>
               <input id="product-input" name="product" type="text" data-combobox-source="product-options" placeholder="Např. rohlík" required>
@@ -137,88 +214,9 @@
             <button class="primary-button" id="submit-button" type="submit">Zapsat</button>
             <button class="ghost-button" id="cancel-edit" type="button" hidden>Zrušit úpravu</button>
           </form>
-
           <p class="message" id="message" role="status" aria-live="polite"></p>
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Potravina</th>
-                  <th scope="col">Kategorie</th>
-                  <th scope="col">Množství</th>
-                </tr>
-              </thead>
-              <tbody id="items-body"></tbody>
-            </table>
-            <div class="empty-state" id="empty-state">Lednice je zatím prázdná.</div>
-          </div>
-        </section>
-
-        <section class="app-view" id="view-shopping" data-view-panel="shopping" hidden>
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Co koupit</p>
-              <h1>Nákupní list</h1>
-            </div>
-          </div>
-          <label class="admin-checkbox setting-line">
-            <input id="shopping-subtract-stock" type="checkbox">
-            <span>Odečítat od nákupního listu to, co už je v lednici</span>
-          </label>
-          <form class="shopping-form" id="shopping-form" autocomplete="off">
-            <label class="field">
-              <span>Potravina</span>
-              <input id="shopping-product" type="text" data-combobox-source="product-options" placeholder="Např. máslo">
-            </label>
-            <label class="field">
-              <span>Množství</span>
-              <input id="shopping-amount" type="number" min="0.01" step="any" inputmode="decimal" placeholder="1">
-            </label>
-            <label class="field">
-              <span>Jednotka</span>
-              <select id="shopping-unit">
-                <option value="g">g</option>
-                <option value="ml">ml</option>
-                <option value="ks">ks</option>
-                <option value="kg">kg</option>
-              </select>
-            </label>
-            <button class="primary-button" type="submit">Přidat</button>
-          </form>
-          <div class="card-list" id="shopping-list"></div>
-        </section>
-
-        <section class="app-view" id="view-history" data-view-panel="history" hidden>
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Změny</p>
-              <h1>Historie akcí</h1>
-            </div>
-            <div class="history-filters">
-              <button class="ghost-button" id="open-combo-change" type="button">Kombinace</button>
-              <label class="field compact-field">
-                <span>Období</span>
-                <select id="history-period-filter">
-                  <option value="">Vše</option>
-                  <option value="today">Dnes</option>
-                  <option value="3d">3 dny</option>
-                  <option value="week">Týden</option>
-                  <option value="month">Měsíc</option>
-                  <option value="year">Rok</option>
-                  <option value="older">Starší</option>
-                  <option value="custom">Od-do</option>
-                </select>
-              </label>
-              <label class="field compact-field">
-                <span>Od</span>
-                <input id="history-date-from" type="date">
-              </label>
-              <label class="field compact-field">
-                <span>Do</span>
-                <input id="history-date-to" type="date">
-              </label>
-            </div>
+          <div class="history-combo-actions">
+            <button class="ghost-button" id="open-combo-change" type="button">Kombinace</button>
           </div>
           <div class="history-list" id="history-list" aria-live="polite"></div>
         </section>
@@ -318,7 +316,10 @@
             </div>
           </form>
           <div class="combo-runner">
-            <select id="combo-select"></select>
+            <label class="field combo-runner-field">
+              <span>Kombinace</span>
+              <select id="combo-select"></select>
+            </label>
             <button class="primary-button" id="use-combo-button" type="button">Použít kombinaci</button>
           </div>
           <div class="card-list" id="combo-list"></div>

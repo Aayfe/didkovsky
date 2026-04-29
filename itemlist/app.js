@@ -275,11 +275,11 @@ function setupEvents() {
   pantryCategoryFilters?.addEventListener("change", handlePantryCategoryFilterChange);
   historyPeriodFilter.addEventListener("change", handleHistoryFilterChange);
   historyDateFrom.addEventListener("input", () => {
-    historyPeriodFilter.value = "custom";
+    historyPeriodFilter.value = "";
     renderHistory();
   });
   historyDateTo.addEventListener("input", () => {
-    historyPeriodFilter.value = "custom";
+    historyPeriodFilter.value = "";
     renderHistory();
   });
   statsMetrics.addEventListener("change", renderHistory);
@@ -303,7 +303,7 @@ function setupEvents() {
   comboItemsList.addEventListener("change", handleComboBuilderInput);
   useComboButton.addEventListener("click", useSelectedCombo);
   comboList.addEventListener("click", handleComboClick);
-  openComboChangeButton?.addEventListener("click", openComboChangeModal);
+  openComboChangeButton?.addEventListener("click", () => openComboChangeModal());
   comboChangeSelect?.addEventListener("change", renderComboChangeItems);
   cancelComboChange?.addEventListener("click", closeComboChangeModal);
   applyComboChangeButton?.addEventListener("click", applyComboChangeFromModal);
@@ -2254,6 +2254,7 @@ function startEdit(id) {
   setActionButtonsDisabled(true);
   submitButton.textContent = "Uložit";
   cancelEditButton.hidden = false;
+  switchView("history");
   productInput.focus();
   showMessage("");
 }
@@ -2682,28 +2683,10 @@ async function useSelectedCombo() {
     return;
   }
 
-  let changed = 0;
-
-  combo.items.forEach((item) => {
-    const result = upsertItemAmount({
-      ...item,
-      action: "purchase"
-    });
-
-    if (result !== "missing") {
-      changed += 1;
-    }
-  });
-
-  recordHistory(`Použita kombinace ${combo.name}, přidáno ${changed} položek do zásob.`, "combo");
-  renderItems();
-  renderCombos();
-  renderHistory();
-  showMessage(`Kombinace ${combo.name} přidána do lednice.`);
-  await saveState();
+  openComboChangeModal(combo.id);
 }
 
-function openComboChangeModal() {
+function openComboChangeModal(selectedComboId = "") {
   if (!comboChangeModal || !comboChangeSelect) {
     return;
   }
@@ -2722,6 +2705,10 @@ function openComboChangeModal() {
       option.textContent = combo.name;
       comboChangeSelect.append(option);
     });
+  }
+
+  if (selectedComboId) {
+    comboChangeSelect.value = selectedComboId;
   }
 
   comboChangeAction.value = "purchase";
@@ -4713,7 +4700,7 @@ function renderHistoryRows(container, entries) {
 
     row.className = `history-entry ${visual.className}`;
     icon.className = "history-entry-icon";
-    icon.textContent = visual.icon;
+    icon.setAttribute("aria-hidden", "true");
     text.textContent = entry.text;
     time.dateTime = entry.createdAt;
     time.textContent = Number.isNaN(date.getTime())
@@ -5046,10 +5033,8 @@ function escapeHtml(value) {
 }
 
 function handleHistoryFilterChange() {
-  if (historyPeriodFilter.value !== "custom") {
-    historyDateFrom.value = "";
-    historyDateTo.value = "";
-  }
+  historyDateFrom.value = "";
+  historyDateTo.value = "";
 
   renderHistory();
 }
@@ -5064,10 +5049,6 @@ function getFilteredHistory() {
       return true;
     }
 
-    if (range.olderThan) {
-      return eventDate < range.olderThan;
-    }
-
     return (!range.from || eventDate >= range.from) && (!range.to || eventDate <= range.to);
   });
 }
@@ -5076,7 +5057,7 @@ function getHistoryFilterRange() {
   const today = getLocalDateValue(new Date());
   const period = historyPeriodFilter.value;
 
-  if (period === "custom") {
+  if (historyDateFrom.value || historyDateTo.value) {
     return {
       from: historyDateFrom.value || "",
       to: historyDateTo.value || ""
@@ -5096,10 +5077,6 @@ function getHistoryFilterRange() {
 
   if (days) {
     return { from: shiftLocalDate(today, -(days - 1)), to: today };
-  }
-
-  if (period === "older") {
-    return { olderThan: shiftLocalDate(today, -365) };
   }
 
   return {};
