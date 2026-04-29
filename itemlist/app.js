@@ -50,7 +50,10 @@ const actionButtons = document.querySelectorAll("[data-action-choice]");
 const amountInput = document.querySelector("#amount-input");
 const amountStepButtons = document.querySelectorAll("[data-amount-step]");
 const unitSelect = document.querySelector("#unit-select");
+const priceInput = document.querySelector("#price-input");
+const eventDateInput = document.querySelector("#event-date-input");
 const submitButton = document.querySelector("#submit-button");
+const pantryScanButton = document.querySelector("#pantry-scan-button");
 const cancelEditButton = document.querySelector("#cancel-edit");
 const deleteListButton = document.querySelector("#delete-list-button");
 const deleteListModal = document.querySelector("#delete-list-modal");
@@ -69,7 +72,10 @@ const confirmImport = document.querySelector("#confirm-import");
 const itemsBody = document.querySelector("#items-body");
 const tableWrap = document.querySelector(".table-wrap");
 const historyList = document.querySelector("#history-list");
-const historyDateFilter = document.querySelector("#history-date-filter");
+const historyPeriodFilter = document.querySelector("#history-period-filter");
+const historyDateFrom = document.querySelector("#history-date-from");
+const historyDateTo = document.querySelector("#history-date-to");
+const priceStats = document.querySelector("#price-stats");
 const catalogBody = document.querySelector("#catalog-body");
 const catalogForm = document.querySelector("#catalog-form");
 const catalogName = document.querySelector("#catalog-name");
@@ -113,7 +119,6 @@ const DEFAULT_CATEGORIES = [
   "Mražené",
   "Trvanlivé",
   "Drogerie",
-  "Kombinace",
   "Ostatní"
 ];
 const RECEIPT_SKIP_PATTERNS = [
@@ -233,7 +238,16 @@ function setupEvents() {
   toggleAdminPanelButton.addEventListener("click", toggleAdminPanel);
   adminForm.addEventListener("submit", saveAllowedUser);
   allowedUsersList.addEventListener("click", handleAllowedUsersClick);
-  historyDateFilter.addEventListener("input", renderHistory);
+  pantryScanButton.addEventListener("click", openEanImport);
+  historyPeriodFilter.addEventListener("change", handleHistoryFilterChange);
+  historyDateFrom.addEventListener("input", () => {
+    historyPeriodFilter.value = "custom";
+    renderHistory();
+  });
+  historyDateTo.addEventListener("input", () => {
+    historyPeriodFilter.value = "custom";
+    renderHistory();
+  });
   darkModeToggle.addEventListener("change", toggleDarkMode);
   shoppingSubtractStock.addEventListener("change", updateShoppingSubtractSetting);
   settingsShoppingSubtractStock.addEventListener("change", updateShoppingSubtractSetting);
@@ -258,6 +272,8 @@ function setupEvents() {
 
     const name = formatProductName(productInput.value);
     const amount = Number(amountInput.value);
+    const price = parseOptionalPrice(priceInput.value);
+    const eventDate = normalizeEventDate(eventDateInput.value);
     const category = tidyName(categoryInput.value) || "Ostatní";
     const existingProduct = findItemByName(name);
     const action = actionSelect.value;
@@ -289,7 +305,7 @@ function setupEvents() {
       return;
     }
 
-    await applyItemChange({ name, amount, unit, action, category });
+    await applyItemChange({ name, amount, unit, action, category, price, eventDate });
   });
 
   amountInput.addEventListener("input", () => {
@@ -302,6 +318,8 @@ function setupEvents() {
   productInput.addEventListener("change", syncUnitFromProduct);
   productInput.addEventListener("input", syncCategoryFromProduct);
   productInput.addEventListener("change", syncCategoryFromProduct);
+  productInput.addEventListener("input", syncEntryProductLock);
+  productInput.addEventListener("change", syncEntryProductLock);
   addListButton.addEventListener("click", addList);
 
   listTabs.addEventListener("click", (event) => {
@@ -417,6 +435,10 @@ function setupComboboxes() {
       return;
     }
 
+    if (input.readOnly && !input.dataset.selectCombobox) {
+      return;
+    }
+
     prepareComboboxInput(input);
     renderComboboxMenu(input);
   });
@@ -424,7 +446,7 @@ function setupComboboxes() {
   document.addEventListener("input", (event) => {
     const input = event.target.closest?.(COMBOBOX_INPUT_SELECTOR);
 
-    if (input) {
+    if (input && (!input.readOnly || input.dataset.selectCombobox)) {
       renderComboboxMenu(input);
     }
   });
@@ -432,7 +454,7 @@ function setupComboboxes() {
   document.addEventListener("click", (event) => {
     const input = event.target.closest?.(COMBOBOX_INPUT_SELECTOR);
 
-    if (input && input === activeComboboxInput) {
+    if (input && input === activeComboboxInput && (!input.readOnly || input.dataset.selectCombobox)) {
       renderComboboxMenu(input);
     }
   });
@@ -545,8 +567,40 @@ function getComboboxOptions(input) {
 
       return key.includes(query) || normalize(item.meta).includes(query);
     })
-    .sort((a, b) => a.value.localeCompare(b.value, "cs"))
+    .sort((a, b) => getComboboxOptionScore(a, query) - getComboboxOptionScore(b, query)
+      || a.value.localeCompare(b.value, "cs"))
     .slice(0, 8);
+}
+
+function getComboboxOptionScore(item, query) {
+  if (!query) {
+    return 100;
+  }
+
+  const value = normalize(item.value);
+  const meta = normalize(item.meta);
+
+  if (value === query) {
+    return 0;
+  }
+
+  if (value.startsWith(query)) {
+    return 1;
+  }
+
+  if (value.split(" ").some((part) => part.startsWith(query))) {
+    return 2;
+  }
+
+  if (value.includes(query)) {
+    return 3;
+  }
+
+  if (meta.startsWith(query)) {
+    return 4;
+  }
+
+  return 5;
 }
 
 function getComboboxMenu(input, createIfMissing = true) {
@@ -632,7 +686,16 @@ function selectComboboxValue(input, value, optionValue = value) {
   input.dispatchEvent(new Event("input", { bubbles: true }));
   input.dispatchEvent(new Event("change", { bubbles: true }));
   hideComboboxMenu(input);
-  input.focus();
+
+  if (input === productInput) {
+    amountInput.focus();
+    amountInput.select();
+  } else if (input === shoppingProduct) {
+    shoppingAmount.focus();
+    shoppingAmount.select();
+  } else {
+    input.focus();
+  }
 }
 
 function hideComboboxMenu(input) {
@@ -660,6 +723,7 @@ async function initializeApp() {
   renderShoppingList();
   renderCombos();
   syncSettingsControls();
+  setDefaultEventDate();
   applyTheme();
   switchView(activeView, { keepMenu: true });
   setActionState(actionSelect.value);
@@ -1289,6 +1353,21 @@ function parseImportAmount(value) {
   return Number.isFinite(amount) && amount > 0 ? roundAmount(amount) : null;
 }
 
+function parseOptionalPrice(value) {
+  const normalized = String(value || "").replace(",", ".").trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  const price = Number(normalized);
+  return Number.isFinite(price) && price >= 0 ? roundAmount(price) : null;
+}
+
+function normalizeEventDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || "")) ? value : getLocalDateValue(new Date());
+}
+
 function normalizeImportAmountAndUnit(amount, unitValue) {
   const normalized = normalize(String(unitValue || ""));
 
@@ -1642,7 +1721,13 @@ function sanitizeState(state) {
           text: entry.text,
           type: typeof entry.type === "string" ? entry.type : "info",
           listName: typeof entry.listName === "string" ? entry.listName : "",
-          createdAt: entry.createdAt
+          createdAt: entry.createdAt,
+          occurredAt: typeof entry.occurredAt === "string" ? entry.occurredAt : entry.createdAt.slice(0, 10),
+          product: typeof entry.product === "string" ? entry.product : "",
+          amount: Number.isFinite(Number(entry.amount)) ? roundAmount(Number(entry.amount)) : null,
+          unit: typeof entry.unit === "string" ? entry.unit : "",
+          price: Number.isFinite(Number(entry.price)) ? roundAmount(Number(entry.price)) : null,
+          action: typeof entry.action === "string" ? entry.action : ""
         };
       })
       .slice(0, HISTORY_LIMIT)
@@ -1866,7 +1951,7 @@ async function confirmDeleteAllLists() {
   await saveState();
 }
 
-async function applyItemChange({ name, amount, unit, action, category }) {
+async function applyItemChange({ name, amount, unit, action, category, price = null, eventDate = "" }) {
   const existingItem = findItemByName(name);
   const matchedDifferentName = existingItem && normalize(existingItem.name) !== normalize(name);
   const result = upsertItemAmount({ name, amount, unit, action, category });
@@ -1899,7 +1984,15 @@ async function applyItemChange({ name, amount, unit, action, category }) {
     }
   }
 
-  recordHistory(getItemHistoryText(itemName, amount, unit, action, result), "item");
+  const historyText = getItemHistoryText(itemName, amount, unit, action, result, price);
+  recordHistory(historyText, "item", getActiveList(), {
+    action,
+    product: itemName,
+    amount,
+    unit,
+    price,
+    occurredAt: eventDate || getLocalDateValue(new Date())
+  });
   renderHistory();
   renderItems();
   resetForm();
@@ -1987,7 +2080,7 @@ function upsertItemAmount({ name, amount, unit, action, category = "Ostatní" })
   return "updated";
 }
 
-function getItemHistoryText(name, amount, unit, action, result) {
+function getItemHistoryText(name, amount, unit, action, result, price = null) {
   const labels = {
     purchase: "Nákup",
     gift: "Dar",
@@ -2003,8 +2096,10 @@ function getItemHistoryText(name, amount, unit, action, result) {
     return `${labels[action] || "Odebráno"}: ${name} do nuly.`;
   }
 
+  const priceSuffix = Number.isFinite(price) && price > 0 ? `, cena ${formatPrice(price)}` : "";
+
   if (result === "set") {
-    return `Nastaveno ${name}: ${formatAmount(amount)} ${unit}.`;
+    return `Nastaveno ${name}: ${formatAmount(amount)} ${unit}${priceSuffix}.`;
   }
 
   if (["eaten", "discarded", "adjustMinus", "subtract"].includes(action)) {
@@ -2012,10 +2107,10 @@ function getItemHistoryText(name, amount, unit, action, result) {
   }
 
   if (result === "created") {
-    return `${labels[action] || "Přidáno"}: ${name} ${formatAmount(amount)} ${unit}.`;
+    return `${labels[action] || "Přidáno"}: ${name} ${formatAmount(amount)} ${unit}${priceSuffix}.`;
   }
 
-  return `${labels[action] || "Přidáno"}: ${name} +${formatAmount(amount)} ${unit}.`;
+  return `${labels[action] || "Přidáno"}: ${name} +${formatAmount(amount)} ${unit}${priceSuffix}.`;
 }
 
 function getActionLabel(action) {
@@ -2230,6 +2325,8 @@ function renderShoppingList() {
   }
 
   shoppingItems.forEach((item) => {
+    const parsed = parseImportLine(item.name);
+    const summary = parsed ? getShoppingNeedSummary(parsed) : null;
     const row = document.createElement("article");
     const content = document.createElement("div");
     const text = document.createElement("strong");
@@ -2239,10 +2336,11 @@ function renderShoppingList() {
     const remove = document.createElement("button");
 
     row.className = `card-row${item.done ? " is-done" : ""}`;
+    row.classList.toggle("is-covered", Boolean(appSettings.subtractStockFromShopping && summary && summary.missing === 0));
     content.className = "row-content";
-    text.textContent = item.name;
+    text.textContent = getShoppingDisplayTitle(item, parsed, summary);
     meta.className = "muted-text";
-    meta.textContent = getShoppingItemMeta(item);
+    meta.textContent = getShoppingItemMeta(item, parsed, summary);
     actions.className = "row-actions";
     toggle.className = "ghost-button";
     toggle.type = "button";
@@ -2296,32 +2394,32 @@ function mergeShoppingItems() {
   shoppingItems = merged;
 }
 
-function getShoppingItemMeta(item) {
+function getShoppingDisplayTitle(item, parsed, summary) {
+  if (!appSettings.subtractStockFromShopping || !parsed || !summary) {
+    return item.name;
+  }
+
+  if (summary.missing === 0) {
+    return `${parsed.name}: není potřeba kupovat`;
+  }
+
+  return `${parsed.name}: koupit ${formatAmountWithUnit(summary.missing, parsed.unit)}`;
+}
+
+function getShoppingItemMeta(item, parsed = parseImportLine(item.name), summary = parsed ? getShoppingNeedSummary(parsed) : null) {
   if (!appSettings.subtractStockFromShopping) {
     return "";
   }
-
-  const parsed = parseImportLine(item.name);
 
   if (!parsed) {
     return "Zadej třeba: Mléko 1000 ml, potom odečtu zásoby.";
   }
 
-  const summary = getShoppingNeedSummary(parsed);
-
-  if (summary.totalWanted !== parsed.amount) {
-    if (summary.missing === 0) {
-      return `Celkem chceš ${formatAmount(summary.totalWanted)} ${parsed.unit}, v zásobách je ${formatAmount(summary.currentAmount)} ${parsed.unit}.`;
-    }
-
-    return `Celkem chceš ${formatAmount(summary.totalWanted)} ${parsed.unit}, koupit ještě ${formatAmount(summary.missing)} ${parsed.unit}.`;
-  }
-
   if (summary.missing === 0) {
-    return `V zásobách je ${formatAmount(summary.currentAmount)} ${parsed.unit}, kupovat netřeba.`;
+    return `Cíl ${formatAmountWithUnit(summary.totalWanted, parsed.unit)}, v zásobách ${formatAmountWithUnit(summary.currentAmount, parsed.unit)}.`;
   }
 
-  return `Koupit ještě ${formatAmount(summary.missing)} ${parsed.unit} z ${formatAmount(parsed.amount)} ${parsed.unit}.`;
+  return `Zadáno ${formatAmountWithUnit(summary.totalWanted, parsed.unit)}, v zásobách ${formatAmountWithUnit(summary.currentAmount, parsed.unit)}.`;
 }
 
 function getShoppingNeedSummary(parsed) {
@@ -2614,21 +2712,17 @@ function renderItems() {
       const row = document.createElement("tr");
 
       row.innerHTML = `
-        <td><span class="product-name"></span></td>
-        <td class="category-cell"></td>
-        <td class="number-cell">${formatAmount(item.amount)}</td>
-        <td class="unit-cell"></td>
-        <td class="icon-cell">
-          <div class="row-actions">
-            <button class="ghost-button" type="button" data-action="edit" data-id="${item.id}" aria-label="Upravit ${escapeAttribute(item.name)}">Upravit</button>
-            <button class="danger-button" type="button" data-action="delete" data-id="${item.id}" aria-label="Smazat ${escapeAttribute(item.name)}">Smazat</button>
-          </div>
+        <td>
+          <span class="product-name"></span>
+          <small class="product-card-category"></small>
         </td>
+        <td class="category-cell"></td>
+        <td class="number-cell">${formatAmountWithUnit(item.amount, item.unit)}</td>
       `;
 
       row.querySelector(".product-name").textContent = item.name;
       row.querySelector(".category-cell").textContent = item.category || "Ostatní";
-      row.querySelector(".unit-cell").textContent = item.unit;
+      row.querySelector(".product-card-category").textContent = item.category || "Ostatní";
       itemsBody.append(row);
     });
 }
@@ -2676,7 +2770,8 @@ function renderCategoryOptions() {
       ...DEFAULT_CATEGORIES,
       ...getCatalogItems().map((item) => item.category || "Ostatní")
     ])
-  ].sort((a, b) => a.localeCompare(b, "cs"));
+  ].filter((category) => normalize(category) !== "kombinace")
+    .sort((a, b) => a.localeCompare(b, "cs"));
   categoryOptions.replaceChildren();
 
   categories.forEach((category) => {
@@ -2689,7 +2784,8 @@ function renderCategoryOptions() {
 async function saveCatalogItem(event) {
   event.preventDefault();
   const name = formatProductName(catalogName.value);
-  const category = tidyName(catalogCategory.value) || "Ostatní";
+  const categoryValue = tidyName(catalogCategory.value) || "Ostatní";
+  const category = normalize(categoryValue) === "kombinace" ? "Ostatní" : categoryValue;
   const unit = normalizeImportUnit(catalogUnit.value || "ks");
 
   if (!name) {
@@ -2819,7 +2915,8 @@ function addOrUpdateCatalogAlias() {
   const ean = normalizeEan(eanText);
   const amount = Number(catalogAliasAmount.value);
   const unit = normalizeImportUnit(catalogAliasUnit.value || catalogUnit.value || "ks");
-  const category = tidyName(catalogCategory.value) || "Ostatní";
+  const categoryValue = tidyName(catalogCategory.value) || "Ostatní";
+  const category = normalize(categoryValue) === "kombinace" ? "Ostatní" : categoryValue;
 
   if (!name) {
     showMessage("Zadej název aliasu, třeba Mléko Kunín.", true);
@@ -4141,28 +4238,32 @@ function getCatalogItems() {
   return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "cs"));
 }
 
-function recordHistory(text, type = "info", list = getActiveList()) {
+function recordHistory(text, type = "info", list = getActiveList(), details = {}) {
   history.unshift({
     id: createId(),
     text,
     type,
     listName: list ? getDisplayListName(list) : "",
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    occurredAt: details.occurredAt || getLocalDateValue(new Date()),
+    product: details.product || "",
+    amount: Number.isFinite(Number(details.amount)) ? roundAmount(Number(details.amount)) : null,
+    unit: details.unit || "",
+    price: Number.isFinite(Number(details.price)) ? roundAmount(Number(details.price)) : null,
+    action: details.action || ""
   });
   history = history.slice(0, HISTORY_LIMIT);
 }
 
 function renderHistory() {
   historyList.replaceChildren();
-  const selectedDate = historyDateFilter?.value || "";
-  const visibleHistory = selectedDate
-    ? history.filter((entry) => entry.createdAt.slice(0, 10) === selectedDate)
-    : history;
+  const visibleHistory = getFilteredHistory();
+  renderPriceStats(visibleHistory);
 
   if (!visibleHistory.length) {
     const empty = document.createElement("p");
     empty.className = "message";
-    empty.textContent = selectedDate ? "Pro vybrané datum nejsou žádné změny." : "Historie je zatím prázdná.";
+    empty.textContent = "Pro vybrané období nejsou žádné změny.";
     historyList.append(empty);
     return;
   }
@@ -4171,7 +4272,9 @@ function renderHistory() {
     const row = document.createElement("article");
     const text = document.createElement("strong");
     const time = document.createElement("time");
+    const meta = document.createElement("span");
     const date = new Date(entry.createdAt);
+    const eventDate = getHistoryEventDate(entry);
 
     row.className = "history-entry";
     text.textContent = entry.text;
@@ -4182,20 +4285,165 @@ function renderHistory() {
         dateStyle: "short",
         timeStyle: "short"
       });
+    meta.className = "muted-text";
+    meta.textContent = eventDate ? `Stalo se: ${formatDisplayDate(eventDate)}` : "";
 
     row.append(text, time);
+
+    if (meta.textContent) {
+      row.append(meta);
+    }
+
     historyList.append(row);
   });
+}
+
+function handleHistoryFilterChange() {
+  if (historyPeriodFilter.value !== "custom") {
+    historyDateFrom.value = "";
+    historyDateTo.value = "";
+  }
+
+  renderHistory();
+}
+
+function getFilteredHistory() {
+  const range = getHistoryFilterRange();
+
+  return history.filter((entry) => {
+    const eventDate = getHistoryEventDate(entry);
+
+    if (!range.from && !range.to) {
+      return true;
+    }
+
+    if (range.olderThan) {
+      return eventDate < range.olderThan;
+    }
+
+    return (!range.from || eventDate >= range.from) && (!range.to || eventDate <= range.to);
+  });
+}
+
+function getHistoryFilterRange() {
+  const today = getLocalDateValue(new Date());
+  const period = historyPeriodFilter.value;
+
+  if (period === "custom") {
+    return {
+      from: historyDateFrom.value || "",
+      to: historyDateTo.value || ""
+    };
+  }
+
+  if (period === "today") {
+    return { from: today, to: today };
+  }
+
+  const days = {
+    "3d": 3,
+    week: 7,
+    month: 31,
+    year: 365
+  }[period];
+
+  if (days) {
+    return { from: shiftLocalDate(today, -(days - 1)), to: today };
+  }
+
+  if (period === "older") {
+    return { olderThan: shiftLocalDate(today, -365) };
+  }
+
+  return {};
+}
+
+function shiftLocalDate(dateValue, days) {
+  const date = new Date(`${dateValue}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return getLocalDateValue(date);
+}
+
+function getHistoryEventDate(entry) {
+  return normalizeEventDate(entry.occurredAt || String(entry.createdAt || "").slice(0, 10));
+}
+
+function formatDisplayDate(dateValue) {
+  const date = new Date(`${dateValue}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? dateValue : date.toLocaleDateString("cs-CZ");
+}
+
+function renderPriceStats(entries) {
+  if (!priceStats) {
+    return;
+  }
+
+  const purchases = entries.filter((entry) => {
+    return ["purchase", "shopping"].includes(entry.action || entry.type)
+      && Number.isFinite(Number(entry.price))
+      && Number(entry.price) > 0;
+  });
+  const total = purchases.reduce((sum, entry) => sum + Number(entry.price), 0);
+  const average = purchases.length ? total / purchases.length : 0;
+
+  priceStats.replaceChildren();
+
+  const totalItem = document.createElement("div");
+  const countItem = document.createElement("div");
+  const averageItem = document.createElement("div");
+
+  totalItem.innerHTML = `<span>Útrata</span><strong>${formatPrice(total)}</strong>`;
+  countItem.innerHTML = `<span>Nákupních zápisů</span><strong>${purchases.length}</strong>`;
+  averageItem.innerHTML = `<span>Průměr</span><strong>${formatPrice(average)}</strong>`;
+  priceStats.append(totalItem, countItem, averageItem);
 }
 
 function resetForm() {
   editingId = null;
   form.reset();
+  setDefaultEventDate();
+  unlockEntryProductMeta();
   setActionState("purchase");
   setActionButtonsDisabled(false);
   updateSubmitButtonText();
   cancelEditButton.hidden = true;
   productInput.focus();
+}
+
+function setDefaultEventDate() {
+  if (eventDateInput) {
+    eventDateInput.value = getLocalDateValue(new Date());
+  }
+}
+
+function getLocalDateValue(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function syncEntryProductLock() {
+  const item = findCatalogItemByName(productInput.value);
+
+  if (!item) {
+    unlockEntryProductMeta();
+    return;
+  }
+
+  categoryInput.value = item.category || "Ostatní";
+  unitSelect.value = item.unit || "ks";
+  categoryInput.readOnly = true;
+  unitSelect.disabled = true;
+  categoryInput.closest(".field")?.classList.add("is-locked");
+  unitSelect.closest(".field")?.classList.add("is-locked");
+}
+
+function unlockEntryProductMeta() {
+  categoryInput.readOnly = false;
+  unitSelect.disabled = false;
+  categoryInput.closest(".field")?.classList.remove("is-locked");
+  unitSelect.closest(".field")?.classList.remove("is-locked");
 }
 
 function showMessage(text, isError = false) {
@@ -4249,12 +4497,12 @@ function updateSubmitButtonText() {
 
 function stepAmount(direction) {
   const currentValue = Number(amountInput.value);
-  const min = 1;
+  const min = 0.01;
   const next = Number.isFinite(currentValue) && currentValue >= min
-    ? Math.max(min, Math.round(currentValue) + direction)
-    : min;
+    ? Math.max(min, roundAmount(currentValue + direction))
+    : 1;
 
-  amountInput.value = String(next);
+  amountInput.value = formatFormNumber(next);
   amountInput.dispatchEvent(new Event("input", { bubbles: true }));
   amountInput.focus();
 }
@@ -4698,6 +4946,17 @@ function formatAmount(value) {
   return Number(value).toLocaleString("cs-CZ", {
     maximumFractionDigits: 2
   });
+}
+
+function formatAmountWithUnit(amount, unit) {
+  return `${formatAmount(amount)} ${unit || "ks"}`;
+}
+
+function formatPrice(value) {
+  return `${Number(value).toLocaleString("cs-CZ", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  })} Kč`;
 }
 
 function formatFormNumber(value) {

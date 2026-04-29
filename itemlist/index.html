@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux15">
+    <link rel="stylesheet" href="styles.css?v=ux16">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -58,6 +58,15 @@
               <p class="eyebrow">Co mám doma</p>
               <h1 id="page-title">Lednice</h1>
             </div>
+            <button class="ghost-button scan-shortcut-button" id="pantry-scan-button" type="button" aria-label="Naskenovat EAN nebo barcode">
+              <span class="button-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path>
+                  <circle cx="12" cy="13.5" r="3.5"></circle>
+                </svg>
+              </span>
+              <span>Sken</span>
+            </button>
           </div>
 
           <form class="entry-form" id="entry-form" autocomplete="off">
@@ -100,7 +109,7 @@
               <span id="amount-label">Množství</span>
               <div class="number-control">
                 <button class="number-step" type="button" data-amount-step="down" aria-label="Snížit množství">-</button>
-                <input id="amount-input" name="amount" type="number" min="1" step="1" inputmode="numeric" placeholder="1" aria-labelledby="amount-label" required>
+                <input id="amount-input" name="amount" type="number" min="0.01" step="any" inputmode="decimal" placeholder="1" aria-labelledby="amount-label" required>
                 <button class="number-step" type="button" data-amount-step="up" aria-label="Zvýšit množství">+</button>
               </div>
             </div>
@@ -113,6 +122,16 @@
                 <option value="ks">ks</option>
                 <option value="Kč">Kč</option>
               </select>
+            </label>
+
+            <label class="field price-field">
+              <span>Cena nákupu</span>
+              <input id="price-input" name="price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Kč">
+            </label>
+
+            <label class="field event-date-field">
+              <span>Datum změny</span>
+              <input id="event-date-input" name="eventDate" type="date">
             </label>
 
             <button class="primary-button" id="submit-button" type="submit">Zapsat</button>
@@ -128,8 +147,6 @@
                   <th scope="col">Potravina</th>
                   <th scope="col">Kategorie</th>
                   <th scope="col">Množství</th>
-                  <th scope="col">Jednotka</th>
-                  <th scope="col" class="icon-heading">Akce</th>
                 </tr>
               </thead>
               <tbody id="items-body"></tbody>
@@ -178,11 +195,31 @@
               <p class="eyebrow">Změny</p>
               <h1>Historie akcí</h1>
             </div>
-            <label class="field compact-field">
-              <span>Datum</span>
-              <input id="history-date-filter" type="date">
-            </label>
+            <div class="history-filters">
+              <label class="field compact-field">
+                <span>Období</span>
+                <select id="history-period-filter">
+                  <option value="">Vše</option>
+                  <option value="today">Dnes</option>
+                  <option value="3d">3 dny</option>
+                  <option value="week">Týden</option>
+                  <option value="month">Měsíc</option>
+                  <option value="year">Rok</option>
+                  <option value="older">Starší</option>
+                  <option value="custom">Od-do</option>
+                </select>
+              </label>
+              <label class="field compact-field">
+                <span>Od</span>
+                <input id="history-date-from" type="date">
+              </label>
+              <label class="field compact-field">
+                <span>Do</span>
+                <input id="history-date-to" type="date">
+              </label>
+            </div>
           </div>
+          <section class="price-stats" id="price-stats" aria-live="polite"></section>
           <div class="history-list" id="history-list" aria-live="polite"></div>
         </section>
 
@@ -426,6 +463,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux15"></script>
+    <script src="app.js?v=ux16"></script>
   </body>
 </html>
