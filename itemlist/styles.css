@@ -2832,3 +2832,200 @@ body.dark-mode .list-name-input {
     text-align: center;
   }
 }
+
+/* Dedicated responsive layout for the Zmeny entry form. Kept last so the
+   generic form breakpoints above cannot collapse it unpredictably. */
+.changes-entry-form {
+  align-items: end;
+  gap: clamp(10px, 1.1vw, 18px);
+  width: 100%;
+}
+
+.changes-entry-form .field,
+.changes-entry-form .number-control {
+  min-width: 0;
+}
+
+.changes-entry-form #submit-button {
+  justify-self: end;
+  width: max-content;
+  min-width: max-content;
+  padding-inline: 18px;
+  white-space: nowrap;
+}
+
+.changes-entry-form #cancel-edit {
+  width: max-content;
+  justify-self: end;
+  white-space: nowrap;
+}
+
+@media (min-width: 1280px) {
+  .changes-entry-form {
+    grid-template-columns:
+      minmax(180px, 1.7fr)
+      minmax(140px, 1fr)
+      minmax(140px, 1fr)
+      minmax(155px, 1.08fr)
+      minmax(124px, 0.74fr)
+      minmax(140px, 0.95fr)
+      max-content;
+    grid-template-areas:
+      "product category action amount unit price price"
+      ". . . event event event submit";
+  }
+
+  .changes-entry-form .product-field {
+    grid-area: product;
+  }
+
+  .changes-entry-form .category-field {
+    grid-area: category;
+  }
+
+  .changes-entry-form .action-field {
+    grid-area: action;
+  }
+
+  .changes-entry-form .amount-field {
+    grid-area: amount;
+  }
+
+  .changes-entry-form .unit-field {
+    grid-area: unit;
+  }
+
+  .changes-entry-form .price-field {
+    grid-area: price;
+  }
+
+  .changes-entry-form .event-date-field {
+    grid-area: event;
+  }
+
+  .changes-entry-form #submit-button {
+    grid-area: submit;
+  }
+
+  .changes-entry-form #cancel-edit {
+    grid-column: 5 / 7;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 1279px) {
+  .changes-entry-form {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-areas:
+      "product product category action"
+      "amount unit price price"
+      ". event event submit";
+  }
+
+  .changes-entry-form .product-field {
+    grid-area: product;
+  }
+
+  .changes-entry-form .category-field {
+    grid-area: category;
+  }
+
+  .changes-entry-form .action-field {
+    grid-area: action;
+  }
+
+  .changes-entry-form .amount-field {
+    grid-area: amount;
+  }
+
+  .changes-entry-form .unit-field {
+    grid-area: unit;
+  }
+
+  .changes-entry-form .price-field {
+    grid-area: price;
+  }
+
+  .changes-entry-form .event-date-field {
+    grid-area: event;
+  }
+
+  .changes-entry-form #submit-button {
+    grid-area: submit;
+  }
+
+  .changes-entry-form #cancel-edit {
+    grid-column: 3 / 5;
+  }
+}
+
+@media (max-width: 720px) {
+  .changes-entry-form {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "product product"
+      "category action"
+      "amount unit"
+      "price price"
+      "event event"
+      "submit submit"
+      "cancel cancel";
+  }
+
+  .changes-entry-form .product-field {
+    grid-area: product;
+  }
+
+  .changes-entry-form .category-field {
+    grid-area: category;
+  }
+
+  .changes-entry-form .action-field {
+    grid-area: action;
+  }
+
+  .changes-entry-form .amount-field {
+    grid-area: amount;
+  }
+
+  .changes-entry-form .unit-field {
+    grid-area: unit;
+  }
+
+  .changes-entry-form .price-field {
+    grid-area: price;
+  }
+
+  .changes-entry-form .event-date-field {
+    grid-area: event;
+  }
+
+  .changes-entry-form #submit-button {
+    grid-area: submit;
+    justify-self: stretch;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .changes-entry-form #cancel-edit {
+    grid-area: cancel;
+    justify-self: stretch;
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .changes-entry-form {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "product"
+      "category"
+      "action"
+      "amount"
+      "unit"
+      "price"
+      "event"
+      "submit"
+      "cancel";
+  }
+}
