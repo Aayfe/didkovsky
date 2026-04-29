@@ -1591,7 +1591,13 @@ body.dark-mode .list-name-input {
 }
 
 .tool-grid {
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: minmax(0, 360px);
+  align-items: stretch;
+}
+
+.tool-grid > button {
+  width: 100%;
+  justify-content: flex-start;
 }
 
 .card-row,

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux8">
+    <link rel="stylesheet" href="styles.css?v=ux9">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -256,6 +256,7 @@
             <button class="ghost-button" id="receipt-import-button" type="button">Import účtenky fotkou</button>
             <button class="ghost-button" id="ean-import-button" type="button">Import EAN skenem</button>
             <button class="ghost-button" id="xml-import-button" type="button">Import XML</button>
+            <button class="ghost-button" id="xml-export-button" type="button">Export XML</button>
             <button class="ghost-button" id="export-fridge-button" type="button">Export lednice</button>
             <button class="ghost-button" id="export-button" type="button">Export všech dat</button>
             <button class="ghost-button" id="anonymous-export-button" type="button">Anonymizovaný export</button>
@@ -296,6 +297,7 @@
               <span>Nákupní list odečítá aktuální zásoby</span>
             </label>
             <button class="danger-button" id="delete-list-button" type="button">Odebrat aktuální prostor</button>
+            <button class="danger-button" id="delete-all-button" type="button" hidden>Smazat všechno</button>
           </div>
 
           <section class="admin-panel" id="admin-panel" aria-label="Správa povolených účtů" hidden>
@@ -327,8 +329,6 @@
         </section>
       </section>
     </main>
-
-    <button class="danger-float-button" id="delete-all-button" type="button" hidden>Smazat vše</button>
 
     <div class="modal-backdrop" id="delete-list-modal" hidden>
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-list-title">
@@ -370,6 +370,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux8"></script>
+    <script src="app.js?v=ux9"></script>
   </body>
 </html>

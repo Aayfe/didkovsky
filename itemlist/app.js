@@ -18,6 +18,7 @@ const anonymousExportButton = document.querySelector("#anonymous-export-button")
 const receiptImportButton = document.querySelector("#receipt-import-button");
 const eanImportButton = document.querySelector("#ean-import-button");
 const xmlImportButton = document.querySelector("#xml-import-button");
+const xmlExportButton = document.querySelector("#xml-export-button");
 const eanTool = document.querySelector("#ean-tool");
 const eanInput = document.querySelector("#ean-input");
 const eanLookupButton = document.querySelector("#ean-lookup-button");
@@ -206,6 +207,7 @@ function setupEvents() {
   receiptImportButton.addEventListener("click", openReceiptImport);
   eanImportButton.addEventListener("click", openEanImport);
   xmlImportButton.addEventListener("click", openXmlImport);
+  xmlExportButton.addEventListener("click", exportXml);
   eanLookupButton.addEventListener("click", lookupEanProduct);
   eanFileInput.addEventListener("change", scanEanFromFile);
   receiptFileInput.addEventListener("change", importReceiptFromImage);
@@ -918,6 +920,15 @@ function exportFridge() {
   queueSaveState();
 }
 
+function exportXml() {
+  const xml = buildItemsXml(getActiveItems(), getDisplayListName(getActiveList()));
+  downloadText("lednice", "xml", xml, "application/xml");
+  recordHistory("Export XML lednice.", "export");
+  renderHistory();
+  queueSaveState();
+  showMessage("XML export připraven.");
+}
+
 function exportCatalog() {
   downloadJson("ciselnik-potravin", getCatalogItems());
   recordHistory("Export číselníku potravin.", "export");
@@ -960,14 +971,18 @@ function exportAnonymousData() {
 }
 
 function downloadJson(name, data) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], {
-    type: "application/json"
+  downloadText(name, "json", JSON.stringify(data, null, 2), "application/json");
+}
+
+function downloadText(name, extension, text, type) {
+  const blob = new Blob([text], {
+    type
   });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
 
   link.href = url;
-  link.download = `${name}-${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = `${name}-${new Date().toISOString().slice(0, 10)}.${extension}`;
   document.body.append(link);
   link.click();
   link.remove();
@@ -1003,7 +1018,7 @@ function openEanImport() {
 }
 
 function openXmlImport() {
-  openImportModal("Import XML", "<items>\n  <item name=\"Mléko\" amount=\"1000\" unit=\"ml\" category=\"Mléčné\" />\n</items>");
+  openImportModal("Import XML", getXmlExample());
 }
 
 function openImportModal(title = "Import", placeholder = "Rohlík 4 ks\nŠunka 100 g\nMléko 1000 ml") {
@@ -1096,19 +1111,63 @@ function parseXmlItems(value) {
   }
 
   doc.querySelectorAll("item").forEach((node) => {
-    const name = formatProductName(node.getAttribute("name") || node.querySelector("name")?.textContent || "");
-    const rawAmount = parseImportAmount(node.getAttribute("amount") || node.querySelector("amount")?.textContent || "1");
-    const normalized = normalizeImportAmountAndUnit(rawAmount, node.getAttribute("unit") || node.querySelector("unit")?.textContent || unitSelect.value);
+    const rawName = readXmlValue(node, "name");
+    const rawAmount = parseImportAmount(readXmlValue(node, "amount") || "1") || 1;
+    const rawUnit = readXmlValue(node, "unit") || unitSelect.value;
+    const rawCategory = readXmlValue(node, "category");
+    const name = formatProductName(rawName);
+    const normalized = normalizeImportAmountAndUnit(rawAmount, rawUnit);
     const amount = normalized.amount;
     const unit = normalized.unit;
-    const category = tidyName(node.getAttribute("category") || node.querySelector("category")?.textContent || "Ostatní");
+    const category = tidyName(rawCategory) || inferCategoryFromName(name);
 
     if (name && amount && unit) {
       items.push({ name, amount, unit, category });
+    } else {
+      skipped.push(node.outerHTML || rawName || "item");
     }
   });
 
   return { items, skipped };
+}
+
+function readXmlValue(node, name) {
+  return node.getAttribute(name) || node.querySelector(name)?.textContent || "";
+}
+
+function getXmlExample() {
+  return [
+    '<domaci-zasoby version="1">',
+    '  <items list="Lednice">',
+    '    <item name="Mléko" category="Mléčné" amount="1000" unit="ml" />',
+    '    <item name="Rohlík" category="Pečivo" amount="4" unit="ks" />',
+    '  </items>',
+    '</domaci-zasoby>'
+  ].join("\n");
+}
+
+function buildItemsXml(items, listName) {
+  const rows = items
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name, "cs"))
+    .map((item) => {
+      return `    <item name="${escapeXml(item.name)}" category="${escapeXml(item.category || inferCategoryFromName(item.name))}" amount="${escapeXml(formatXmlAmount(item.amount))}" unit="${escapeXml(item.unit || "ks")}" />`;
+    })
+    .join("\n");
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<domaci-zasoby version="1">',
+    `  <items list="${escapeXml(listName || "Lednice")}">`,
+    rows || '    <!-- Žádné položky -->',
+    '  </items>',
+    '</domaci-zasoby>',
+    ''
+  ].join("\n");
+}
+
+function formatXmlAmount(value) {
+  return String(roundAmount(Number(value) || 0)).replace(",", ".");
 }
 
 function parseImportLine(line) {
@@ -3385,6 +3444,15 @@ function escapeAttribute(value) {
   return value
     .replaceAll("&", "&amp;")
     .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function escapeXml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
 }
