@@ -2805,7 +2805,7 @@ async function applyComboChangeFromModal() {
   });
 
   recordHistory(
-    `${action === "purchase" ? "Přičtena" : "Odečtena"} kombinace ${combo.name}: ${changed} položek${missing ? `, ${missing} chybělo` : ""}.`,
+    `${getActionLabel(action)} kombinace ${combo.name}: ${changed} položek${missing ? `, ${missing} chybělo` : ""}.`,
     "item",
     getActiveList(),
     {
