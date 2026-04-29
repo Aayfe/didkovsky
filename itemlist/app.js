@@ -98,6 +98,8 @@ const comboForm = document.querySelector("#combo-form");
 const comboName = document.querySelector("#combo-name");
 const comboItemsList = document.querySelector("#combo-items-list");
 const addComboItemButton = document.querySelector("#add-combo-item");
+const comboSubmitButton = document.querySelector("#combo-submit-button");
+const cancelComboEditButton = document.querySelector("#cancel-combo-edit");
 const comboSelect = document.querySelector("#combo-select");
 const useComboButton = document.querySelector("#use-combo-button");
 const comboList = document.querySelector("#combo-list");
@@ -174,6 +176,7 @@ let appSettings = {
 };
 let activeView = "pantry";
 let editingId = null;
+let editingComboId = null;
 let supabaseClient = null;
 let saveTimer = null;
 let currentUser = null;
@@ -261,6 +264,7 @@ function setupEvents() {
   shoppingList.addEventListener("click", handleShoppingClick);
   comboForm.addEventListener("submit", saveCombo);
   addComboItemButton.addEventListener("click", () => addComboItemRow());
+  cancelComboEditButton.addEventListener("click", resetComboForm);
   comboItemsList.addEventListener("click", handleComboBuilderClick);
   comboItemsList.addEventListener("input", handleComboBuilderInput);
   comboItemsList.addEventListener("change", handleComboBuilderInput);
@@ -995,10 +999,14 @@ function switchView(view, options = {}) {
 
   currentViewLabel.textContent = labels[activeView] || "Lednice";
 
-  if (!options.keepMenu) {
+  if (!options.keepMenu && !isDesktopMenuPersistent()) {
     menuPanel.hidden = true;
     menuButton.setAttribute("aria-expanded", "false");
   }
+}
+
+function isDesktopMenuPersistent() {
+  return window.matchMedia("(min-width: 900px)").matches;
 }
 
 function exportData() {
@@ -1365,7 +1373,17 @@ function parseOptionalPrice(value) {
 }
 
 function normalizeEventDate(value) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || "")) ? value : getLocalDateValue(new Date());
+  const text = String(value || "");
+
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(text)) {
+    return text.length === 16 ? `${text}:00` : text;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return `${text}T00:00:00`;
+  }
+
+  return getLocalDateTimeValue(new Date());
 }
 
 function normalizeImportAmountAndUnit(amount, unitValue) {
@@ -1722,7 +1740,7 @@ function sanitizeState(state) {
           type: typeof entry.type === "string" ? entry.type : "info",
           listName: typeof entry.listName === "string" ? entry.listName : "",
           createdAt: entry.createdAt,
-          occurredAt: typeof entry.occurredAt === "string" ? entry.occurredAt : entry.createdAt.slice(0, 10),
+          occurredAt: normalizeEventDate(typeof entry.occurredAt === "string" ? entry.occurredAt : entry.createdAt.slice(0, 10)),
           product: typeof entry.product === "string" ? entry.product : "",
           amount: Number.isFinite(Number(entry.amount)) ? roundAmount(Number(entry.amount)) : null,
           unit: typeof entry.unit === "string" ? entry.unit : "",
@@ -2456,8 +2474,14 @@ async function saveCombo(event) {
   }
 
   const existing = combos.find((combo) => normalize(combo.name) === normalize(name));
+  const editedCombo = editingComboId
+    ? combos.find((combo) => combo.id === editingComboId)
+    : null;
 
-  if (existing) {
+  if (editedCombo) {
+    editedCombo.name = name;
+    editedCombo.items = items;
+  } else if (existing) {
     existing.items = items;
   } else {
     combos.unshift({
@@ -2467,8 +2491,7 @@ async function saveCombo(event) {
     });
   }
 
-  comboForm.reset();
-  resetComboBuilderRows();
+  resetComboForm();
   recordHistory(`Uložena kombinace ${name}.`, "combo");
   renderCombos();
   renderCatalog();
@@ -2491,11 +2514,19 @@ function resetComboBuilderRows() {
   addComboItemRow();
 }
 
+function resetComboForm() {
+  editingComboId = null;
+  comboForm.reset();
+  resetComboBuilderRows();
+  comboSubmitButton.textContent = "Uložit kombinaci";
+  cancelComboEditButton.hidden = true;
+}
+
 function addComboItemRow(item = {}) {
   const row = document.createElement("div");
   row.className = "combo-item-row";
   row.innerHTML = `
-    <label class="field">
+    <label class="field combo-field">
       <span>Potravina</span>
       <input class="combo-product" type="text" data-combobox-source="product-options" placeholder="Rohlík">
     </label>
@@ -2512,7 +2543,7 @@ function addComboItemRow(item = {}) {
         <option value="Kč">Kč</option>
       </select>
     </label>
-    <label class="field">
+    <label class="field combo-field">
       <span>Kategorie</span>
       <input class="combo-category" type="text" data-combobox-source="category-options" placeholder="Ostatní">
     </label>
@@ -2630,13 +2661,37 @@ async function handleComboClick(event) {
 
   if (button.dataset.comboAction === "remove") {
     combos = combos.filter((currentCombo) => currentCombo.id !== combo.id);
+    if (editingComboId === combo.id) {
+      resetComboForm();
+    }
     recordHistory(`Smazána kombinace ${combo.name}.`, "combo");
+  }
+
+  if (button.dataset.comboAction === "edit") {
+    startComboEdit(combo);
+    return;
   }
 
   renderCombos();
   renderCatalog();
   renderHistory();
   await saveState();
+}
+
+function startComboEdit(combo) {
+  editingComboId = combo.id;
+  comboName.value = combo.name;
+  comboItemsList.replaceChildren();
+  combo.items.forEach((item) => addComboItemRow(item));
+
+  if (!combo.items.length) {
+    addComboItemRow();
+  }
+
+  comboSubmitButton.textContent = "Uložit úpravu";
+  cancelComboEditButton.hidden = false;
+  comboName.focus();
+  showMessage(`Upravuješ kombinaci ${combo.name}.`);
 }
 
 function renderCombos() {
@@ -2662,6 +2717,8 @@ function renderCombos() {
     const content = document.createElement("div");
     const text = document.createElement("strong");
     const meta = document.createElement("span");
+    const actions = document.createElement("div");
+    const edit = document.createElement("button");
     const remove = document.createElement("button");
 
     option.value = combo.id;
@@ -2673,6 +2730,12 @@ function renderCombos() {
     text.textContent = combo.name;
     meta.className = "muted-text";
     meta.textContent = combo.items.map((item) => `${item.name} ${formatAmount(item.amount)} ${item.unit}`).join(", ");
+    actions.className = "row-actions";
+    edit.className = "ghost-button";
+    edit.type = "button";
+    edit.dataset.comboAction = "edit";
+    edit.dataset.id = combo.id;
+    edit.textContent = "Upravit";
     remove.className = "danger-button";
     remove.type = "button";
     remove.dataset.comboAction = "remove";
@@ -2680,7 +2743,8 @@ function renderCombos() {
     remove.textContent = "Smazat";
 
     content.append(text, meta);
-    row.append(content, remove);
+    actions.append(edit, remove);
+    row.append(content, actions);
     comboList.append(row);
   });
 }
@@ -3088,11 +3152,26 @@ async function lookupEanProduct() {
 }
 
 async function lookupProductInPublicDatabases(ean) {
+  const openFactsHosts = [
+    "https://world.openfoodfacts.org",
+    "https://cz.openfoodfacts.org",
+    "https://sk.openfoodfacts.org",
+    "https://de.openfoodfacts.org",
+    "https://at.openfoodfacts.org",
+    "https://pl.openfoodfacts.org",
+    "https://fr.openfoodfacts.org",
+    "https://it.openfoodfacts.org",
+    "https://es.openfoodfacts.org",
+    "https://uk.openfoodfacts.org",
+    "https://us.openfoodfacts.org",
+    "https://world.openproductsfacts.org",
+    "https://world.openbeautyfacts.org",
+    "https://world.openpetfoodfacts.org"
+  ];
   const lookups = [
-    () => lookupOpenFoodFactsProduct(ean, "https://world.openfoodfacts.org"),
-    () => lookupOpenFoodFactsProduct(ean, "https://cz.openfoodfacts.org"),
-    () => lookupOpenFoodFactsProduct(ean, "https://world.openproductsfacts.org"),
-    () => lookupUpcItemDbProduct(ean)
+    ...openFactsHosts.map((host) => () => lookupOpenFoodFactsProduct(ean, host)),
+    () => lookupUpcItemDbProduct(ean),
+    () => lookupBarcodeMonsterProduct(ean)
   ];
 
   for (const lookup of lookups) {
@@ -3108,6 +3187,26 @@ async function lookupProductInPublicDatabases(ean) {
   }
 
   return null;
+}
+
+async function lookupBarcodeMonsterProduct(ean) {
+  const response = await fetch(`https://barcode.monster/api/${ean}`);
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = await response.json();
+
+  if (!data || data.status === "notfound") {
+    return null;
+  }
+
+  return mapExternalBarcodeProduct({
+    title: data.description || data.name || data.title,
+    brand: data.company || data.brand,
+    size: data.size
+  }, ean);
 }
 
 async function lookupOpenFoodFactsProduct(ean, baseUrl) {
@@ -3571,7 +3670,20 @@ async function createBarcodeImageVariants(file) {
       rotateCanvas(canvas, Math.PI),
       rotateCanvas(canvas, (Math.PI * 3) / 2)
     ].filter(Boolean);
-    const modes = ["plain", "contrast", "threshold-125", "threshold-150", "threshold-175", "invert-threshold"];
+    const modes = [
+      "plain",
+      "contrast",
+      "threshold-105",
+      "threshold-125",
+      "threshold-150",
+      "threshold-175",
+      "invert-threshold",
+      "red-channel",
+      "green-channel",
+      "blue-channel",
+      "black-key",
+      "red-bg-black-key"
+    ];
     const variants = [];
 
     for (const sourceCanvas of sourceCanvases) {
@@ -3644,12 +3756,16 @@ async function createBarcodeVariantBlob(sourceCanvas, mode) {
   const threshold = Number(mode.split("-")[1]) || 150;
 
   for (let index = 0; index < image.data.length; index += 4) {
-    const gray = (image.data[index] * 0.299) + (image.data[index + 1] * 0.587) + (image.data[index + 2] * 0.114);
+    const red = image.data[index];
+    const green = image.data[index + 1];
+    const blue = image.data[index + 2];
+    const gray = (red * 0.299) + (green * 0.587) + (blue * 0.114);
+    const channelValue = getBarcodeFilterValue({ red, green, blue, gray, mode, threshold });
     const value = mode === "contrast"
       ? Math.max(0, Math.min(255, (gray - 128) * 2.15 + 128))
       : mode === "invert-threshold"
         ? (gray > threshold ? 0 : 255)
-        : (gray > threshold ? 255 : 0);
+        : channelValue;
     image.data[index] = value;
     image.data[index + 1] = value;
     image.data[index + 2] = value;
@@ -3657,6 +3773,32 @@ async function createBarcodeVariantBlob(sourceCanvas, mode) {
 
   context.putImageData(image, 0, 0);
   return await canvasToBlob(canvas);
+}
+
+function getBarcodeFilterValue({ red, green, blue, gray, mode, threshold }) {
+  if (mode === "red-channel") {
+    return red > threshold ? 255 : 0;
+  }
+
+  if (mode === "green-channel") {
+    return green > threshold ? 255 : 0;
+  }
+
+  if (mode === "blue-channel") {
+    return blue > threshold ? 255 : 0;
+  }
+
+  if (mode === "black-key") {
+    return Math.max(red, green, blue) < 92 ? 0 : 255;
+  }
+
+  if (mode === "red-bg-black-key") {
+    const looksRed = red > 120 && green < 115 && blue < 115;
+    const looksBlack = Math.max(red, green, blue) < 120;
+    return looksBlack && !looksRed ? 0 : 255;
+  }
+
+  return gray > threshold ? 255 : 0;
 }
 
 async function canvasToBlob(canvas) {
@@ -4286,7 +4428,7 @@ function renderHistory() {
         timeStyle: "short"
       });
     meta.className = "muted-text";
-    meta.textContent = eventDate ? `Stalo se: ${formatDisplayDate(eventDate)}` : "";
+    meta.textContent = eventDate ? `Stalo se: ${formatDisplayDate(entry.occurredAt || eventDate)}` : "";
 
     row.append(text, time);
 
@@ -4365,12 +4507,18 @@ function shiftLocalDate(dateValue, days) {
 }
 
 function getHistoryEventDate(entry) {
-  return normalizeEventDate(entry.occurredAt || String(entry.createdAt || "").slice(0, 10));
+  return normalizeEventDate(entry.occurredAt || String(entry.createdAt || "").slice(0, 10)).slice(0, 10);
 }
 
 function formatDisplayDate(dateValue) {
-  const date = new Date(`${dateValue}T12:00:00`);
-  return Number.isNaN(date.getTime()) ? dateValue : date.toLocaleDateString("cs-CZ");
+  const normalized = normalizeEventDate(dateValue);
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime())
+    ? dateValue
+    : date.toLocaleString("cs-CZ", {
+      dateStyle: "short",
+      timeStyle: "medium"
+    });
 }
 
 function renderPriceStats(entries) {
@@ -4412,7 +4560,7 @@ function resetForm() {
 
 function setDefaultEventDate() {
   if (eventDateInput) {
-    eventDateInput.value = getLocalDateValue(new Date());
+    eventDateInput.value = getLocalDateTimeValue(new Date());
   }
 }
 
@@ -4421,6 +4569,13 @@ function getLocalDateValue(date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function getLocalDateTimeValue(date) {
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${getLocalDateValue(date)}T${hours}:${minutes}:${seconds}`;
 }
 
 function syncEntryProductLock() {

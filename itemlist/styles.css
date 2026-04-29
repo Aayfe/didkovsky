@@ -537,9 +537,30 @@ h1 {
 
 .entry-form {
   display: grid;
-  grid-template-columns: minmax(180px, 1.2fr) 150px 150px 128px 104px 120px 150px auto auto;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   align-items: end;
   gap: 14px;
+}
+
+.product-field {
+  grid-column: span 3;
+}
+
+.category-field,
+.action-field,
+.amount-field,
+.event-date-field {
+  grid-column: span 2;
+}
+
+.unit-field,
+.price-field {
+  grid-column: span 1;
+}
+
+.entry-form > .primary-button,
+.entry-form > .ghost-button {
+  grid-column: span 2;
 }
 
 .shopping-form {
@@ -565,6 +586,12 @@ h1 {
 
 .combo-form {
   margin-bottom: 14px;
+}
+
+.combo-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .combo-items-builder {
@@ -1856,6 +1883,10 @@ body.dark-mode .list-name-input {
   cursor: pointer;
 }
 
+.combo-item-row .field {
+  position: relative;
+}
+
 #action-combo-input {
   caret-color: transparent;
 }
@@ -1994,14 +2025,28 @@ body.dark-mode .list-name-input {
   color: var(--accent);
 }
 
-.tool-grid {
-  grid-template-columns: minmax(0, 360px);
-  align-items: stretch;
-  justify-content: center;
-  margin-inline: auto;
+.tool-groups {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
 }
 
-.tool-grid > button {
+.tool-group {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: var(--field);
+  padding: 12px;
+}
+
+.tool-group h2 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.tool-group > button {
   width: 100%;
   justify-content: flex-start;
 }
@@ -2071,6 +2116,10 @@ body.dark-mode .list-name-input {
   .entry-form > .ghost-button {
     grid-column: span 3;
   }
+
+  .tool-groups {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {
@@ -2103,6 +2152,7 @@ body.dark-mode .list-name-input {
   .catalog-form,
   .catalog-alias-form,
   .combo-item-row,
+  .combo-form-actions,
   .compact-form,
   .combo-runner,
   .admin-form,
@@ -2120,6 +2170,10 @@ body.dark-mode .list-name-input {
   .entry-form > .primary-button,
   .entry-form > .ghost-button {
     grid-column: 1 / -1;
+  }
+
+  .combo-form-actions {
+    display: grid;
   }
 
   .primary-button,

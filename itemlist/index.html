@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux16">
+    <link rel="stylesheet" href="styles.css?v=ux17">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -130,8 +130,8 @@
             </label>
 
             <label class="field event-date-field">
-              <span>Datum změny</span>
-              <input id="event-date-input" name="eventDate" type="date">
+              <span>Datum a čas změny</span>
+              <input id="event-date-input" name="eventDate" type="datetime-local" step="1">
             </label>
 
             <button class="primary-button" id="submit-button" type="submit">Zapsat</button>
@@ -312,7 +312,10 @@
             </label>
             <div class="combo-items-builder" id="combo-items-list" aria-label="Položky v kombinaci"></div>
             <button class="ghost-button combo-add-button" id="add-combo-item" type="button">Přidat další položku</button>
-            <button class="primary-button" type="submit">Uložit kombinaci</button>
+            <div class="combo-form-actions">
+              <button class="primary-button" id="combo-submit-button" type="submit">Uložit kombinaci</button>
+              <button class="ghost-button" id="cancel-combo-edit" type="button" hidden>Zrušit úpravu</button>
+            </div>
           </form>
           <div class="combo-runner">
             <select id="combo-select"></select>
@@ -328,17 +331,26 @@
               <h1>Nástroje</h1>
             </div>
           </div>
-          <div class="tool-grid">
-            <button class="ghost-button" id="import-button" type="button">Hromadný import textem</button>
-            <button class="ghost-button" id="receipt-import-button" type="button">Import účtenky fotkou</button>
-            <button class="ghost-button" id="ean-import-button" type="button">Import EAN / barcode</button>
-            <button class="ghost-button" id="xml-import-button" type="button">Import XML</button>
-            <button class="ghost-button" id="xml-file-button" type="button">Import XML souborem</button>
-            <input class="visually-hidden" id="xml-file-input" type="file" accept=".xml,application/xml,text/xml">
-            <button class="ghost-button" id="xml-export-button" type="button">Export XML</button>
-            <button class="ghost-button" id="export-fridge-button" type="button">Export lednice</button>
-            <button class="ghost-button" id="export-button" type="button">Export všech dat</button>
-            <button class="ghost-button" id="anonymous-export-button" type="button">Anonymizovaný export</button>
+          <div class="tool-groups">
+            <section class="tool-group tool-group-primary">
+              <h2>Skenování</h2>
+              <button class="primary-button" id="ean-import-button" type="button">Import EAN / barcode</button>
+              <button class="ghost-button" id="receipt-import-button" type="button">Import účtenky fotkou</button>
+            </section>
+            <section class="tool-group">
+              <h2>Import</h2>
+              <button class="ghost-button" id="import-button" type="button">Hromadný import textem</button>
+              <button class="ghost-button" id="xml-import-button" type="button">Import XML textem</button>
+              <button class="ghost-button" id="xml-file-button" type="button">Import XML souborem</button>
+              <input class="visually-hidden" id="xml-file-input" type="file" accept=".xml,application/xml,text/xml">
+            </section>
+            <section class="tool-group">
+              <h2>Export</h2>
+              <button class="ghost-button" id="xml-export-button" type="button">Export XML</button>
+              <button class="ghost-button" id="export-fridge-button" type="button">Export lednice</button>
+              <button class="ghost-button" id="export-button" type="button">Export všech dat</button>
+              <button class="ghost-button" id="anonymous-export-button" type="button">Anonymizovaný export</button>
+            </section>
           </div>
           <div class="tool-card" id="ean-tool" hidden>
             <h2>EAN / barcode</h2>
@@ -463,6 +475,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux16"></script>
+    <script src="app.js?v=ux17"></script>
   </body>
 </html>
