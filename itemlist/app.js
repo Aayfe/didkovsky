@@ -54,6 +54,7 @@ const priceInput = document.querySelector("#price-input");
 const eventDateInput = document.querySelector("#event-date-input");
 const submitButton = document.querySelector("#submit-button");
 const pantryScanButton = document.querySelector("#pantry-scan-button");
+const pantryCategoryFilters = document.querySelector("#pantry-category-filters");
 const cancelEditButton = document.querySelector("#cancel-edit");
 const deleteListButton = document.querySelector("#delete-list-button");
 const deleteListModal = document.querySelector("#delete-list-modal");
@@ -71,10 +72,18 @@ const cancelImport = document.querySelector("#cancel-import");
 const confirmImport = document.querySelector("#confirm-import");
 const itemsBody = document.querySelector("#items-body");
 const tableWrap = document.querySelector(".table-wrap");
+const emptyState = document.querySelector("#empty-state");
 const historyList = document.querySelector("#history-list");
 const historyPeriodFilter = document.querySelector("#history-period-filter");
 const historyDateFrom = document.querySelector("#history-date-from");
 const historyDateTo = document.querySelector("#history-date-to");
+const openComboChangeButton = document.querySelector("#open-combo-change");
+const comboChangeModal = document.querySelector("#combo-change-modal");
+const comboChangeSelect = document.querySelector("#combo-change-select");
+const comboChangeAction = document.querySelector("#combo-change-action");
+const comboChangeItems = document.querySelector("#combo-change-items");
+const cancelComboChange = document.querySelector("#cancel-combo-change");
+const applyComboChangeButton = document.querySelector("#apply-combo-change");
 const priceStats = document.querySelector("#price-stats");
 const statsPanel = document.querySelector("#stats-panel");
 const statsMetrics = document.querySelector("#stats-metrics");
@@ -110,12 +119,13 @@ const useComboButton = document.querySelector("#use-combo-button");
 const comboList = document.querySelector("#combo-list");
 const darkModeToggle = document.querySelector("#dark-mode-toggle");
 const settingsShoppingSubtractStock = document.querySelector("#settings-shopping-subtract-stock");
+const settingsLogList = document.querySelector("#settings-log-list");
 const message = document.querySelector("#message");
 
 const SUPABASE_TABLE = "shopping_app_state";
 const ALLOWED_USERS_TABLE = "allowed_users";
 const HISTORY_LIMIT = 120;
-const IMPORT_UNITS = ["g", "ml", "ks", "Kč", "kč"];
+const IMPORT_UNITS = ["g", "ml", "ks", "kg"];
 const DEFAULT_CATEGORIES = [
   "Pečivo",
   "Mléčné",
@@ -128,6 +138,18 @@ const DEFAULT_CATEGORIES = [
   "Drogerie",
   "Ostatní"
 ];
+const CATEGORY_ICONS = {
+  "Pečivo": "🥖",
+  "Mléčné": "🥛",
+  "Maso": "🥩",
+  "Ovoce a zelenina": "🥕",
+  "Nápoje": "🥤",
+  "Sladké": "🍫",
+  "Mražené": "🧊",
+  "Trvanlivé": "🥫",
+  "Drogerie": "🧼",
+  "Ostatní": "📦"
+};
 const RECEIPT_SKIP_PATTERNS = [
   /^(celkem|suma|součet|subtotal|total|hotově|hotovost|kartou|visa|mastercard|cash|vráceno|zaplaceno|účtenka|ucet|datum|čas|dic|dič|ičo|ico|provozovna|pokladna|doklad|terminál|terminal|děkujeme|dekujeme|www|tel\.?|eet|fik|bkp)\b/iu,
   /\b(dph|vat|sazba|základ|zaklad|sleva|platební|platebni|transakce|autorizační|autorizacni)\b/iu,
@@ -190,6 +212,8 @@ let listNameBeforeEdit = "";
 let editingCatalogId = null;
 let editingCatalogAliases = [];
 let editingCatalogAliasIndex = -1;
+let selectedPantryCategories = new Set();
+let pantryCategoryFiltersInitialized = false;
 let pendingEanProduct = null;
 let pendingEanCatalogChoice = null;
 let pendingCatalogEanProduct = null;
@@ -223,6 +247,7 @@ function setupEvents() {
   googleLoginButton.addEventListener("click", signInWithGoogle);
   logoutButton.addEventListener("click", signOut);
   menuButton.addEventListener("click", toggleMenu);
+  window.addEventListener("resize", syncResponsiveMenu);
   menuLinks.forEach((button) => {
     button.addEventListener("click", () => {
       switchView(button.dataset.view);
@@ -247,6 +272,7 @@ function setupEvents() {
   adminForm.addEventListener("submit", saveAllowedUser);
   allowedUsersList.addEventListener("click", handleAllowedUsersClick);
   pantryScanButton.addEventListener("click", openEanImport);
+  pantryCategoryFilters?.addEventListener("change", handlePantryCategoryFilterChange);
   historyPeriodFilter.addEventListener("change", handleHistoryFilterChange);
   historyDateFrom.addEventListener("input", () => {
     historyPeriodFilter.value = "custom";
@@ -277,6 +303,10 @@ function setupEvents() {
   comboItemsList.addEventListener("change", handleComboBuilderInput);
   useComboButton.addEventListener("click", useSelectedCombo);
   comboList.addEventListener("click", handleComboClick);
+  openComboChangeButton?.addEventListener("click", openComboChangeModal);
+  comboChangeSelect?.addEventListener("change", renderComboChangeItems);
+  cancelComboChange?.addEventListener("click", closeComboChangeModal);
+  applyComboChangeButton?.addEventListener("click", applyComboChangeFromModal);
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -417,6 +447,12 @@ function setupEvents() {
     }
   });
 
+  comboChangeModal?.addEventListener("click", (event) => {
+    if (event.target === comboChangeModal) {
+      closeComboChangeModal();
+    }
+  });
+
   setupComboboxes();
 
   itemsBody.addEventListener("click", (event) => {
@@ -525,7 +561,9 @@ function renderComboboxMenu(input) {
     button.dataset.value = item.value;
     button.dataset.optionValue = item.optionValue;
     button.setAttribute("role", "option");
-    text.textContent = item.value;
+    text.textContent = input.dataset.comboboxSource === "category-options"
+      ? formatCategoryLabel(item.value)
+      : item.value;
     button.append(text);
 
     if (item.meta) {
@@ -854,6 +892,7 @@ function showApp() {
   }
 
   switchView(activeView, { keepMenu: true });
+  syncResponsiveMenu();
 }
 
 function showAuthMessage(text, isError = false) {
@@ -975,6 +1014,19 @@ function toggleMenu() {
   menuButton.setAttribute("aria-expanded", String(!nextHidden));
 }
 
+function syncResponsiveMenu() {
+  if (isDesktopMenuPersistent() && !appShell.hidden) {
+    menuPanel.hidden = false;
+    menuButton.setAttribute("aria-expanded", "true");
+    return;
+  }
+
+  if (!isDesktopMenuPersistent()) {
+    menuPanel.hidden = true;
+    menuButton.setAttribute("aria-expanded", "false");
+  }
+}
+
 function switchView(view, options = {}) {
   const nextView = view || "pantry";
 
@@ -1013,7 +1065,7 @@ function switchView(view, options = {}) {
 }
 
 function isDesktopMenuPersistent() {
-  return window.matchMedia("(min-width: 900px)").matches;
+  return window.matchMedia("(min-width: 1280px)").matches;
 }
 
 function exportData() {
@@ -1324,7 +1376,7 @@ function parseImportLine(line) {
 }
 
 function parseNameFirstImportLine(line) {
-  const match = line.match(/^(.+?)\s+(\d+(?:[,.]\d+)?)\s*([^\d\s]+(?:\s+[^\d\s]+)?)?$/u);
+  const match = line.match(/^(.+?)\s+(\d[\d\s\u00a0]*(?:[,.]\d+)?)\s*([^\d\s]+(?:\s+[^\d\s]+)?)?$/u);
 
   if (!match) {
     return null;
@@ -1344,7 +1396,7 @@ function parseNameFirstImportLine(line) {
 }
 
 function parseAmountFirstImportLine(line) {
-  const match = line.match(/^(\d+(?:[,.]\d+)?)\s*([^\d\s]+)?\s+(.+)$/u);
+  const match = line.match(/^(\d[\d\s\u00a0]*(?:[,.]\d+)?)\s*([^\d\s]+)?\s+(.+)$/u);
 
   if (!match) {
     return null;
@@ -1364,7 +1416,7 @@ function parseAmountFirstImportLine(line) {
 }
 
 function parseImportAmount(value) {
-  const amount = Number(String(value).replace(",", "."));
+  const amount = Number(String(value).replace(/[\s\u00a0]/g, "").replace(",", "."));
   return Number.isFinite(amount) && amount > 0 ? roundAmount(amount) : null;
 }
 
@@ -1431,16 +1483,16 @@ function normalizeImportUnit(value) {
     ml: "ml",
     mililitru: "ml",
     mililitrů: "ml",
-    kc: "Kč",
-    kč: "Kč",
-    czk: "Kč",
-    kg: "g",
+    kilogram: "kg",
+    kilogramu: "kg",
+    kilogramů: "kg",
+    kg: "kg",
     l: "ml"
   };
   const mappedUnit = unitMap[normalize(normalizedUnit)] || normalizedUnit;
 
   if (IMPORT_UNITS.includes(mappedUnit)) {
-    return mappedUnit === "kč" ? "Kč" : mappedUnit;
+    return mappedUnit;
   }
 
   return unitSelect.value || "ks";
@@ -1962,17 +2014,15 @@ async function confirmDeleteActiveList() {
 }
 
 async function confirmDeleteAllLists() {
-  const removedCount = lists.length;
-  const previousHistory = history;
   setState(createDefaultState());
-  history = previousHistory;
+  selectedPantryCategories.clear();
+  pantryCategoryFiltersInitialized = false;
   closeDeleteAllModal();
   resetForm();
   renderLists();
   renderItems();
-  recordHistory(`Smazány všechny seznamy (${removedCount}).`, "list");
   renderHistory();
-  showMessage("Všechny seznamy byly smazány.");
+  showMessage("Všechna data včetně historie a statistik byla smazána.");
   await saveState();
 }
 
@@ -2547,7 +2597,7 @@ function addComboItemRow(item = {}) {
         <option value="g">g</option>
         <option value="ml">ml</option>
         <option value="ks">ks</option>
-        <option value="Kč">Kč</option>
+        <option value="kg">kg</option>
       </select>
     </label>
     <label class="field combo-field">
@@ -2650,6 +2700,129 @@ async function useSelectedCombo() {
   renderCombos();
   renderHistory();
   showMessage(`Kombinace ${combo.name} přidána do lednice.`);
+  await saveState();
+}
+
+function openComboChangeModal() {
+  if (!comboChangeModal || !comboChangeSelect) {
+    return;
+  }
+
+  comboChangeSelect.replaceChildren();
+
+  if (!combos.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "Zatím žádná kombinace";
+    comboChangeSelect.append(option);
+  } else {
+    combos.forEach((combo) => {
+      const option = document.createElement("option");
+      option.value = combo.id;
+      option.textContent = combo.name;
+      comboChangeSelect.append(option);
+    });
+  }
+
+  comboChangeAction.value = "purchase";
+  renderComboChangeItems();
+  comboChangeModal.hidden = false;
+}
+
+function closeComboChangeModal() {
+  if (comboChangeModal) {
+    comboChangeModal.hidden = true;
+  }
+}
+
+function renderComboChangeItems() {
+  if (!comboChangeItems || !comboChangeSelect) {
+    return;
+  }
+
+  const combo = combos.find((currentCombo) => currentCombo.id === comboChangeSelect.value);
+  comboChangeItems.replaceChildren();
+
+  if (!combo) {
+    const empty = document.createElement("p");
+    empty.className = "message";
+    empty.textContent = "Nejdřív si ulož kombinaci.";
+    comboChangeItems.append(empty);
+    return;
+  }
+
+  combo.items.forEach((item, index) => {
+    const row = document.createElement("div");
+    row.className = "combo-change-row";
+    row.innerHTML = `
+      <div class="combo-change-product">
+        <strong></strong>
+        <small></small>
+      </div>
+      <label class="field">
+        <span>Množství</span>
+        <input type="number" min="0.01" step="any" inputmode="decimal" data-combo-change-amount="${index}">
+      </label>
+    `;
+
+    row.querySelector("strong").textContent = item.name;
+    row.querySelector("small").textContent = `${formatCategoryLabel(item.category)} · ${item.unit || "ks"}`;
+    row.querySelector("input").value = item.amount ? String(item.amount) : "1";
+    comboChangeItems.append(row);
+  });
+}
+
+async function applyComboChangeFromModal() {
+  const combo = combos.find((currentCombo) => currentCombo.id === comboChangeSelect?.value);
+  const action = comboChangeAction?.value || "purchase";
+
+  if (!combo) {
+    showMessage("Vyber kombinaci.", true);
+    return;
+  }
+
+  let changed = 0;
+  let missing = 0;
+
+  combo.items.forEach((item, index) => {
+    const amountInput = comboChangeItems.querySelector(`[data-combo-change-amount="${index}"]`);
+    const amount = Number(amountInput?.value);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return;
+    }
+
+    const result = upsertItemAmount({
+      ...item,
+      amount: roundAmount(amount),
+      action
+    });
+
+    if (result === "missing") {
+      missing += 1;
+    } else {
+      changed += 1;
+    }
+  });
+
+  recordHistory(
+    `${action === "purchase" ? "Přičtena" : "Odečtena"} kombinace ${combo.name}: ${changed} položek${missing ? `, ${missing} chybělo` : ""}.`,
+    "item",
+    getActiveList(),
+    {
+      action,
+      product: combo.name,
+      amount: changed,
+      unit: "ks",
+      price: null,
+      occurredAt: normalizeEventDate(eventDateInput.value)
+    }
+  );
+  renderItems();
+  renderCombos();
+  renderHistory();
+  closeComboChangeModal();
+  showMessage(`${combo.name}: změna zapsána.`);
   await saveState();
 }
 
@@ -2769,14 +2942,21 @@ function applyTheme() {
 
 function renderItems() {
   const items = getActiveItems();
+  renderPantryCategoryFilters(items);
+  const visibleItems = getVisiblePantryItems(items);
   itemsBody.innerHTML = "";
   renderProductOptions();
   renderCategoryOptions();
   renderCatalog();
 
-  tableWrap.classList.toggle("has-items", items.length > 0);
+  tableWrap.classList.toggle("has-items", visibleItems.length > 0);
+  if (emptyState) {
+    emptyState.textContent = items.length && !visibleItems.length
+      ? "Žádná položka neodpovídá vybraným kategoriím."
+      : "Lednice je zatím prázdná.";
+  }
 
-  items
+  visibleItems
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name, "cs"))
     .forEach((item) => {
@@ -2784,7 +2964,10 @@ function renderItems() {
 
       row.innerHTML = `
         <td>
-          <span class="product-name"></span>
+          <span class="product-title-row">
+            <span class="product-name"></span>
+            <button class="icon-inline-button" type="button" data-action="edit" data-id="${item.id}" aria-label="Upravit položku">${icons.edit}</button>
+          </span>
           <small class="product-card-category"></small>
         </td>
         <td class="category-cell"></td>
@@ -2792,10 +2975,84 @@ function renderItems() {
       `;
 
       row.querySelector(".product-name").textContent = item.name;
-      row.querySelector(".category-cell").textContent = item.category || "Ostatní";
-      row.querySelector(".product-card-category").textContent = item.category || "Ostatní";
+      row.querySelector(".category-cell").textContent = formatCategoryLabel(item.category);
+      row.querySelector(".product-card-category").textContent = formatCategoryLabel(item.category);
       itemsBody.append(row);
     });
+}
+
+function renderPantryCategoryFilters(items = getActiveItems()) {
+  if (!pantryCategoryFilters) {
+    return;
+  }
+
+  const categories = [...new Set(items.map((item) => tidyName(item.category) || "Ostatní"))]
+    .sort((a, b) => a.localeCompare(b, "cs"));
+
+  pantryCategoryFilters.replaceChildren();
+
+  if (!categories.length) {
+    selectedPantryCategories.clear();
+    pantryCategoryFiltersInitialized = false;
+    pantryCategoryFilters.hidden = true;
+    return;
+  }
+
+  pantryCategoryFilters.hidden = false;
+  selectedPantryCategories = new Set([...selectedPantryCategories].filter((category) => categories.includes(category)));
+
+  if (!pantryCategoryFiltersInitialized) {
+    selectedPantryCategories = new Set(categories);
+    pantryCategoryFiltersInitialized = true;
+  }
+
+  categories.forEach((category) => {
+    const label = document.createElement("label");
+    const checkbox = document.createElement("input");
+    const text = document.createElement("span");
+
+    checkbox.type = "checkbox";
+    checkbox.value = category;
+    checkbox.checked = selectedPantryCategories.has(category);
+    text.textContent = formatCategoryLabel(category);
+    label.append(checkbox, text);
+    pantryCategoryFilters.append(label);
+  });
+}
+
+function handlePantryCategoryFilterChange(event) {
+  const checkbox = event.target.closest?.("input[type='checkbox']");
+
+  if (!checkbox) {
+    return;
+  }
+
+  if (checkbox.checked) {
+    selectedPantryCategories.add(checkbox.value);
+  } else {
+    selectedPantryCategories.delete(checkbox.value);
+  }
+
+  renderItems();
+}
+
+function getVisiblePantryItems(items) {
+  if (!selectedPantryCategories.size) {
+    return [];
+  }
+
+  return items.filter((item) => selectedPantryCategories.has(tidyName(item.category) || "Ostatní"));
+}
+
+function formatCategoryLabel(category) {
+  const cleanCategory = tidyName(category) || "Ostatní";
+  return `${getCategoryIcon(cleanCategory)} ${cleanCategory}`;
+}
+
+function getCategoryIcon(category) {
+  const cleanCategory = tidyName(category) || "Ostatní";
+  const match = Object.entries(CATEGORY_ICONS).find(([name]) => normalize(name) === normalize(cleanCategory));
+  return match ? match[1] : CATEGORY_ICONS["Ostatní"];
 }
 
 function renderProductOptions() {
@@ -2804,7 +3061,7 @@ function renderProductOptions() {
     ...getCatalogItems().flatMap((item) => [
       {
         value: item.name,
-        label: `${item.category || "Ostatní"} | ${item.unit}`,
+        label: `${formatCategoryLabel(item.category)} | ${item.unit}`,
         text: item.unit
       },
       ...normalizeEanAliases(item.eanAliases).map((alias) => ({
@@ -2848,6 +3105,8 @@ function renderCategoryOptions() {
   categories.forEach((category) => {
     const option = document.createElement("option");
     option.value = category;
+    option.label = formatCategoryLabel(category);
+    option.textContent = formatCategoryLabel(category);
     categoryOptions.append(option);
   });
 }
@@ -3303,7 +3562,7 @@ function renderEanResolution(product, matches) {
 
   header.className = "ean-result-head";
   title.textContent = product.name;
-  meta.textContent = `${product.category || "Ostatní"} | odhad: ${formatAmount(product.amount || 1)} ${product.unit || "ks"}`;
+  meta.textContent = `${formatCategoryLabel(product.category)} | odhad: ${formatAmount(product.amount || 1)} ${product.unit || "ks"}`;
   header.append(title, meta);
   eanResult.append(header);
 
@@ -4296,7 +4555,7 @@ function renderCatalog() {
       </td>
     `;
     row.children[0].textContent = item.name;
-    row.children[1].textContent = item.category;
+    row.children[1].textContent = formatCategoryLabel(item.category);
     row.children[2].textContent = item.unit;
     row.children[3].append(createCatalogAliasSummary(item));
     row.querySelectorAll("[data-catalog-action]").forEach((button) => {
@@ -4406,27 +4665,55 @@ function recordHistory(text, type = "info", list = getActiveList(), details = {}
 
 function renderHistory() {
   historyList.replaceChildren();
-  const visibleHistory = getFilteredHistory();
-  renderPriceStats(visibleHistory);
-  renderStatsDashboard(visibleHistory);
+  const filteredHistory = getFilteredHistory();
+  const visibleHistory = filteredHistory.filter(isInventoryHistoryEntry);
+  renderPriceStats(filteredHistory);
+  renderStatsDashboard(filteredHistory);
+  renderSettingsLog(history);
 
   if (!visibleHistory.length) {
     const empty = document.createElement("p");
     empty.className = "message";
-    empty.textContent = "Pro vybrané období nejsou žádné změny.";
+    empty.textContent = "Pro vybrané období nejsou žádné změny lednice.";
     historyList.append(empty);
     return;
   }
 
-  visibleHistory.slice(0, 80).forEach((entry) => {
+  renderHistoryRows(historyList, visibleHistory.slice(0, 80));
+}
+
+function renderSettingsLog(entries = history) {
+  if (!settingsLogList) {
+    return;
+  }
+
+  settingsLogList.replaceChildren();
+
+  if (!entries.length) {
+    const empty = document.createElement("p");
+    empty.className = "message";
+    empty.textContent = "Log je prázdný.";
+    settingsLogList.append(empty);
+    return;
+  }
+
+  renderHistoryRows(settingsLogList, entries.slice(0, 120));
+}
+
+function renderHistoryRows(container, entries) {
+  entries.forEach((entry) => {
     const row = document.createElement("article");
+    const icon = document.createElement("span");
     const text = document.createElement("strong");
     const time = document.createElement("time");
     const meta = document.createElement("span");
     const date = new Date(entry.createdAt);
     const eventDate = getHistoryEventDate(entry);
+    const visual = getHistoryVisual(entry);
 
-    row.className = "history-entry";
+    row.className = `history-entry ${visual.className}`;
+    icon.className = "history-entry-icon";
+    icon.textContent = visual.icon;
     text.textContent = entry.text;
     time.dateTime = entry.createdAt;
     time.textContent = Number.isNaN(date.getTime())
@@ -4438,14 +4725,30 @@ function renderHistory() {
     meta.className = "muted-text";
     meta.textContent = eventDate ? `Stalo se: ${formatDisplayDate(entry.occurredAt || eventDate)}` : "";
 
-    row.append(text, time);
+    row.append(icon, text, time);
 
     if (meta.textContent) {
       row.append(meta);
     }
 
-    historyList.append(row);
+    container.append(row);
   });
+}
+
+function isInventoryHistoryEntry(entry) {
+  return entry.type === "item";
+}
+
+function getHistoryVisual(entry) {
+  if (["purchase", "gift", "adjustPlus", "add"].includes(entry.action)) {
+    return { icon: "+", className: "is-positive" };
+  }
+
+  if (["eaten", "discarded", "adjustMinus", "subtract"].includes(entry.action)) {
+    return { icon: "-", className: "is-negative" };
+  }
+
+  return { icon: "=", className: "is-neutral" };
 }
 
 function getSelectedStatsMetrics() {
@@ -4587,16 +4890,20 @@ function createBarChart(title, rows, unit) {
   const context = canvas.getContext("2d");
   const width = canvas.width;
   const height = canvas.height;
-  const padding = 42;
+  const padding = 48;
   const max = Math.max(1, ...rows.map(([, value]) => Number(value)));
 
   context.clearRect(0, 0, width, height);
-  context.fillStyle = "#ffffff";
+  const background = context.createLinearGradient(0, 0, width, height);
+  background.addColorStop(0, "#f8fbfb");
+  background.addColorStop(1, "#eef6f4");
+  context.fillStyle = background;
   context.fillRect(0, 0, width, height);
   context.fillStyle = "#17202a";
   context.font = "700 24px Arial";
   context.fillText(title, padding, 34);
   context.strokeStyle = "#d8e0e7";
+  context.lineWidth = 1;
   context.beginPath();
   context.moveTo(padding, height - padding);
   context.lineTo(width - 18, height - padding);
@@ -4616,8 +4923,14 @@ function createBarChart(title, rows, unit) {
     const x = padding + index * (barWidth + barGap);
     const barHeight = Math.round((height - 110) * (Number(value) / max));
     const y = height - padding - barHeight;
-    context.fillStyle = "#137a6f";
-    context.fillRect(x, y, barWidth, barHeight);
+    const gradient = context.createLinearGradient(0, y, 0, height - padding);
+    gradient.addColorStop(0, "#20a394");
+    gradient.addColorStop(1, "#0f766e");
+    context.fillStyle = "rgba(15, 118, 110, 0.12)";
+    context.fillRect(x + 4, y + 5, barWidth, barHeight);
+    context.fillStyle = gradient;
+    roundRect(context, x, y, barWidth, barHeight, 8);
+    context.fill();
     context.fillStyle = "#17202a";
     context.font = "700 13px Arial";
     context.fillText(`${formatAmount(value)} ${unit}`, x, Math.max(56, y - 8));
@@ -4631,6 +4944,19 @@ function createBarChart(title, rows, unit) {
   });
 
   return canvas.toDataURL("image/png");
+}
+
+function roundRect(context, x, y, width, height, radius) {
+  const safeRadius = Math.min(radius, width / 2, height / 2);
+  context.beginPath();
+  context.moveTo(x + safeRadius, y);
+  context.lineTo(x + width - safeRadius, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
+  context.lineTo(x + width, y + height);
+  context.lineTo(x, y + height);
+  context.lineTo(x, y + safeRadius);
+  context.quadraticCurveTo(x, y, x + safeRadius, y);
+  context.closePath();
 }
 
 function exportStatsPdf() {
@@ -4899,7 +5225,24 @@ function setActionState(action) {
     button.setAttribute("aria-pressed", String(isActive));
   });
 
+  updatePriceInputLock();
   updateSubmitButtonText();
+}
+
+function updatePriceInputLock() {
+  if (!priceInput) {
+    return;
+  }
+
+  const lockedActions = new Set(["eaten", "discarded", "adjustPlus", "adjustMinus", "subtract", "set"]);
+  const locked = lockedActions.has(actionSelect.value);
+
+  priceInput.disabled = locked;
+  priceInput.closest(".field")?.classList.toggle("is-locked", locked);
+
+  if (locked) {
+    priceInput.value = "";
+  }
 }
 
 function setActionButtonsDisabled(disabled) {
@@ -4931,9 +5274,10 @@ function updateSubmitButtonText() {
 
 function stepAmount(direction) {
   const currentValue = Number(amountInput.value);
-  const min = 0.01;
+  const min = 1;
+  const base = direction > 0 ? Math.floor(currentValue) : Math.ceil(currentValue);
   const next = Number.isFinite(currentValue) && currentValue >= min
-    ? Math.max(min, roundAmount(currentValue + direction))
+    ? Math.max(min, base + direction)
     : 1;
 
   amountInput.value = formatFormNumber(next);

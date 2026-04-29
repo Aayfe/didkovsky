@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux17">
+    <link rel="stylesheet" href="styles.css?v=ux18">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -65,9 +65,9 @@
                   <circle cx="12" cy="13.5" r="3.5"></circle>
                 </svg>
               </span>
-              <span>Sken</span>
             </button>
           </div>
+          <div class="category-filter-panel" id="pantry-category-filters" aria-label="Filtr kategorií"></div>
 
           <form class="entry-form" id="entry-form" autocomplete="off">
             <label class="field combo-field product-field">
@@ -120,7 +120,7 @@
                 <option value="g">g</option>
                 <option value="ml">ml</option>
                 <option value="ks">ks</option>
-                <option value="Kč">Kč</option>
+                <option value="kg">kg</option>
               </select>
             </label>
 
@@ -181,7 +181,7 @@
                 <option value="g">g</option>
                 <option value="ml">ml</option>
                 <option value="ks">ks</option>
-                <option value="Kč">Kč</option>
+                <option value="kg">kg</option>
               </select>
             </label>
             <button class="primary-button" type="submit">Přidat</button>
@@ -196,6 +196,7 @@
               <h1>Historie akcí</h1>
             </div>
             <div class="history-filters">
+              <button class="ghost-button" id="open-combo-change" type="button">Kombinace</button>
               <label class="field compact-field">
                 <span>Období</span>
                 <select id="history-period-filter">
@@ -219,25 +220,6 @@
               </label>
             </div>
           </div>
-          <section class="price-stats" id="price-stats" aria-live="polite"></section>
-          <section class="stats-panel" id="stats-panel">
-            <div class="stats-panel-head">
-              <div>
-                <p class="eyebrow">Statistiky</p>
-                <h2>Grafy za vybrané období</h2>
-              </div>
-              <button class="ghost-button" id="stats-export-pdf" type="button">Export PDF</button>
-            </div>
-            <div class="stats-metrics" id="stats-metrics">
-              <label><input type="checkbox" value="count" checked> Počty změn</label>
-              <label><input type="checkbox" value="spend" checked> Celková útrata</label>
-              <label><input type="checkbox" value="avgPrice" checked> Průměrná cena za produkt</label>
-              <label><input type="checkbox" value="consumed" checked> Projezeno / odečteno</label>
-              <label><input type="checkbox" value="topProducts" checked> Top produkty</label>
-            </div>
-            <div class="stats-grid" id="stats-grid"></div>
-            <canvas class="visually-hidden" id="stats-chart-canvas" width="900" height="360"></canvas>
-          </section>
           <div class="history-list" id="history-list" aria-live="polite"></div>
         </section>
 
@@ -264,7 +246,7 @@
                 <option value="g">g</option>
                 <option value="ml">ml</option>
                 <option value="ks">ks</option>
-                <option value="Kč">Kč</option>
+                <option value="kg">kg</option>
               </select>
             </label>
             <section class="catalog-alias-editor" aria-label="Aliasy a EANy">
@@ -292,7 +274,7 @@
                     <option value="g">g</option>
                     <option value="ml">ml</option>
                     <option value="ks">ks</option>
-                    <option value="Kč">Kč</option>
+                    <option value="kg">kg</option>
                   </select>
                 </label>
                 <button class="ghost-button" id="catalog-alias-add-button" type="button">Přidat alias</button>
@@ -445,6 +427,34 @@
             </label>
           </details>
 
+          <details class="settings-stats-panel">
+            <summary>Statistiky, grafy a export</summary>
+            <section class="price-stats" id="price-stats" aria-live="polite"></section>
+            <section class="stats-panel" id="stats-panel">
+              <div class="stats-panel-head">
+                <div>
+                  <p class="eyebrow">Statistiky</p>
+                  <h2>Grafy za vybrané období</h2>
+                </div>
+                <button class="ghost-button" id="stats-export-pdf" type="button">Export PDF</button>
+              </div>
+              <div class="stats-metrics" id="stats-metrics">
+                <label><input type="checkbox" value="count" checked> Počty změn</label>
+                <label><input type="checkbox" value="spend" checked> Celková útrata</label>
+                <label><input type="checkbox" value="avgPrice" checked> Průměrná cena za produkt</label>
+                <label><input type="checkbox" value="consumed" checked> Projezeno / odečteno</label>
+                <label><input type="checkbox" value="topProducts" checked> Top produkty</label>
+              </div>
+              <div class="stats-grid" id="stats-grid"></div>
+              <canvas class="visually-hidden" id="stats-chart-canvas" width="900" height="360"></canvas>
+            </section>
+          </details>
+
+          <details class="settings-log-panel">
+            <summary>Kompletní log aplikace</summary>
+            <div class="history-list" id="settings-log-list" aria-live="polite"></div>
+          </details>
+
           <div class="settings-danger-zone">
             <button class="danger-button settings-danger-small" id="delete-all-button" type="button" hidden>Smazat všechno</button>
           </div>
@@ -489,10 +499,32 @@
       </div>
     </div>
 
+    <div class="modal-backdrop" id="combo-change-modal" hidden>
+      <div class="modal combo-change-modal" role="dialog" aria-modal="true" aria-labelledby="combo-change-title">
+        <h2 id="combo-change-title">Použít kombinaci</h2>
+        <label class="field">
+          <span>Kombinace</span>
+          <select id="combo-change-select"></select>
+        </label>
+        <label class="field">
+          <span>Akce</span>
+          <select id="combo-change-action">
+            <option value="purchase">Přičíst do lednice</option>
+            <option value="eaten">Odečíst z lednice</option>
+          </select>
+        </label>
+        <div class="combo-change-items" id="combo-change-items"></div>
+        <div class="modal-actions">
+          <button class="ghost-button" id="cancel-combo-change" type="button">Zrušit</button>
+          <button class="primary-button" id="apply-combo-change" type="button">Použít kombinaci</button>
+        </div>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux17"></script>
+    <script src="app.js?v=ux18"></script>
   </body>
 </html>
