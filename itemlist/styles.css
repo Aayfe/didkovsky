@@ -563,6 +563,44 @@ h1 {
   grid-column: span 2;
 }
 
+@media (min-width: 1041px) {
+  .product-field {
+    grid-column: 1 / 4;
+  }
+
+  .category-field {
+    grid-column: 4 / 6;
+  }
+
+  .action-field {
+    grid-column: 6 / 8;
+  }
+
+  .amount-field {
+    grid-column: 8 / 10;
+  }
+
+  .unit-field {
+    grid-column: 10 / 11;
+  }
+
+  .price-field {
+    grid-column: 11 / 13;
+  }
+
+  .event-date-field {
+    grid-column: 8 / 11;
+  }
+
+  .entry-form > .primary-button {
+    grid-column: 11 / 13;
+  }
+
+  .entry-form > .ghost-button {
+    grid-column: 9 / 11;
+  }
+}
+
 .shopping-form {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) 130px 110px auto;
@@ -762,6 +800,11 @@ body.dark-mode .modal {
   opacity: 0.78;
 }
 
+.event-date-field input,
+.price-field input {
+  min-width: 0;
+}
+
 .scan-shortcut-button {
   display: inline-flex;
   align-items: center;
@@ -803,6 +846,73 @@ body.dark-mode .modal {
 
 .price-stats strong {
   font-size: 1.05rem;
+}
+
+.stats-panel {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 16px;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: var(--field);
+  padding: 14px;
+}
+
+.stats-panel-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stats-panel h2,
+.stats-card h3 {
+  margin: 0;
+}
+
+.stats-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stats-metrics label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-strong);
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+  padding: 7px 10px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.stats-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  padding: 12px;
+}
+
+.stats-card img {
+  width: 100%;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+}
+
+.stats-card table {
+  min-width: 0;
+  font-size: 0.86rem;
 }
 
 .history-filters {
@@ -2204,12 +2314,22 @@ body.dark-mode .list-name-input {
   }
 
   .history-filters,
-  .price-stats {
+  .price-stats,
+  .stats-grid {
     grid-template-columns: 1fr;
     width: 100%;
   }
 
   .history-filters {
+    display: grid;
+  }
+
+  .stats-panel-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .stats-metrics {
     display: grid;
   }
 

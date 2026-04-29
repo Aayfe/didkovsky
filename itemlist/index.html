@@ -220,6 +220,24 @@
             </div>
           </div>
           <section class="price-stats" id="price-stats" aria-live="polite"></section>
+          <section class="stats-panel" id="stats-panel">
+            <div class="stats-panel-head">
+              <div>
+                <p class="eyebrow">Statistiky</p>
+                <h2>Grafy za vybrané období</h2>
+              </div>
+              <button class="ghost-button" id="stats-export-pdf" type="button">Export PDF</button>
+            </div>
+            <div class="stats-metrics" id="stats-metrics">
+              <label><input type="checkbox" value="count" checked> Počty změn</label>
+              <label><input type="checkbox" value="spend" checked> Celková útrata</label>
+              <label><input type="checkbox" value="avgPrice" checked> Průměrná cena za produkt</label>
+              <label><input type="checkbox" value="consumed" checked> Projezeno / odečteno</label>
+              <label><input type="checkbox" value="topProducts" checked> Top produkty</label>
+            </div>
+            <div class="stats-grid" id="stats-grid"></div>
+            <canvas class="visually-hidden" id="stats-chart-canvas" width="900" height="360"></canvas>
+          </section>
           <div class="history-list" id="history-list" aria-live="polite"></div>
         </section>
 

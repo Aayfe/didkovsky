@@ -76,6 +76,11 @@ const historyPeriodFilter = document.querySelector("#history-period-filter");
 const historyDateFrom = document.querySelector("#history-date-from");
 const historyDateTo = document.querySelector("#history-date-to");
 const priceStats = document.querySelector("#price-stats");
+const statsPanel = document.querySelector("#stats-panel");
+const statsMetrics = document.querySelector("#stats-metrics");
+const statsGrid = document.querySelector("#stats-grid");
+const statsExportPdfButton = document.querySelector("#stats-export-pdf");
+const statsChartCanvas = document.querySelector("#stats-chart-canvas");
 const catalogBody = document.querySelector("#catalog-body");
 const catalogForm = document.querySelector("#catalog-form");
 const catalogName = document.querySelector("#catalog-name");
@@ -251,6 +256,8 @@ function setupEvents() {
     historyPeriodFilter.value = "custom";
     renderHistory();
   });
+  statsMetrics.addEventListener("change", renderHistory);
+  statsExportPdfButton.addEventListener("click", exportStatsPdf);
   darkModeToggle.addEventListener("change", toggleDarkMode);
   shoppingSubtractStock.addEventListener("change", updateShoppingSubtractSetting);
   settingsShoppingSubtractStock.addEventListener("change", updateShoppingSubtractSetting);
@@ -4387,7 +4394,7 @@ function recordHistory(text, type = "info", list = getActiveList(), details = {}
     type,
     listName: list ? getDisplayListName(list) : "",
     createdAt: new Date().toISOString(),
-    occurredAt: details.occurredAt || getLocalDateValue(new Date()),
+    occurredAt: details.occurredAt || getLocalDateTimeValue(new Date()),
     product: details.product || "",
     amount: Number.isFinite(Number(details.amount)) ? roundAmount(Number(details.amount)) : null,
     unit: details.unit || "",
@@ -4401,6 +4408,7 @@ function renderHistory() {
   historyList.replaceChildren();
   const visibleHistory = getFilteredHistory();
   renderPriceStats(visibleHistory);
+  renderStatsDashboard(visibleHistory);
 
   if (!visibleHistory.length) {
     const empty = document.createElement("p");
@@ -4438,6 +4446,277 @@ function renderHistory() {
 
     historyList.append(row);
   });
+}
+
+function getSelectedStatsMetrics() {
+  return [...statsMetrics.querySelectorAll("input[type='checkbox']:checked")].map((input) => input.value);
+}
+
+function renderStatsDashboard(entries) {
+  if (!statsGrid) {
+    return;
+  }
+
+  const metrics = getSelectedStatsMetrics();
+  const stats = buildStatsModel(entries);
+  statsGrid.replaceChildren();
+
+  if (!entries.length) {
+    const empty = document.createElement("p");
+    empty.className = "message";
+    empty.textContent = "Pro vybrané období nejsou data pro grafy.";
+    statsGrid.append(empty);
+    return;
+  }
+
+  const cards = [];
+
+  if (metrics.includes("count")) {
+    cards.push(createStatsCard("Počty změn", createBarChart("Změny podle dne", stats.countByDay, "ks"), createStatsTable(["Den", "Počet"], stats.countByDay)));
+  }
+
+  if (metrics.includes("spend")) {
+    cards.push(createStatsCard("Celková útrata", createBarChart("Útrata podle dne", stats.spendByDay, "Kč"), createStatsTable(["Den", "Útrata"], stats.spendByDay, formatPrice)));
+  }
+
+  if (metrics.includes("avgPrice")) {
+    cards.push(createStatsCard("Průměrná cena za produkt", createBarChart("Průměrná cena", stats.avgPriceByProduct, "Kč"), createStatsTable(["Produkt", "Průměr"], stats.avgPriceByProduct, formatPrice)));
+  }
+
+  if (metrics.includes("consumed")) {
+    cards.push(createStatsCard("Projezeno / odečteno", createBarChart("Odečtené množství", stats.consumedByProduct, "jedn."), createStatsTable(["Produkt", "Množství"], stats.consumedByProduct)));
+  }
+
+  if (metrics.includes("topProducts")) {
+    cards.push(createStatsCard("Top produkty podle změn", createBarChart("Top produkty", stats.topProducts, "ks"), createStatsTable(["Produkt", "Počet"], stats.topProducts)));
+  }
+
+  cards.forEach((card) => statsGrid.append(card));
+}
+
+function buildStatsModel(entries) {
+  const countByDay = new Map();
+  const spendByDay = new Map();
+  const productCounts = new Map();
+  const productPriceTotals = new Map();
+  const productPriceCounts = new Map();
+  const consumedByProduct = new Map();
+
+  entries.forEach((entry) => {
+    const day = getHistoryEventDate(entry);
+    const product = entry.product || getProductNameFromHistoryText(entry.text) || "Ostatní";
+    const price = Number(entry.price);
+    const amount = Number(entry.amount);
+
+    incrementMap(countByDay, day, 1);
+    incrementMap(productCounts, product, 1);
+
+    if (Number.isFinite(price) && price > 0) {
+      incrementMap(spendByDay, day, price);
+      incrementMap(productPriceTotals, product, price);
+      incrementMap(productPriceCounts, product, 1);
+    }
+
+    if (["eaten", "discarded", "adjustMinus", "subtract"].includes(entry.action) && Number.isFinite(amount)) {
+      incrementMap(consumedByProduct, `${product} ${entry.unit || ""}`.trim(), amount);
+    }
+  });
+
+  return {
+    countByDay: mapToChartRows(countByDay, 12),
+    spendByDay: mapToChartRows(spendByDay, 12),
+    avgPriceByProduct: [...productPriceTotals.entries()]
+      .map(([product, total]) => [product, roundAmount(total / (productPriceCounts.get(product) || 1))])
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8),
+    consumedByProduct: mapToChartRows(consumedByProduct, 8),
+    topProducts: mapToChartRows(productCounts, 8)
+  };
+}
+
+function incrementMap(map, key, amount) {
+  map.set(key, roundAmount((map.get(key) || 0) + amount));
+}
+
+function mapToChartRows(map, limit) {
+  return [...map.entries()]
+    .filter(([, value]) => Number(value) > 0)
+    .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), "cs"))
+    .slice(0, limit);
+}
+
+function getProductNameFromHistoryText(text) {
+  const match = String(text || "").match(/:\s*([^,+.-]+?)(?:\s+[+-]?\d|,|\.|$)/u);
+  return match ? tidyName(match[1]) : "";
+}
+
+function createStatsCard(title, chartDataUrl, table) {
+  const card = document.createElement("article");
+  const heading = document.createElement("h3");
+  const image = document.createElement("img");
+
+  card.className = "stats-card";
+  heading.textContent = title;
+  image.src = chartDataUrl;
+  image.alt = title;
+  card.append(heading, image, table);
+  return card;
+}
+
+function createStatsTable(headers, rows, formatter = formatAmount) {
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const tbody = document.createElement("tbody");
+
+  thead.innerHTML = `<tr><th>${headers[0]}</th><th>${headers[1]}</th></tr>`;
+  rows.forEach(([label, value]) => {
+    const row = document.createElement("tr");
+    const labelCell = document.createElement("td");
+    const valueCell = document.createElement("td");
+    labelCell.textContent = label;
+    valueCell.textContent = formatter(value);
+    row.append(labelCell, valueCell);
+    tbody.append(row);
+  });
+  table.append(thead, tbody);
+  return table;
+}
+
+function createBarChart(title, rows, unit) {
+  const canvas = statsChartCanvas;
+  const context = canvas.getContext("2d");
+  const width = canvas.width;
+  const height = canvas.height;
+  const padding = 42;
+  const max = Math.max(1, ...rows.map(([, value]) => Number(value)));
+
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.fillStyle = "#17202a";
+  context.font = "700 24px Arial";
+  context.fillText(title, padding, 34);
+  context.strokeStyle = "#d8e0e7";
+  context.beginPath();
+  context.moveTo(padding, height - padding);
+  context.lineTo(width - 18, height - padding);
+  context.stroke();
+
+  if (!rows.length) {
+    context.fillStyle = "#657184";
+    context.font = "16px Arial";
+    context.fillText("Bez dat", padding, height / 2);
+    return canvas.toDataURL("image/png");
+  }
+
+  const barGap = 10;
+  const barWidth = Math.max(18, (width - padding - 28 - (rows.length - 1) * barGap) / rows.length);
+
+  rows.forEach(([label, value], index) => {
+    const x = padding + index * (barWidth + barGap);
+    const barHeight = Math.round((height - 110) * (Number(value) / max));
+    const y = height - padding - barHeight;
+    context.fillStyle = "#137a6f";
+    context.fillRect(x, y, barWidth, barHeight);
+    context.fillStyle = "#17202a";
+    context.font = "700 13px Arial";
+    context.fillText(`${formatAmount(value)} ${unit}`, x, Math.max(56, y - 8));
+    context.save();
+    context.translate(x + 4, height - 18);
+    context.rotate(-0.35);
+    context.font = "12px Arial";
+    context.fillStyle = "#657184";
+    context.fillText(String(label).slice(0, 18), 0, 0);
+    context.restore();
+  });
+
+  return canvas.toDataURL("image/png");
+}
+
+function exportStatsPdf() {
+  const entries = getFilteredHistory();
+  const metrics = getSelectedStatsMetrics();
+  const stats = buildStatsModel(entries);
+  const sections = [];
+
+  if (metrics.includes("count")) {
+    sections.push(getExportSection("Počty změn", createBarChart("Změny podle dne", stats.countByDay, "ks"), ["Den", "Počet"], stats.countByDay));
+  }
+
+  if (metrics.includes("spend")) {
+    sections.push(getExportSection("Celková útrata", createBarChart("Útrata podle dne", stats.spendByDay, "Kč"), ["Den", "Útrata"], stats.spendByDay, formatPrice));
+  }
+
+  if (metrics.includes("avgPrice")) {
+    sections.push(getExportSection("Průměrná cena za produkt", createBarChart("Průměrná cena", stats.avgPriceByProduct, "Kč"), ["Produkt", "Průměr"], stats.avgPriceByProduct, formatPrice));
+  }
+
+  if (metrics.includes("consumed")) {
+    sections.push(getExportSection("Projezeno / odečteno", createBarChart("Odečtené množství", stats.consumedByProduct, "jedn."), ["Produkt", "Množství"], stats.consumedByProduct));
+  }
+
+  if (metrics.includes("topProducts")) {
+    sections.push(getExportSection("Top produkty podle změn", createBarChart("Top produkty", stats.topProducts, "ks"), ["Produkt", "Počet"], stats.topProducts));
+  }
+
+  const printWindow = window.open("", "_blank");
+
+  if (!printWindow) {
+    showMessage("Prohlížeč zablokoval okno pro export PDF.", true);
+    return;
+  }
+
+  printWindow.document.write(getStatsExportHtml(sections));
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+function getExportSection(title, chart, headers, rows, formatter = formatAmount) {
+  return { title, chart, headers, rows, formatter };
+}
+
+function getStatsExportHtml(sections) {
+  const rowsHtml = sections.map((section) => `
+    <section>
+      <h2>${escapeHtml(section.title)}</h2>
+      <table>
+        <thead><tr><th>${escapeHtml(section.headers[0])}</th><th>${escapeHtml(section.headers[1])}</th></tr></thead>
+        <tbody>${section.rows.map(([label, value]) => `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(section.formatter(value))}</td></tr>`).join("")}</tbody>
+      </table>
+      <img src="${section.chart}" alt="${escapeHtml(section.title)}">
+    </section>
+  `).join("");
+
+  return `<!doctype html>
+    <html lang="cs">
+      <head>
+        <meta charset="utf-8">
+        <title>Statistiky domácích zásob</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #17202a; margin: 28px; }
+          h1 { margin-bottom: 4px; }
+          section { break-inside: avoid; margin-top: 24px; }
+          table { width: 100%; border-collapse: collapse; margin: 10px 0 14px; }
+          th, td { border: 1px solid #d8e0e7; padding: 8px; text-align: left; }
+          th { background: #f3f6f8; }
+          img { width: 100%; max-width: 900px; border: 1px solid #d8e0e7; }
+        </style>
+      </head>
+      <body>
+        <h1>Statistiky domácích zásob</h1>
+        <p>Vygenerováno ${escapeHtml(new Date().toLocaleString("cs-CZ"))}</p>
+        ${rowsHtml || "<p>Bez vybraných dat.</p>"}
+      </body>
+    </html>`;
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 function handleHistoryFilterChange() {
