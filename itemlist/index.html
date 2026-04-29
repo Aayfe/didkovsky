@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux12">
+    <link rel="stylesheet" href="styles.css?v=ux13">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -262,7 +262,7 @@
           <div class="tool-grid">
             <button class="ghost-button" id="import-button" type="button">Hromadný import textem</button>
             <button class="ghost-button" id="receipt-import-button" type="button">Import účtenky fotkou</button>
-            <button class="ghost-button" id="ean-import-button" type="button">Import EAN skenem</button>
+            <button class="ghost-button" id="ean-import-button" type="button">Import EAN / barcode</button>
             <button class="ghost-button" id="xml-import-button" type="button">Import XML</button>
             <button class="ghost-button" id="xml-file-button" type="button">Import XML souborem</button>
             <input class="visually-hidden" id="xml-file-input" type="file" accept=".xml,application/xml,text/xml">
@@ -272,10 +272,10 @@
             <button class="ghost-button" id="anonymous-export-button" type="button">Anonymizovaný export</button>
           </div>
           <div class="tool-card" id="ean-tool" hidden>
-            <h2>EAN</h2>
+            <h2>EAN / barcode</h2>
             <div class="compact-form">
-              <input id="ean-input" type="text" inputmode="numeric" placeholder="Zadej nebo naskenuj EAN">
-              <button class="primary-button" id="ean-lookup-button" type="button">Načíst potravinu</button>
+              <input id="ean-input" type="text" inputmode="numeric" placeholder="Zadej EAN nebo barcode">
+              <button class="primary-button" id="ean-lookup-button" type="button">Načíst produkt</button>
             </div>
             <label class="file-drop ean-camera-drop">
               <span class="button-icon" aria-hidden="true">
@@ -286,7 +286,7 @@
               </span>
               <span class="file-drop-copy">
                 <strong>Naskenovat fotoaparátem</strong>
-                <small>Na mobilu otevře kameru, na počítači vybere fotku EANu.</small>
+                <small>Na mobilu otevře kameru, na počítači vybere fotku kódu.</small>
               </span>
               <input id="ean-file-input" type="file" accept="image/*" capture="environment">
             </label>
@@ -301,7 +301,7 @@
             </label>
             <p class="message" id="receipt-message" role="status" aria-live="polite"></p>
           </div>
-          <p class="message">EAN se načítá přes Open Food Facts. OCR účtenky používá knihovnu v prohlížeči, když se načte z internetu.</p>
+          <p class="message">EAN / barcode se načítá přes Open Food Facts. OCR účtenky používá knihovnu v prohlížeči, když se načte z internetu.</p>
         </section>
 
         <section class="app-view" id="view-settings" data-view-panel="settings" hidden>
@@ -317,7 +317,6 @@
               <span>Nákupní list odečítá aktuální zásoby</span>
             </label>
             <button class="danger-button" id="delete-list-button" type="button">Odebrat aktuální prostor</button>
-            <button class="danger-button" id="delete-all-button" type="button" hidden>Smazat všechno</button>
           </div>
 
           <section class="admin-panel" id="admin-panel" aria-label="Správa povolených účtů" hidden>
@@ -346,6 +345,10 @@
               <input class="list-name-input" id="list-name-input" type="text" value="Lednice">
             </label>
           </details>
+
+          <div class="settings-danger-zone">
+            <button class="danger-button settings-danger-small" id="delete-all-button" type="button" hidden>Smazat všechno</button>
+          </div>
         </section>
       </section>
     </main>
@@ -391,6 +394,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux12"></script>
+    <script src="app.js?v=ux13"></script>
   </body>
 </html>
