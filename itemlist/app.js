@@ -147,6 +147,10 @@ let currentUser = null;
 let currentAccess = null;
 let listNameBeforeEdit = "";
 let editingCatalogId = null;
+let activeComboboxInput = null;
+let activeComboboxIndex = -1;
+
+const COMBOBOX_INPUT_SELECTOR = "[data-combobox-source]";
 
 const icons = {
   edit: `
@@ -345,6 +349,8 @@ function setupEvents() {
     }
   });
 
+  setupComboboxes();
+
   itemsBody.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
 
@@ -362,6 +368,227 @@ function setupEvents() {
       removeItem(id);
     }
   });
+}
+
+function setupComboboxes() {
+  document.addEventListener("focusin", (event) => {
+    const input = event.target.closest?.(COMBOBOX_INPUT_SELECTOR);
+
+    if (!input) {
+      return;
+    }
+
+    prepareComboboxInput(input);
+    renderComboboxMenu(input);
+  });
+
+  document.addEventListener("input", (event) => {
+    const input = event.target.closest?.(COMBOBOX_INPUT_SELECTOR);
+
+    if (input) {
+      renderComboboxMenu(input);
+    }
+  });
+
+  document.addEventListener("keydown", handleComboboxKeydown);
+
+  document.addEventListener("pointerdown", (event) => {
+    if (!activeComboboxInput) {
+      return;
+    }
+
+    const menu = getComboboxMenu(activeComboboxInput, false);
+
+    if (event.target === activeComboboxInput || menu?.contains(event.target)) {
+      return;
+    }
+
+    hideComboboxMenu(activeComboboxInput);
+  });
+}
+
+function prepareComboboxInput(input) {
+  const field = input.closest(".field");
+
+  input.setAttribute("autocomplete", "off");
+  input.setAttribute("autocapitalize", "sentences");
+  input.setAttribute("role", "combobox");
+  input.setAttribute("aria-autocomplete", "list");
+  input.setAttribute("aria-expanded", "false");
+
+  if (field) {
+    field.classList.add("has-combobox");
+  }
+}
+
+function renderComboboxMenu(input) {
+  const options = getComboboxOptions(input);
+  const menu = getComboboxMenu(input);
+
+  activeComboboxInput = input;
+  activeComboboxIndex = -1;
+  menu.replaceChildren();
+
+  if (!options.length) {
+    hideComboboxMenu(input);
+    return;
+  }
+
+  options.forEach((item, index) => {
+    const button = document.createElement("button");
+    const text = document.createElement("span");
+    const meta = document.createElement("small");
+
+    button.className = "combobox-option";
+    button.type = "button";
+    button.dataset.index = String(index);
+    button.dataset.value = item.value;
+    button.setAttribute("role", "option");
+    text.textContent = item.value;
+    button.append(text);
+
+    if (item.meta) {
+      meta.textContent = item.meta;
+      button.append(meta);
+    }
+
+    button.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+    });
+    button.addEventListener("click", () => {
+      selectComboboxValue(input, item.value);
+    });
+
+    menu.append(button);
+  });
+
+  menu.hidden = false;
+  input.setAttribute("aria-expanded", "true");
+}
+
+function getComboboxOptions(input) {
+  const source = document.getElementById(input.dataset.comboboxSource);
+
+  if (!source) {
+    return [];
+  }
+
+  const query = normalize(input.value);
+  const seen = new Set();
+
+  return [...source.options]
+    .map((option) => ({
+      value: option.value || option.textContent || "",
+      meta: option.label || option.textContent || ""
+    }))
+    .filter((item) => {
+      const key = normalize(item.value);
+
+      if (!key || seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+
+      if (!query) {
+        return true;
+      }
+
+      return key.includes(query) || normalize(item.meta).includes(query);
+    })
+    .sort((a, b) => a.value.localeCompare(b.value, "cs"))
+    .slice(0, 8);
+}
+
+function getComboboxMenu(input, createIfMissing = true) {
+  const field = input.closest(".field") || input.parentElement;
+  let menu = field?.querySelector(".combobox-menu");
+
+  if (!menu && createIfMissing && field) {
+    menu = document.createElement("div");
+    menu.className = "combobox-menu";
+    menu.hidden = true;
+    menu.setAttribute("role", "listbox");
+    field.append(menu);
+  }
+
+  return menu;
+}
+
+function handleComboboxKeydown(event) {
+  const input = event.target.closest?.(COMBOBOX_INPUT_SELECTOR);
+
+  if (!input) {
+    return;
+  }
+
+  const menu = getComboboxMenu(input, false);
+  const options = menu && !menu.hidden ? [...menu.querySelectorAll(".combobox-option")] : [];
+
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+
+    if (!options.length) {
+      renderComboboxMenu(input);
+      return;
+    }
+
+    setComboboxIndex(input, Math.min(activeComboboxIndex + 1, options.length - 1));
+  }
+
+  if (event.key === "ArrowUp" && options.length) {
+    event.preventDefault();
+    setComboboxIndex(input, Math.max(activeComboboxIndex - 1, 0));
+  }
+
+  if (event.key === "Enter" && options.length && activeComboboxIndex >= 0) {
+    event.preventDefault();
+    selectComboboxValue(input, options[activeComboboxIndex].dataset.value);
+  }
+
+  if (event.key === "Escape") {
+    hideComboboxMenu(input);
+  }
+}
+
+function setComboboxIndex(input, index) {
+  const menu = getComboboxMenu(input, false);
+
+  if (!menu) {
+    return;
+  }
+
+  const options = [...menu.querySelectorAll(".combobox-option")];
+  activeComboboxIndex = index;
+
+  options.forEach((option, optionIndex) => {
+    option.classList.toggle("is-active", optionIndex === index);
+  });
+
+  options[index]?.scrollIntoView({ block: "nearest" });
+}
+
+function selectComboboxValue(input, value) {
+  input.value = value;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  hideComboboxMenu(input);
+  input.focus();
+}
+
+function hideComboboxMenu(input) {
+  const menu = getComboboxMenu(input, false);
+
+  if (menu) {
+    menu.hidden = true;
+  }
+
+  input?.setAttribute("aria-expanded", "false");
+
+  if (activeComboboxInput === input) {
+    activeComboboxInput = null;
+    activeComboboxIndex = -1;
+  }
 }
 
 async function initializeApp() {
@@ -2012,7 +2239,7 @@ function addComboItemRow(item = {}) {
   row.innerHTML = `
     <label class="field">
       <span>Potravina</span>
-      <input class="combo-product" type="text" list="product-options" placeholder="Rohlík">
+      <input class="combo-product" type="text" data-combobox-source="product-options" placeholder="Rohlík">
     </label>
     <label class="field">
       <span>Množství</span>
@@ -2029,7 +2256,7 @@ function addComboItemRow(item = {}) {
     </label>
     <label class="field">
       <span>Kategorie</span>
-      <input class="combo-category" type="text" list="category-options" placeholder="Ostatní">
+      <input class="combo-category" type="text" data-combobox-source="category-options" placeholder="Ostatní">
     </label>
     <button class="ghost-button combo-remove-button" type="button" data-combo-builder-action="remove">Odebrat</button>
   `;

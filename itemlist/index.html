@@ -2,9 +2,9 @@
 <html lang="cs">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux6">
+    <link rel="stylesheet" href="styles.css?v=ux7">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -63,13 +63,13 @@
           <form class="entry-form" id="entry-form" autocomplete="off">
             <label class="field product-field">
               <span>Potravina</span>
-              <input id="product-input" name="product" type="text" list="product-options" placeholder="Např. rohlík" required>
+              <input id="product-input" name="product" type="text" data-combobox-source="product-options" placeholder="Např. rohlík" required>
               <datalist id="product-options"></datalist>
             </label>
 
             <label class="field category-field">
               <span>Kategorie</span>
-              <input id="category-input" name="category" type="text" list="category-options" placeholder="Pečivo">
+              <input id="category-input" name="category" type="text" data-combobox-source="category-options" placeholder="Pečivo">
               <datalist id="category-options"></datalist>
             </label>
 
@@ -144,7 +144,7 @@
           <form class="shopping-form" id="shopping-form" autocomplete="off">
             <label class="field">
               <span>Potravina</span>
-              <input id="shopping-product" type="text" list="product-options" placeholder="Např. máslo">
+              <input id="shopping-product" type="text" data-combobox-source="product-options" placeholder="Např. máslo">
             </label>
             <label class="field">
               <span>Množství</span>
@@ -193,7 +193,7 @@
             </label>
             <label class="field">
               <span>Kategorie</span>
-              <input id="catalog-category" type="text" list="category-options" placeholder="Mléčné">
+              <input id="catalog-category" type="text" data-combobox-source="category-options" placeholder="Mléčné">
             </label>
             <label class="field">
               <span>Jednotka</span>
@@ -370,6 +370,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux6"></script>
+    <script src="app.js?v=ux7"></script>
   </body>
 </html>
