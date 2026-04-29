@@ -2897,12 +2897,35 @@ async function scanEanFromFile(event) {
     return;
   }
 
-  if (!("BarcodeDetector" in window)) {
-    eanMessage.textContent = "Tenhle prohlížeč neumí číst EAN z fotky. Zadej číslo ručně.";
-    return;
-  }
+  eanMessage.textContent = "Čtu EAN z obrázku...";
 
-  eanMessage.textContent = "Čtu čárový kód z obrázku...";
+  try {
+    const code = await detectEanFromImage(file);
+
+    if (!code) {
+      eanMessage.textContent = "Na fotce jsem EAN nenašel. Zkus ostřejší fotku zblízka nebo číslo napiš ručně.";
+      return;
+    }
+
+    eanInput.value = code;
+    await lookupEanProduct();
+  } catch (error) {
+    eanMessage.textContent = "Sken se nepovedl. Zkus jinou fotku, lepší světlo nebo ruční zadání.";
+  } finally {
+    eanFileInput.value = "";
+  }
+}
+
+async function detectEanFromImage(file) {
+  return await detectEanWithBarcodeDetector(file)
+    || await detectEanWithZxing(file)
+    || await detectEanWithOcr(file);
+}
+
+async function detectEanWithBarcodeDetector(file) {
+  if (!("BarcodeDetector" in window) || !window.createImageBitmap) {
+    return "";
+  }
 
   try {
     const bitmap = await createImageBitmap(file);
@@ -2910,20 +2933,73 @@ async function scanEanFromFile(event) {
       formats: ["ean_13", "ean_8", "upc_a", "upc_e"]
     });
     const codes = await detector.detect(bitmap);
-    const code = codes[0]?.rawValue || "";
+    const code = codes.map((item) => item.rawValue).find(Boolean);
+    return findLikelyEanCode(code);
+  } catch (error) {
+    return "";
+  }
+}
 
-    if (!code) {
-      eanMessage.textContent = "Na fotce jsem EAN nenašel. Zkus ostřejší fotku nebo číslo napiš.";
-      return;
+async function detectEanWithZxing(file) {
+  if (!window.ZXing?.BrowserMultiFormatReader) {
+    return "";
+  }
+
+  const reader = new ZXing.BrowserMultiFormatReader();
+  const url = URL.createObjectURL(file);
+
+  try {
+    const result = await reader.decodeFromImageUrl(url);
+    const text = typeof result.getText === "function" ? result.getText() : result.text;
+    return findLikelyEanCode(text);
+  } catch (error) {
+    return "";
+  } finally {
+    if (typeof reader.reset === "function") {
+      reader.reset();
     }
 
-    eanInput.value = code;
-    await lookupEanProduct();
-  } catch (error) {
-    eanMessage.textContent = "Sken se nepovedl. Zkus jinou fotku nebo ruční zadání.";
-  } finally {
-    eanFileInput.value = "";
+    URL.revokeObjectURL(url);
   }
+}
+
+async function detectEanWithOcr(file) {
+  if (!window.Tesseract) {
+    return "";
+  }
+
+  try {
+    const preparedImage = await prepareReceiptImage(file);
+    const { data } = await Tesseract.recognize(preparedImage || file, "eng", {
+      tessedit_char_whitelist: "0123456789",
+      tessedit_pageseg_mode: "6"
+    });
+    return findLikelyEanCode(data.text);
+  } catch (error) {
+    return "";
+  }
+}
+
+function findLikelyEanCode(value) {
+  const candidates = String(value || "").match(/\d{8,14}/g) || [];
+  return candidates.find(hasValidGtinChecksum) || candidates[0] || "";
+}
+
+function hasValidGtinChecksum(value) {
+  const code = String(value || "").replace(/\D/g, "");
+
+  if (![8, 12, 13, 14].includes(code.length)) {
+    return false;
+  }
+
+  const digits = [...code].map(Number);
+  const checkDigit = digits.pop();
+  const sum = digits
+    .reverse()
+    .reduce((total, digit, index) => total + digit * (index % 2 === 0 ? 3 : 1), 0);
+  const expected = (10 - (sum % 10)) % 10;
+
+  return expected === checkDigit;
 }
 
 async function importReceiptFromImage(event) {

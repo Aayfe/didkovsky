@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux11">
+    <link rel="stylesheet" href="styles.css?v=ux12">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -277,8 +277,17 @@
               <input id="ean-input" type="text" inputmode="numeric" placeholder="Zadej nebo naskenuj EAN">
               <button class="primary-button" id="ean-lookup-button" type="button">Načíst potravinu</button>
             </div>
-            <label class="file-drop">
-              <span>Vybrat fotku EANu</span>
+            <label class="file-drop ean-camera-drop">
+              <span class="button-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path>
+                  <circle cx="12" cy="13.5" r="3.5"></circle>
+                </svg>
+              </span>
+              <span class="file-drop-copy">
+                <strong>Naskenovat fotoaparátem</strong>
+                <small>Na mobilu otevře kameru, na počítači vybere fotku EANu.</small>
+              </span>
               <input id="ean-file-input" type="file" accept="image/*" capture="environment">
             </label>
             <div class="ean-result" id="ean-result" hidden></div>
@@ -379,8 +388,9 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux11"></script>
+    <script src="app.js?v=ux12"></script>
   </body>
 </html>
