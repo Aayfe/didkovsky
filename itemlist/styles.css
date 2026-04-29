@@ -719,6 +719,7 @@ h1 {
 .combo-form-actions {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 10px;
 }
 
@@ -754,7 +755,7 @@ h1 {
 }
 
 .catalog-submit-button {
-  justify-self: start;
+  justify-self: end;
 }
 
 .catalog-alias-editor {
