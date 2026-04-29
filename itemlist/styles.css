@@ -108,7 +108,7 @@ textarea {
 }
 
 .app-shell {
-  width: min(1120px, 100%);
+  width: min(1180px, 100%);
   margin: 0 auto;
   padding: 22px 18px 44px;
 }
@@ -599,11 +599,39 @@ h1 {
   .entry-form > .ghost-button {
     grid-column: 9 / 11;
   }
+
+  .changes-entry-form {
+    grid-template-columns:
+      minmax(170px, 1.7fr)
+      minmax(130px, 1.15fr)
+      minmax(130px, 1.15fr)
+      minmax(130px, 1.15fr)
+      minmax(82px, 0.55fr)
+      minmax(96px, 0.7fr)
+      minmax(230px, 1.6fr)
+      max-content;
+  }
+
+  .changes-entry-form .product-field,
+  .changes-entry-form .category-field,
+  .changes-entry-form .action-field,
+  .changes-entry-form .amount-field,
+  .changes-entry-form .unit-field,
+  .changes-entry-form .price-field,
+  .changes-entry-form .event-date-field,
+  .changes-entry-form > .primary-button {
+    grid-column: auto;
+  }
+
+  .changes-entry-form > .ghost-button {
+    grid-column: 7 / 9;
+    justify-self: start;
+  }
 }
 
 @media (min-width: 1280px) {
   .app-shell {
-    width: min(1360px, 100%);
+    width: clamp(980px, 60vw, 1500px);
     display: grid;
     grid-template-columns: 280px minmax(0, 1fr);
     align-items: start;
@@ -1014,6 +1042,18 @@ body.dark-mode .modal {
 
 .changes-entry-form {
   margin-bottom: 10px;
+}
+
+#submit-button {
+  width: max-content;
+  max-width: 100%;
+  justify-self: start;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.history-title-heading {
+  margin-top: 8px;
 }
 
 .field {
