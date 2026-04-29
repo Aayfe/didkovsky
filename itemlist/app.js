@@ -104,6 +104,22 @@ const DEFAULT_CATEGORIES = [
   "Kombinace",
   "Ostatní"
 ];
+const RECEIPT_SKIP_PATTERNS = [
+  /^(celkem|suma|součet|subtotal|total|hotově|hotovost|kartou|visa|mastercard|cash|vráceno|zaplaceno|účtenka|ucet|datum|čas|dic|dič|ičo|ico|provozovna|pokladna|doklad|terminál|terminal|děkujeme|dekujeme|www|tel\.?|eet|fik|bkp)\b/iu,
+  /\b(dph|vat|sazba|základ|zaklad|sleva|platební|platebni|transakce|autorizační|autorizacni)\b/iu,
+  /^[\d\s.,:/\\-]+$/u
+];
+const CATEGORY_NAME_RULES = [
+  [/rohl|hous|chleb|baget|toast|toust|pečiv|peciv|vánoč|vanoc|koláč|kolac|buch/, "Pečivo"],
+  [/mlék|mlek|másl|masl|sýr|syr|jogurt|tvaroh|smetan|kefír|kefir|mozzarell|eidam|gouda/, "Mléčné"],
+  [/kuř|kur|vepř|vepr|hověz|hovez|maso|šunk|sunk|salám|salam|slanina|klobás|klobas|párk|park/, "Maso"],
+  [/jabl|banán|banan|rajč|rajc|okurk|paprik|brambor|cibul|mrkev|salát|salat|citron|pomeranč|pomeranc|ovoce|zelen/, "Ovoce a zelenina"],
+  [/voda|minerál|mineral|džus|dzus|cola|limon|pivo|víno|vino|nápoj|napoj|sirup/, "Nápoje"],
+  [/čokol|cokol|sušenk|susenk|oplat|bonbon|cukr|zmrz|dezert|sladk/, "Sladké"],
+  [/mraž|mraz|pizza|hranolky/, "Mražené"],
+  [/rýž|ryz|těst|test|mouka|olej|sůl|sul|kečup|kecup|hořč|horc|konzerv|trvanl|vločky|vlocky/, "Trvanlivé"],
+  [/jar|prášek|prasek|ubrousk|papír|papir|šampon|sampon|mýdlo|mydlo|droger/, "Drogerie"]
+];
 const PRODUCT_WORDS = {
   rohlik: "rohlík",
   rohliky: "rohlíky",
@@ -1116,7 +1132,7 @@ function parseNameFirstImportLine(line) {
     return null;
   }
 
-  return { name, amount, unit, category: "Ostatní" };
+  return { name, amount, unit, category: inferCategoryFromName(name) };
 }
 
 function parseAmountFirstImportLine(line) {
@@ -1136,7 +1152,7 @@ function parseAmountFirstImportLine(line) {
     return null;
   }
 
-  return { name, amount, unit, category: "Ostatní" };
+  return { name, amount, unit, category: inferCategoryFromName(name) };
 }
 
 function parseImportAmount(value) {
@@ -2667,21 +2683,24 @@ async function importReceiptFromImage(event) {
     return;
   }
 
-  receiptMessage.textContent = "Rozpoznávám text z účtenky...";
+  receiptMessage.textContent = "Rozpoznávám text z účtenky a čistím položky...";
 
   try {
     const result = await recognizeReceiptText(file);
-    const text = tidyReceiptText(result);
+    const parsed = parseReceiptText(result);
+    const text = formatReceiptItemsForImport(parsed.items);
 
     if (!text) {
-      receiptMessage.textContent = "Z účtenky jsem nevyčetl žádný použitelný text.";
+      receiptMessage.textContent = "Z účtenky jsem nevyčetl žádné použitelné položky.";
       return;
     }
 
     openImportModal("Import z účtenky", "Rozpoznané položky uprav a potvrď.");
     importText.value = text;
-    importError.textContent = "Zkontroluj množství a jednotky, účtenky bývají šumivé.";
-    receiptMessage.textContent = "Hotovo. Otevřel jsem import, kde si text doladíš.";
+    importError.textContent = parsed.skipped.length
+      ? `Zkontroluj množství a jednotky. Přeskočeno řádků: ${parsed.skipped.length}.`
+      : "Zkontroluj množství a jednotky, účtenky bývají šumivé.";
+    receiptMessage.textContent = `Hotovo. Našel jsem ${parsed.items.length} položek k importu.`;
   } catch (error) {
     receiptMessage.textContent = "OCR se nepovedlo. Zkus ostřejší fotku nebo ruční hromadný import.";
   } finally {
@@ -2690,8 +2709,13 @@ async function importReceiptFromImage(event) {
 }
 
 async function recognizeReceiptText(file) {
+  const preparedImage = await prepareReceiptImage(file);
+
   try {
-    const { data } = await Tesseract.recognize(file, "ces+eng");
+    const { data } = await Tesseract.recognize(preparedImage || file, "ces+eng", {
+      tessedit_pageseg_mode: "6",
+      preserve_interword_spaces: "1"
+    });
     return data.text || "";
   } catch (error) {
     const { data } = await Tesseract.recognize(file, "eng");
@@ -2699,39 +2723,178 @@ async function recognizeReceiptText(file) {
   }
 }
 
-function tidyReceiptText(text) {
-  return text
+async function prepareReceiptImage(file) {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxSide = 1800;
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+
+    if (!context) {
+      return file;
+    }
+
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const image = context.getImageData(0, 0, canvas.width, canvas.height);
+
+    for (let index = 0; index < image.data.length; index += 4) {
+      const gray = (image.data[index] * 0.299) + (image.data[index + 1] * 0.587) + (image.data[index + 2] * 0.114);
+      const contrasted = gray > 158 ? 255 : 0;
+      image.data[index] = contrasted;
+      image.data[index + 1] = contrasted;
+      image.data[index + 2] = contrasted;
+    }
+
+    context.putImageData(image, 0, 0);
+
+    return await new Promise((resolve) => {
+      canvas.toBlob((blob) => resolve(blob || file), "image/png");
+    });
+  } catch (error) {
+    return file;
+  }
+}
+
+function parseReceiptText(text) {
+  const items = [];
+  const skipped = [];
+
+  String(text || "")
     .split(/\r?\n/)
     .map(normalizeReceiptLine)
-    .map(parseReceiptProductLine)
     .filter(Boolean)
+    .forEach((line) => {
+      const parsed = parseReceiptProductLine(line);
+
+      if (parsed) {
+        mergeReceiptItem(items, parsed);
+      } else {
+        skipped.push(line);
+      }
+    });
+
+  return { items: items.slice(0, 80), skipped };
+}
+
+function formatReceiptItemsForImport(items) {
+  return items
     .map((item) => `${item.name} ${formatAmount(item.amount)} ${item.unit}`)
-    .slice(0, 80)
     .join("\n");
 }
 
 function parseReceiptProductLine(line) {
-  if (!/\b\d+(?:[,.]\d+)?\s*(kg|g|l|ml|ks|kč)\b/iu.test(line)) {
+  if (isReceiptNoiseLine(line)) {
     return null;
   }
 
-  const parsed = parseImportLine(line);
+  const normalizedLine = line
+    .replace(/\b(\d+(?:[,.]\d+)?)\s*[x×]\s*(\d+(?:[,.]\d{2})\s*(?:kč|czk)?)\b/iu, "$1 ks")
+    .replace(/\s+\d+(?:[,.]\d{2})\s*(?:kč|czk)?\s*$/iu, "");
+  const parsed = parseImportLine(normalizedLine);
 
   if (!parsed || normalize(parsed.name).length < 3) {
+    return parseReceiptPriceLine(line);
+  }
+
+  parsed.category = inferCategoryFromName(parsed.name);
+  return parsed;
+}
+
+function parseReceiptPriceLine(line) {
+  const match = line.match(/^(.+?)\s+(-?\d+(?:[,.]\d{2}))\s*(?:kč|czk)?\s*$/iu);
+
+  if (!match) {
     return null;
   }
 
-  return parsed;
+  const name = cleanReceiptProductName(match[1]);
+
+  if (!name || normalize(name).length < 3) {
+    return null;
+  }
+
+  const quantity = inferReceiptQuantity(line);
+
+  return {
+    name,
+    amount: quantity.amount,
+    unit: quantity.unit,
+    category: inferCategoryFromName(name)
+  };
+}
+
+function inferReceiptQuantity(line) {
+  const quantityMatch = line.match(/\b(\d+(?:[,.]\d+)?)\s*(kg|g|l|ml|ks|kus|kusu|kusy)\b/iu);
+
+  if (quantityMatch) {
+    const amount = parseImportAmount(quantityMatch[1]) || 1;
+    return normalizeImportAmountAndUnit(amount, quantityMatch[2]);
+  }
+
+  const multiplierMatch = line.match(/\b(\d+(?:[,.]\d+)?)\s*[x×]\b/iu);
+
+  if (multiplierMatch) {
+    return {
+      amount: parseImportAmount(multiplierMatch[1]) || 1,
+      unit: "ks"
+    };
+  }
+
+  return { amount: 1, unit: "ks" };
+}
+
+function cleanReceiptProductName(value) {
+  const text = tidyName(String(value || "")
+    .replace(/\b\d+(?:[,.]\d+)?\s*(kg|g|l|ml|ks|kus|kusu|kusy)\b/igu, " ")
+    .replace(/\b\d+(?:[,.]\d+)?\s*[x×]\s*/igu, " ")
+    .replace(/\b[a-z]?\d{4,}\b/igu, " ")
+    .replace(/\b(akce|sleva|kaufland|lidl|tesco|albert|billa|penny|globus)\b/igu, " ")
+    .replace(/[^\p{L}\p{N}\s%.-]/gu, " "));
+
+  return formatProductName(text);
+}
+
+function mergeReceiptItem(items, item) {
+  const existing = items.find((currentItem) => {
+    return normalize(currentItem.name) === normalize(item.name)
+      && currentItem.unit === item.unit;
+  });
+
+  if (existing) {
+    existing.amount = roundAmount(existing.amount + item.amount);
+    return;
+  }
+
+  items.push(item);
+}
+
+function isReceiptNoiseLine(line) {
+  const normalizedLine = tidyName(line);
+
+  if (normalizedLine.length < 3) {
+    return true;
+  }
+
+  return RECEIPT_SKIP_PATTERNS.some((pattern) => pattern.test(normalizedLine));
 }
 
 function normalizeReceiptLine(line) {
   return tidyName(String(line || "")
+    .replace(/[|*_~[\]{}]/g, " ")
+    .replace(/[€$]/g, " Kč")
+    .replace(/[×]/g, "x")
+    .replace(/\bO(?=\d)/g, "0")
+    .replace(/(?<=\d)O\b/g, "0")
+    .replace(/(?<=\d)[Il]\b/g, "1")
     .replace(/[|*_~]/g, " ")
     .replace(/^[A-Z]\.(?=\S)/u, "")
-    .replace(/\b\d+\s*x\s+\d+[,.]\d{2}.*$/iu, "")
-    .replace(/\s+\d+[,.]\d{2}\s*(Kč|CZK)?\s*[A-Z0-9]?$/iu, "")
+    .replace(/\bEAN\s*\d+\b/iu, "")
     .replace(/(\d+(?:[,.]\d+)?)(kg|g|l|ml|ks)\b/iu, "$1 $2")
-    .replace(/[.,;:]+/g, " ")
+    .replace(/\s+Kc\b/iu, " Kč")
+    .replace(/[;:]+/g, " ")
     .replace(/\s+/g, " "));
 }
 
@@ -2781,6 +2944,19 @@ function inferProductCategory(product) {
     [/frozen|mraž/, "Mražené"]
   ];
   const match = rules.find(([pattern]) => pattern.test(text));
+
+  return match ? match[1] : "Ostatní";
+}
+
+function inferCategoryFromName(name) {
+  const catalogItem = findCatalogItemByName(name);
+
+  if (catalogItem?.category) {
+    return catalogItem.category;
+  }
+
+  const normalizedName = normalize(name);
+  const match = CATEGORY_NAME_RULES.find(([pattern]) => pattern.test(normalizedName));
 
   return match ? match[1] : "Ostatní";
 }
@@ -2986,12 +3162,11 @@ function updateSubmitButtonText() {
 }
 
 function stepAmount(direction) {
-  const min = Number(amountInput.min) || 1;
   const currentValue = Number(amountInput.value);
-  const current = Number.isFinite(currentValue) && currentValue >= min
-    ? currentValue
+  const min = 1;
+  const next = Number.isFinite(currentValue) && currentValue >= min
+    ? Math.max(min, Math.round(currentValue) + direction)
     : min;
-  const next = Math.max(min, roundAmount(current + direction));
 
   amountInput.value = String(next);
   amountInput.dispatchEvent(new Event("input", { bubbles: true }));
