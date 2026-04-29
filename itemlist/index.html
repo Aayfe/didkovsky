@@ -430,6 +430,27 @@
 
           <details class="settings-stats-panel">
             <summary>Statistiky, grafy a export</summary>
+            <div class="settings-history-filters">
+              <label class="field compact-field">
+                <span>Období</span>
+                <select id="settings-period-filter">
+                  <option value="">Vše</option>
+                  <option value="today">Dnes</option>
+                  <option value="3d">3 dny</option>
+                  <option value="week">Týden</option>
+                  <option value="month">Měsíc</option>
+                  <option value="year">Rok</option>
+                </select>
+              </label>
+              <label class="field compact-field">
+                <span>Od</span>
+                <input id="settings-date-from" type="date">
+              </label>
+              <label class="field compact-field">
+                <span>Do</span>
+                <input id="settings-date-to" type="date">
+              </label>
+            </div>
             <section class="price-stats" id="price-stats" aria-live="polite"></section>
             <section class="stats-panel" id="stats-panel">
               <div class="stats-panel-head">

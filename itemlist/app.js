@@ -90,6 +90,9 @@ const statsMetrics = document.querySelector("#stats-metrics");
 const statsGrid = document.querySelector("#stats-grid");
 const statsExportPdfButton = document.querySelector("#stats-export-pdf");
 const statsChartCanvas = document.querySelector("#stats-chart-canvas");
+const settingsPeriodFilter = document.querySelector("#settings-period-filter");
+const settingsDateFrom = document.querySelector("#settings-date-from");
+const settingsDateTo = document.querySelector("#settings-date-to");
 const catalogBody = document.querySelector("#catalog-body");
 const catalogForm = document.querySelector("#catalog-form");
 const catalogName = document.querySelector("#catalog-name");
@@ -284,6 +287,15 @@ function setupEvents() {
   });
   statsMetrics.addEventListener("change", renderHistory);
   statsExportPdfButton.addEventListener("click", exportStatsPdf);
+  settingsPeriodFilter?.addEventListener("change", handleSettingsHistoryFilterChange);
+  settingsDateFrom?.addEventListener("input", () => {
+    settingsPeriodFilter.value = "";
+    renderHistory();
+  });
+  settingsDateTo?.addEventListener("input", () => {
+    settingsPeriodFilter.value = "";
+    renderHistory();
+  });
   darkModeToggle.addEventListener("change", toggleDarkMode);
   shoppingSubtractStock.addEventListener("change", updateShoppingSubtractSetting);
   settingsShoppingSubtractStock.addEventListener("change", updateShoppingSubtractSetting);
@@ -598,7 +610,7 @@ function getComboboxOptions(input) {
   return [...source.options]
     .map((option) => ({
       value: option.value || option.textContent || "",
-      meta: option.label || option.textContent || "",
+      meta: input.dataset.comboboxSource === "category-options" ? "" : option.label || option.textContent || "",
       optionValue: option.dataset.value || option.value || option.textContent || ""
     }))
     .filter((item) => {
@@ -2951,11 +2963,13 @@ function renderItems() {
 
       row.innerHTML = `
         <td>
-          <span class="product-title-row">
-            <span class="product-name"></span>
+          <div class="product-cell-content">
+            <span class="product-card-copy">
+              <span class="product-name"></span>
+              <small class="product-card-category"></small>
+            </span>
             <button class="icon-inline-button" type="button" data-action="edit" data-id="${item.id}" aria-label="Upravit položku">${icons.edit}</button>
-          </span>
-          <small class="product-card-category"></small>
+          </div>
         </td>
         <td class="category-cell"></td>
         <td class="number-cell">${formatAmountWithUnit(item.amount, item.unit)}</td>
@@ -4653,10 +4667,11 @@ function recordHistory(text, type = "info", list = getActiveList(), details = {}
 function renderHistory() {
   historyList.replaceChildren();
   const filteredHistory = getFilteredHistory();
+  const filteredSettingsHistory = getFilteredSettingsHistory();
   const visibleHistory = filteredHistory.filter(isInventoryHistoryEntry);
-  renderPriceStats(filteredHistory);
-  renderStatsDashboard(filteredHistory);
-  renderSettingsLog(history);
+  renderPriceStats(filteredSettingsHistory);
+  renderStatsDashboard(filteredSettingsHistory);
+  renderSettingsLog(filteredSettingsHistory);
 
   if (!visibleHistory.length) {
     const empty = document.createElement("p");
@@ -4947,7 +4962,7 @@ function roundRect(context, x, y, width, height, radius) {
 }
 
 function exportStatsPdf() {
-  const entries = getFilteredHistory();
+  const entries = getFilteredSettingsHistory();
   const metrics = getSelectedStatsMetrics();
   const stats = buildStatsModel(entries);
   const sections = [];
@@ -5039,9 +5054,21 @@ function handleHistoryFilterChange() {
   renderHistory();
 }
 
-function getFilteredHistory() {
-  const range = getHistoryFilterRange();
+function handleSettingsHistoryFilterChange() {
+  settingsDateFrom.value = "";
+  settingsDateTo.value = "";
+  renderHistory();
+}
 
+function getFilteredHistory() {
+  return getHistoryEntriesForRange(getHistoryFilterRange());
+}
+
+function getFilteredSettingsHistory() {
+  return getHistoryEntriesForRange(getSettingsHistoryFilterRange());
+}
+
+function getHistoryEntriesForRange(range) {
   return history.filter((entry) => {
     const eventDate = getHistoryEventDate(entry);
 
@@ -5054,13 +5081,21 @@ function getFilteredHistory() {
 }
 
 function getHistoryFilterRange() {
-  const today = getLocalDateValue(new Date());
-  const period = historyPeriodFilter.value;
+  return getHistoryFilterRangeFromControls(historyPeriodFilter, historyDateFrom, historyDateTo);
+}
 
-  if (historyDateFrom.value || historyDateTo.value) {
+function getSettingsHistoryFilterRange() {
+  return getHistoryFilterRangeFromControls(settingsPeriodFilter, settingsDateFrom, settingsDateTo);
+}
+
+function getHistoryFilterRangeFromControls(periodInput, fromInput, toInput) {
+  const today = getLocalDateValue(new Date());
+  const period = periodInput?.value || "";
+
+  if (fromInput?.value || toInput?.value) {
     return {
-      from: historyDateFrom.value || "",
-      to: historyDateTo.value || ""
+      from: fromInput?.value || "",
+      to: toInput?.value || ""
     };
   }
 
