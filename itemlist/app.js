@@ -614,7 +614,9 @@ function getComboboxOptions(input) {
       optionValue: option.dataset.value || option.value || option.textContent || ""
     }))
     .filter((item) => {
-      const key = normalize(item.value);
+      const key = input.dataset.selectCombobox
+        ? `${normalize(item.value)}|${normalize(item.optionValue)}`
+        : normalize(item.value);
 
       if (!key || seen.has(key)) {
         return false;
