@@ -3030,3 +3030,37 @@ body.dark-mode .list-name-input {
       "cancel";
   }
 }
+
+/* Final alignment overrides for primary form actions. */
+.catalog-form #catalog-submit-button,
+.combo-form-actions {
+  grid-column: 1 / -1;
+}
+
+.combo-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.catalog-form #catalog-submit-button,
+.combo-form-actions #combo-submit-button {
+  width: max-content;
+  max-width: 100%;
+  justify-self: end;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .combo-form-actions {
+    display: grid;
+  }
+
+  .catalog-form #catalog-submit-button,
+  .combo-form-actions #combo-submit-button {
+    width: 100%;
+    justify-self: stretch;
+    margin-left: 0;
+  }
+}
