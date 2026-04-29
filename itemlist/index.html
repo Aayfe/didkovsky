@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux13">
+    <link rel="stylesheet" href="styles.css?v=ux15">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -212,7 +212,38 @@
                 <option value="Kč">Kč</option>
               </select>
             </label>
-            <button class="primary-button" type="submit">Přidat do číselníku</button>
+            <section class="catalog-alias-editor" aria-label="Aliasy a EANy">
+              <div class="catalog-alias-heading">
+                <strong>Aliasy a EAN/barcody</strong>
+                <span>Varianty, které mají patřit pod tuhle jednu položku.</span>
+              </div>
+              <div class="catalog-alias-list" id="catalog-alias-list"></div>
+              <div class="catalog-alias-form">
+                <label class="field">
+                  <span>Alias</span>
+                  <input id="catalog-alias-name" type="text" placeholder="Např. Mléko Kunín">
+                </label>
+                <label class="field">
+                  <span>EAN / barcode</span>
+                  <input id="catalog-alias-ean" type="text" inputmode="numeric" placeholder="Např. 5056784907320">
+                </label>
+                <label class="field">
+                  <span>Množství</span>
+                  <input id="catalog-alias-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="1">
+                </label>
+                <label class="field">
+                  <span>Jednotka</span>
+                  <select id="catalog-alias-unit">
+                    <option value="g">g</option>
+                    <option value="ml">ml</option>
+                    <option value="ks">ks</option>
+                    <option value="Kč">Kč</option>
+                  </select>
+                </label>
+                <button class="ghost-button" id="catalog-alias-add-button" type="button">Přidat alias</button>
+              </div>
+            </section>
+            <button class="primary-button catalog-submit-button" id="catalog-submit-button" type="submit">Přidat do číselníku</button>
           </form>
           <div class="table-wrap">
             <table>
@@ -221,6 +252,7 @@
                   <th>Potravina</th>
                   <th>Kategorie</th>
                   <th>Jednotka</th>
+                  <th>Aliasy / EANy</th>
                   <th class="icon-heading">Akce</th>
                 </tr>
               </thead>
@@ -301,7 +333,7 @@
             </label>
             <p class="message" id="receipt-message" role="status" aria-live="polite"></p>
           </div>
-          <p class="message">EAN / barcode se načítá přes Open Food Facts. OCR účtenky používá knihovnu v prohlížeči, když se načte z internetu.</p>
+          <p class="message">EAN / barcode se načítá přes více veřejných databází a vlastní číselník aliasů. OCR účtenky používá knihovnu v prohlížeči, když se načte z internetu.</p>
         </section>
 
         <section class="app-view" id="view-settings" data-view-panel="settings" hidden>
@@ -394,6 +426,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux13"></script>
+    <script src="app.js?v=ux15"></script>
   </body>
 </html>

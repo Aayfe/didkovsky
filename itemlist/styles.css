@@ -593,6 +593,90 @@ h1 {
   margin-bottom: 18px;
 }
 
+.catalog-alias-editor,
+.catalog-submit-button {
+  grid-column: 1 / -1;
+}
+
+.catalog-submit-button {
+  justify-self: start;
+}
+
+.catalog-alias-editor {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: var(--field);
+  padding: 12px;
+}
+
+.catalog-alias-heading {
+  display: grid;
+  gap: 2px;
+}
+
+.catalog-alias-heading strong {
+  font-weight: 800;
+}
+
+.catalog-alias-heading span,
+.catalog-alias-text span,
+.catalog-alias-summary {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.catalog-alias-list {
+  display: grid;
+  gap: 8px;
+}
+
+.catalog-alias-empty {
+  margin: 0;
+}
+
+.catalog-alias-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  padding: 10px;
+}
+
+.catalog-alias-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.catalog-alias-text strong,
+.catalog-alias-text span {
+  overflow-wrap: anywhere;
+}
+
+.catalog-alias-form {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(150px, 210px) 100px 100px auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.catalog-alias-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.catalog-alias-summary span {
+  border-radius: 999px;
+  background: var(--field);
+  padding: 4px 8px;
+}
+
 .card-list {
   display: grid;
   gap: 8px;
@@ -1109,7 +1193,16 @@ body.dark-mode .modal {
 }
 
 .ean-result-primary-actions {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.ean-alias-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  border-top: 1px solid var(--soft-line);
+  padding-top: 10px;
 }
 
 .table-wrap {
@@ -1122,7 +1215,7 @@ body.dark-mode .modal {
 
 table {
   width: 100%;
-  min-width: 620px;
+  min-width: 760px;
   border-collapse: collapse;
 }
 
@@ -1397,8 +1490,17 @@ tbody tr:last-child td {
 
   .compact-form,
   .catalog-form,
+  .catalog-alias-form,
   .combo-runner,
   .card-row {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-submit-button {
+    justify-self: stretch;
+  }
+
+  .catalog-alias-row {
     grid-template-columns: 1fr;
   }
 }
@@ -1869,6 +1971,7 @@ body.dark-mode .list-name-input {
   .entry-form,
   .shopping-form,
   .catalog-form,
+  .catalog-alias-form,
   .combo-item-row,
   .compact-form,
   .combo-runner,
@@ -1895,6 +1998,18 @@ body.dark-mode .list-name-input {
   }
 
   .ean-result-primary-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .ean-alias-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-submit-button {
+    justify-self: stretch;
+  }
+
+  .catalog-alias-row {
     grid-template-columns: 1fr;
   }
 
@@ -1993,8 +2108,12 @@ body.dark-mode .list-name-input {
     content: "Jednotka";
   }
 
-  #items-body td:nth-child(5)::before,
   #catalog-body td:nth-child(4)::before {
+    content: "Aliasy / EANy";
+  }
+
+  #items-body td:nth-child(5)::before,
+  #catalog-body td:nth-child(5)::before {
     content: "Akce";
   }
 

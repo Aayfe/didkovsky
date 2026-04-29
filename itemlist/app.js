@@ -75,6 +75,13 @@ const catalogForm = document.querySelector("#catalog-form");
 const catalogName = document.querySelector("#catalog-name");
 const catalogCategory = document.querySelector("#catalog-category");
 const catalogUnit = document.querySelector("#catalog-unit");
+const catalogAliasList = document.querySelector("#catalog-alias-list");
+const catalogAliasName = document.querySelector("#catalog-alias-name");
+const catalogAliasEan = document.querySelector("#catalog-alias-ean");
+const catalogAliasAmount = document.querySelector("#catalog-alias-amount");
+const catalogAliasUnit = document.querySelector("#catalog-alias-unit");
+const catalogAliasAddButton = document.querySelector("#catalog-alias-add-button");
+const catalogSubmitButton = document.querySelector("#catalog-submit-button");
 const shoppingForm = document.querySelector("#shopping-form");
 const shoppingProduct = document.querySelector("#shopping-product");
 const shoppingAmount = document.querySelector("#shopping-amount");
@@ -168,6 +175,8 @@ let currentUser = null;
 let currentAccess = null;
 let listNameBeforeEdit = "";
 let editingCatalogId = null;
+let editingCatalogAliases = [];
+let editingCatalogAliasIndex = -1;
 let pendingEanProduct = null;
 let pendingEanCatalogChoice = null;
 let pendingCatalogEanProduct = null;
@@ -230,6 +239,8 @@ function setupEvents() {
   settingsShoppingSubtractStock.addEventListener("change", updateShoppingSubtractSetting);
   catalogForm.addEventListener("submit", saveCatalogItem);
   catalogBody.addEventListener("click", handleCatalogClick);
+  catalogAliasAddButton.addEventListener("click", addOrUpdateCatalogAlias);
+  catalogAliasList.addEventListener("click", handleCatalogAliasClick);
   shoppingForm.addEventListener("submit", addShoppingItem);
   shoppingProduct.addEventListener("input", syncShoppingUnitFromProduct);
   shoppingProduct.addEventListener("change", syncShoppingUnitFromProduct);
@@ -645,6 +656,7 @@ async function initializeApp() {
   renderItems();
   renderHistory();
   renderCatalog();
+  renderCatalogAliasEditor();
   renderShoppingList();
   renderCombos();
   syncSettingsControls();
@@ -1654,7 +1666,12 @@ function sanitizeCatalogItems(items) {
     ? items
       .filter((item) => item && typeof item.name === "string")
       .map((item) => {
-        const eans = normalizeEanList(item.eans || item.ean);
+        const aliases = normalizeEanAliases(item.eanAliases);
+        const eans = normalizeEanList([
+          ...(Array.isArray(item.eans) ? item.eans : [item.eans]),
+          item.ean,
+          ...aliases.map((alias) => alias.ean)
+        ]);
 
         return {
           id: typeof item.id === "string" ? item.id : createId(),
@@ -1663,7 +1680,7 @@ function sanitizeCatalogItems(items) {
           unit: normalizeImportUnit(item.unit || "ks"),
           ean: eans[0] || "",
           eans,
-          eanAliases: normalizeEanAliases(item.eanAliases)
+          eanAliases: aliases
         };
       })
       .filter((item) => item.name)
@@ -2619,11 +2636,18 @@ function renderItems() {
 function renderProductOptions() {
   productOptions.innerHTML = "";
   const options = [
-    ...getCatalogItems().map((item) => ({
-      value: item.name,
-      label: `${item.category || "Ostatní"} | ${item.unit}`,
-      text: item.unit
-    })),
+    ...getCatalogItems().flatMap((item) => [
+      {
+        value: item.name,
+        label: `${item.category || "Ostatní"} | ${item.unit}`,
+        text: item.unit
+      },
+      ...normalizeEanAliases(item.eanAliases).map((alias) => ({
+        value: alias.name,
+        label: `Alias pro ${item.name}${alias.ean ? ` | EAN ${alias.ean}` : ""}`,
+        text: alias.unit || item.unit
+      }))
+    ]),
     ...combos.map((combo) => ({
       value: combo.name,
       label: "Kombinace",
@@ -2676,12 +2700,15 @@ async function saveCatalogItem(event) {
 
   const eanPayload = getPendingCatalogEanPayload(pendingCatalogEanProduct);
   const savedFromEan = Boolean(eanPayload.ean);
+  const aliases = mergeEanAliases(editingCatalogAliases, eanPayload.eanAliases || []);
+  const eans = normalizeEanList([
+    ...aliases.map((alias) => alias.ean),
+    ...(eanPayload.eans || []),
+    eanPayload.ean
+  ]);
 
-  upsertCatalogItem({ id: editingCatalogId, name, category, unit, ...eanPayload });
-  catalogForm.reset();
-  editingCatalogId = null;
-  pendingCatalogEanProduct = null;
-  catalogUnit.value = unit;
+  upsertCatalogItem({ id: editingCatalogId, name, category, unit, eans, eanAliases: aliases, replaceAliases: true });
+  resetCatalogEditor(unit);
   renderProductOptions();
   renderCategoryOptions();
   renderCatalog();
@@ -2707,6 +2734,179 @@ function getPendingCatalogEanPayload(product) {
   };
 }
 
+function resetCatalogEditor(unit = "ks") {
+  catalogForm.reset();
+  editingCatalogId = null;
+  editingCatalogAliases = [];
+  editingCatalogAliasIndex = -1;
+  pendingCatalogEanProduct = null;
+  catalogUnit.value = unit;
+  catalogAliasAmount.value = "1";
+  catalogAliasUnit.value = unit;
+  catalogAliasAddButton.textContent = "Přidat alias";
+  catalogSubmitButton.textContent = "Přidat do číselníku";
+  renderCatalogAliasEditor();
+}
+
+function getCatalogAliasesForEditor(item) {
+  const aliases = normalizeEanAliases(item?.eanAliases);
+  const existingEans = new Set(aliases.map((alias) => alias.ean).filter(Boolean));
+
+  normalizeEanList(item?.eans || item?.ean).forEach((ean) => {
+    if (!existingEans.has(ean)) {
+      aliases.push({
+        ean,
+        name: item.name,
+        amount: 1,
+        unit: item.unit || "ks",
+        category: item.category || "Ostatní"
+      });
+    }
+  });
+
+  return aliases;
+}
+
+function renderCatalogAliasEditor() {
+  if (!catalogAliasList) {
+    return;
+  }
+
+  catalogAliasList.replaceChildren();
+
+  if (!editingCatalogAliases.length) {
+    const empty = document.createElement("p");
+    empty.className = "message catalog-alias-empty";
+    empty.textContent = "Zatím bez aliasů. Přidej třeba Mléko Kunín + jeho EAN, aby se při skenu nabídlo pod Mléko.";
+    catalogAliasList.append(empty);
+    return;
+  }
+
+  editingCatalogAliases.forEach((alias, index) => {
+    const row = document.createElement("div");
+    const text = document.createElement("div");
+    const title = document.createElement("strong");
+    const meta = document.createElement("span");
+    const actions = document.createElement("div");
+    const editButton = document.createElement("button");
+    const deleteButton = document.createElement("button");
+
+    row.className = "catalog-alias-row";
+    text.className = "catalog-alias-text";
+    actions.className = "row-actions";
+    title.textContent = alias.name;
+    meta.textContent = `${alias.ean ? `EAN ${alias.ean}` : "bez EANu"} | ${formatAmount(alias.amount || 1)} ${alias.unit || "ks"}`;
+    editButton.className = "ghost-button";
+    editButton.type = "button";
+    editButton.dataset.catalogAliasAction = "edit";
+    editButton.dataset.index = String(index);
+    editButton.textContent = "Upravit";
+    deleteButton.className = "danger-button";
+    deleteButton.type = "button";
+    deleteButton.dataset.catalogAliasAction = "delete";
+    deleteButton.dataset.index = String(index);
+    deleteButton.textContent = "Smazat";
+    text.append(title, meta);
+    actions.append(editButton, deleteButton);
+    row.append(text, actions);
+    catalogAliasList.append(row);
+  });
+}
+
+function addOrUpdateCatalogAlias() {
+  const name = formatProductName(catalogAliasName.value);
+  const eanText = tidyName(catalogAliasEan.value);
+  const ean = normalizeEan(eanText);
+  const amount = Number(catalogAliasAmount.value);
+  const unit = normalizeImportUnit(catalogAliasUnit.value || catalogUnit.value || "ks");
+  const category = tidyName(catalogCategory.value) || "Ostatní";
+
+  if (!name) {
+    showMessage("Zadej název aliasu, třeba Mléko Kunín.", true);
+    catalogAliasName.focus();
+    return;
+  }
+
+  if (eanText && !ean) {
+    showMessage("EAN/barcode musí mít 8 až 14 číslic.", true);
+    catalogAliasEan.focus();
+    return;
+  }
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    showMessage("Množství aliasu musí být číslo větší než nula.", true);
+    catalogAliasAmount.focus();
+    return;
+  }
+
+  const alias = normalizeEanAlias({ ean, name, amount, unit, category });
+
+  if (!alias) {
+    showMessage("Alias se nepodařilo připravit.", true);
+    return;
+  }
+
+  editingCatalogAliases = editingCatalogAliases.filter((currentAlias, index) => {
+    if (index === editingCatalogAliasIndex) {
+      return false;
+    }
+
+    return !isSameEanAlias(currentAlias, alias);
+  });
+
+  if (editingCatalogAliasIndex >= 0 && editingCatalogAliasIndex <= editingCatalogAliases.length) {
+    editingCatalogAliases.splice(editingCatalogAliasIndex, 0, alias);
+  } else {
+    editingCatalogAliases.push(alias);
+  }
+
+  clearCatalogAliasFields();
+  renderCatalogAliasEditor();
+  showMessage(`Alias ${alias.name} je připravený k uložení v číselníku.`);
+}
+
+function handleCatalogAliasClick(event) {
+  const button = event.target.closest("button[data-catalog-alias-action]");
+
+  if (!button) {
+    return;
+  }
+
+  const index = Number(button.dataset.index);
+  const alias = editingCatalogAliases[index];
+
+  if (!alias) {
+    return;
+  }
+
+  if (button.dataset.catalogAliasAction === "edit") {
+    editingCatalogAliasIndex = index;
+    catalogAliasName.value = alias.name;
+    catalogAliasEan.value = alias.ean || "";
+    catalogAliasAmount.value = formatFormNumber(alias.amount || 1);
+    catalogAliasUnit.value = alias.unit || catalogUnit.value || "ks";
+    catalogAliasAddButton.textContent = "Uložit alias";
+    catalogAliasName.focus();
+    return;
+  }
+
+  if (button.dataset.catalogAliasAction === "delete") {
+    editingCatalogAliases.splice(index, 1);
+    clearCatalogAliasFields();
+    renderCatalogAliasEditor();
+    showMessage(`Alias ${alias.name} byl odebraný. Ulož číselník pro potvrzení změn.`);
+  }
+}
+
+function clearCatalogAliasFields() {
+  editingCatalogAliasIndex = -1;
+  catalogAliasName.value = "";
+  catalogAliasEan.value = "";
+  catalogAliasAmount.value = "1";
+  catalogAliasUnit.value = catalogUnit.value || "ks";
+  catalogAliasAddButton.textContent = "Přidat alias";
+}
+
 async function handleCatalogClick(event) {
   const button = event.target.closest("button[data-catalog-action]");
 
@@ -2724,9 +2924,15 @@ async function handleCatalogClick(event) {
     const existing = catalogItems.find((currentItem) => normalize(currentItem.name) === normalize(item.name));
     editingCatalogId = existing?.id || null;
     pendingCatalogEanProduct = null;
+    editingCatalogAliases = getCatalogAliasesForEditor(existing || item);
+    editingCatalogAliasIndex = -1;
     catalogName.value = item.name;
     catalogCategory.value = item.category || "Ostatní";
     catalogUnit.value = item.unit || "ks";
+    catalogAliasUnit.value = item.unit || "ks";
+    catalogAliasAddButton.textContent = "Přidat alias";
+    catalogSubmitButton.textContent = "Uložit položku";
+    renderCatalogAliasEditor();
     catalogName.focus();
     showMessage(`Upravuješ položku číselníku ${item.name}.`);
     return;
@@ -2763,20 +2969,17 @@ async function lookupEanProduct() {
     return;
   }
 
-  eanMessage.textContent = "Hledám potravinu v Open Food Facts...";
+  eanMessage.textContent = "Hledám produkt ve veřejných databázích...";
 
   try {
-    const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${ean}.json?fields=product_name,product_name_cs,generic_name,brands,categories,categories_tags,quantity,product_quantity,product_quantity_unit,net_weight,code`);
-    const data = await response.json();
+    const product = await lookupProductInPublicDatabases(ean);
 
-    if (!response.ok || data.status === 0 || !data.product) {
-      const product = createDefaultEanProduct(ean);
-      renderEanResolution(product, []);
+    if (!product) {
+      renderEanResolution(createDefaultEanProduct(ean), []);
       eanMessage.textContent = "EAN jsem nenašel v databázi. Můžeš ho založit do číselníku se standardy.";
       return;
     }
 
-    const product = mapOpenFoodFactsProduct(data.product, ean);
     const matches = findCatalogMatchesForEanProduct(product);
     renderEanResolution(product, matches);
     eanMessage.textContent = matches.length
@@ -2785,6 +2988,75 @@ async function lookupEanProduct() {
   } catch (error) {
     eanMessage.textContent = "EAN API teď neodpovídá. Zkus to za chvíli nebo zadej položku ručně.";
   }
+}
+
+async function lookupProductInPublicDatabases(ean) {
+  const lookups = [
+    () => lookupOpenFoodFactsProduct(ean, "https://world.openfoodfacts.org"),
+    () => lookupOpenFoodFactsProduct(ean, "https://cz.openfoodfacts.org"),
+    () => lookupOpenFoodFactsProduct(ean, "https://world.openproductsfacts.org"),
+    () => lookupUpcItemDbProduct(ean)
+  ];
+
+  for (const lookup of lookups) {
+    try {
+      const product = await lookup();
+
+      if (product?.name && normalize(product.name) !== normalize(`EAN ${ean}`)) {
+        return product;
+      }
+    } catch (error) {
+      // Pokračujeme dalším veřejným zdrojem, aby jeden výpadek neshodil celé načtení.
+    }
+  }
+
+  return null;
+}
+
+async function lookupOpenFoodFactsProduct(ean, baseUrl) {
+  const fields = [
+    "product_name",
+    "product_name_cs",
+    "generic_name",
+    "brands",
+    "categories",
+    "categories_tags",
+    "quantity",
+    "product_quantity",
+    "product_quantity_unit",
+    "net_weight",
+    "code"
+  ].join(",");
+  const response = await fetch(`${baseUrl}/api/v2/product/${ean}.json?fields=${fields}`);
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = await response.json();
+
+  if (data.status === 0 || !data.product) {
+    return null;
+  }
+
+  return mapOpenFoodFactsProduct(data.product, ean);
+}
+
+async function lookupUpcItemDbProduct(ean) {
+  const response = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${ean}`);
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = await response.json();
+  const item = Array.isArray(data.items) ? data.items[0] : null;
+
+  if (!item) {
+    return null;
+  }
+
+  return mapExternalBarcodeProduct(item, ean);
 }
 
 function createDefaultEanProduct(ean) {
@@ -2823,6 +3095,7 @@ function renderEanResolution(product, matches) {
   const matchActions = document.createElement("div");
   const primaryActions = document.createElement("div");
   const addToListButton = document.createElement("button");
+  const addScannedButton = document.createElement("button");
   const addToCatalogButton = document.createElement("button");
 
   header.className = "ean-result-head";
@@ -2855,10 +3128,38 @@ function renderEanResolution(product, matches) {
     eanResult.append(hint);
   }
 
+  const aliasPanel = document.createElement("div");
+  const aliasLabel = document.createElement("label");
+  const aliasText = document.createElement("span");
+  const aliasInput = document.createElement("input");
+  const aliasButton = document.createElement("button");
+
+  aliasPanel.className = "ean-alias-panel";
+  aliasLabel.className = "field";
+  aliasText.textContent = "Přiřadit EAN k jiné položce";
+  aliasInput.id = "ean-alias-target-input";
+  aliasInput.type = "text";
+  aliasInput.dataset.comboboxSource = "product-options";
+  aliasInput.placeholder = "Např. Mléko nebo Cottage";
+  aliasButton.className = "ghost-button";
+  aliasButton.type = "button";
+  aliasButton.dataset.eanAction = "assign-custom";
+  aliasButton.textContent = "Přiřadit EAN";
+  aliasLabel.append(aliasText, aliasInput);
+  aliasPanel.append(aliasLabel, aliasButton);
+  eanResult.append(aliasPanel);
+
   addToListButton.className = "primary-button";
   addToListButton.type = "button";
   addToListButton.dataset.eanAction = "add-to-list";
-  addToListButton.textContent = `Přidat do ${getDisplayListName(getActiveList())}`;
+  addToListButton.textContent = pendingEanCatalogChoice
+    ? `Přidat jako ${pendingEanCatalogChoice.name} do ${getDisplayListName(getActiveList())}`
+    : `Přidat do ${getDisplayListName(getActiveList())}`;
+
+  addScannedButton.className = "ghost-button";
+  addScannedButton.type = "button";
+  addScannedButton.dataset.eanAction = "add-scanned-to-list";
+  addScannedButton.textContent = `Přidat naskenované: ${product.name}`;
 
   addToCatalogButton.className = "ghost-button";
   addToCatalogButton.type = "button";
@@ -2866,7 +3167,13 @@ function renderEanResolution(product, matches) {
   addToCatalogButton.textContent = "Přidat do číselníku";
 
   primaryActions.className = "ean-result-actions ean-result-primary-actions";
-  primaryActions.append(addToListButton, addToCatalogButton);
+  primaryActions.append(addToListButton);
+
+  if (pendingEanCatalogChoice && normalize(pendingEanCatalogChoice.name) !== normalize(product.name)) {
+    primaryActions.append(addScannedButton);
+  }
+
+  primaryActions.append(addToCatalogButton);
   eanResult.append(primaryActions);
 }
 
@@ -2887,6 +3194,12 @@ async function handleEanResultClick(event) {
         matchButton.classList.toggle("is-selected", isSelected);
         matchButton.setAttribute("aria-pressed", String(isSelected));
       });
+      const addButton = eanResult.querySelector("[data-ean-action='add-to-list']");
+
+      if (addButton) {
+        addButton.textContent = `Přidat jako ${item.name} do ${getDisplayListName(getActiveList())}`;
+      }
+
       eanMessage.textContent = `Vybráno: ${item.name}. Teď můžeš přidat položku do seznamu.`;
     }
 
@@ -2900,6 +3213,25 @@ async function handleEanResultClick(event) {
     }
 
     addEanProductToActiveList(pendingEanProduct);
+    return;
+  }
+
+  if (button.dataset.eanAction === "add-scanned-to-list") {
+    addEanProductToActiveList(pendingEanProduct);
+    return;
+  }
+
+  if (button.dataset.eanAction === "assign-custom") {
+    const input = eanResult.querySelector("#ean-alias-target-input");
+    const item = findCatalogItemByName(input?.value);
+
+    if (!item) {
+      eanMessage.textContent = "Vyber existující položku z číselníku, ke které se má EAN přiřadit.";
+      input?.focus();
+      return;
+    }
+
+    await applyEanCatalogChoice(item, pendingEanProduct, "assigned");
     return;
   }
 
@@ -2952,9 +3284,14 @@ function prepareCatalogItemFromEan(product) {
     unit: product.unit || unit
   };
   editingCatalogId = null;
+  editingCatalogAliases = normalizeEanAliases([pendingCatalogEanProduct]);
+  editingCatalogAliasIndex = -1;
   catalogName.value = formatProductName(product.name);
   catalogCategory.value = category;
   catalogUnit.value = unit;
+  catalogAliasUnit.value = unit;
+  catalogSubmitButton.textContent = "Uložit položku";
+  renderCatalogAliasEditor();
   renderCategoryOptions();
   clearEanResult();
   switchView("catalog");
@@ -2981,13 +3318,13 @@ async function scanEanFromFile(event) {
     return;
   }
 
-  eanMessage.textContent = "Čtu EAN z obrázku...";
+  eanMessage.textContent = "Čtu kód z fotky: zkouším originál, výřezy, otočení a kontrastní varianty...";
 
   try {
     const code = await detectEanFromImage(file);
 
     if (!code) {
-      eanMessage.textContent = "Na fotce jsem EAN nenašel. Zkus ostřejší fotku zblízka nebo číslo napiš ručně.";
+      eanMessage.textContent = "Na fotce jsem kód nenašel ani po úpravách obrazu. Zkus fotku kolmo na čárový kód, bez odlesku a tak, aby byly vidět celé krajní čáry.";
       return;
     }
 
@@ -3001,14 +3338,39 @@ async function scanEanFromFile(event) {
 }
 
 async function detectEanFromImage(file) {
-  return await detectEanWithBarcodeDetector(file)
-    || await detectEanWithZxing(file)
-    || await detectEanWithOcr(file);
+  const variants = [file, ...await createBarcodeImageVariants(file)];
+  const candidates = [];
+
+  for (const variant of variants) {
+    candidates.push(...await detectEanCandidatesWithBarcodeDetector(variant));
+  }
+
+  for (const variant of variants) {
+    const code = await detectEanWithZxing(variant);
+
+    if (code) {
+      candidates.push(code);
+    }
+  }
+
+  for (const variant of variants.slice(0, 8)) {
+    const code = await detectEanWithOcr(variant);
+
+    if (code) {
+      candidates.push(code);
+    }
+  }
+
+  return pickLikelyEanCode(candidates);
 }
 
 async function detectEanWithBarcodeDetector(file) {
+  return pickLikelyEanCode(await detectEanCandidatesWithBarcodeDetector(file));
+}
+
+async function detectEanCandidatesWithBarcodeDetector(file) {
   if (!("BarcodeDetector" in window) || !window.createImageBitmap) {
-    return "";
+    return [];
   }
 
   try {
@@ -3034,10 +3396,9 @@ async function detectEanWithBarcodeDetector(file) {
       ? new BarcodeDetector({ formats })
       : new BarcodeDetector();
     const codes = await detector.detect(bitmap);
-    const code = codes.map((item) => item.rawValue).filter(Boolean).join(" ");
-    return findLikelyEanCode(code);
+    return codes.flatMap((item) => findLikelyEanCodes(item.rawValue));
   } catch (error) {
-    return "";
+    return [];
   }
 }
 
@@ -3064,6 +3425,149 @@ async function detectEanWithZxing(file) {
   }
 }
 
+async function detectEanWithZxingVariants(file) {
+  if (!window.ZXing?.BrowserMultiFormatReader || !window.createImageBitmap) {
+    return "";
+  }
+
+  const variants = await createBarcodeImageVariants(file);
+
+  for (const variant of variants) {
+    const code = await detectEanWithZxing(variant);
+
+    if (code) {
+      return code;
+    }
+  }
+
+  return "";
+}
+
+async function createBarcodeImageVariants(file) {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxSide = 2600;
+    const sourceMaxSide = Math.max(bitmap.width, bitmap.height);
+    const scale = sourceMaxSide > maxSide
+      ? maxSide / sourceMaxSide
+      : Math.min(2.4, maxSide / sourceMaxSide);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      return [];
+    }
+
+    context.imageSmoothingEnabled = false;
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+    const sourceCanvases = [
+      canvas,
+      cropCanvas(canvas, 0.04, 0.04, 0.92, 0.92),
+      cropCanvas(canvas, 0, 0.18, 1, 0.64),
+      cropCanvas(canvas, 0.16, 0, 0.68, 1),
+      cropCanvas(canvas, 0, 0, 0.58, 1),
+      cropCanvas(canvas, 0.42, 0, 0.58, 1),
+      rotateCanvas(canvas, Math.PI / 2),
+      rotateCanvas(canvas, Math.PI),
+      rotateCanvas(canvas, (Math.PI * 3) / 2)
+    ].filter(Boolean);
+    const modes = ["plain", "contrast", "threshold-125", "threshold-150", "threshold-175", "invert-threshold"];
+    const variants = [];
+
+    for (const sourceCanvas of sourceCanvases) {
+      for (const mode of modes) {
+        const blob = await createBarcodeVariantBlob(sourceCanvas, mode);
+
+        if (blob) {
+          variants.push(blob);
+        }
+      }
+    }
+
+    return variants;
+  } catch (error) {
+    return [];
+  }
+}
+
+function cropCanvas(sourceCanvas, xRatio, yRatio, widthRatio, heightRatio) {
+  const x = Math.max(0, Math.round(sourceCanvas.width * xRatio));
+  const y = Math.max(0, Math.round(sourceCanvas.height * yRatio));
+  const width = Math.max(1, Math.round(sourceCanvas.width * widthRatio));
+  const height = Math.max(1, Math.round(sourceCanvas.height * heightRatio));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.min(width, sourceCanvas.width - x);
+  canvas.height = Math.min(height, sourceCanvas.height - y);
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    return null;
+  }
+
+  context.drawImage(sourceCanvas, x, y, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+function rotateCanvas(sourceCanvas, radians) {
+  const quarterTurn = Math.abs(Math.sin(radians)) > 0.5;
+  const canvas = document.createElement("canvas");
+  canvas.width = quarterTurn ? sourceCanvas.height : sourceCanvas.width;
+  canvas.height = quarterTurn ? sourceCanvas.width : sourceCanvas.height;
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    return null;
+  }
+
+  context.translate(canvas.width / 2, canvas.height / 2);
+  context.rotate(radians);
+  context.drawImage(sourceCanvas, -sourceCanvas.width / 2, -sourceCanvas.height / 2);
+  return canvas;
+}
+
+async function createBarcodeVariantBlob(sourceCanvas, mode) {
+  if (mode === "plain") {
+    return await canvasToBlob(sourceCanvas);
+  }
+
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+
+  if (!context) {
+    return null;
+  }
+
+  canvas.width = sourceCanvas.width;
+  canvas.height = sourceCanvas.height;
+  context.drawImage(sourceCanvas, 0, 0);
+  const image = context.getImageData(0, 0, canvas.width, canvas.height);
+  const threshold = Number(mode.split("-")[1]) || 150;
+
+  for (let index = 0; index < image.data.length; index += 4) {
+    const gray = (image.data[index] * 0.299) + (image.data[index + 1] * 0.587) + (image.data[index + 2] * 0.114);
+    const value = mode === "contrast"
+      ? Math.max(0, Math.min(255, (gray - 128) * 2.15 + 128))
+      : mode === "invert-threshold"
+        ? (gray > threshold ? 0 : 255)
+        : (gray > threshold ? 255 : 0);
+    image.data[index] = value;
+    image.data[index + 1] = value;
+    image.data[index + 2] = value;
+  }
+
+  context.putImageData(image, 0, 0);
+  return await canvasToBlob(canvas);
+}
+
+async function canvasToBlob(canvas) {
+  return await new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), "image/png");
+  });
+}
+
 async function detectEanWithOcr(file) {
   if (!window.Tesseract) {
     return "";
@@ -3082,8 +3586,47 @@ async function detectEanWithOcr(file) {
 }
 
 function findLikelyEanCode(value) {
-  const candidates = String(value || "").match(/\d{8,14}/g) || [];
-  return candidates.find(hasValidGtinChecksum) || candidates[0] || "";
+  return pickLikelyEanCode(findLikelyEanCodes(value));
+}
+
+function findLikelyEanCodes(value) {
+  const text = String(value || "");
+  const directCandidates = text.match(/\d{8,14}/g) || [];
+  const spacedCandidates = text.match(/\d(?:[\s.-]?\d){7,13}/g) || [];
+  const candidates = [...directCandidates, ...spacedCandidates]
+    .map((candidate) => candidate.replace(/\D/g, ""))
+    .filter((candidate) => candidate.length >= 8 && candidate.length <= 14);
+
+  return [...new Set(candidates)].sort(sortEanCandidates);
+}
+
+function pickLikelyEanCode(values) {
+  const candidates = [...new Set(values.flatMap(findLikelyEanCodes))];
+
+  if (!candidates.length) {
+    return "";
+  }
+
+  return candidates.sort(sortEanCandidates)[0] || "";
+}
+
+function sortEanCandidates(first, second) {
+  const firstValid = hasValidGtinChecksum(first) ? 1 : 0;
+  const secondValid = hasValidGtinChecksum(second) ? 1 : 0;
+
+  if (firstValid !== secondValid) {
+    return secondValid - firstValid;
+  }
+
+  const preferredLengths = [13, 8, 12, 14];
+  const firstRank = preferredLengths.indexOf(first.length);
+  const secondRank = preferredLengths.indexOf(second.length);
+
+  if (firstRank !== secondRank) {
+    return (firstRank === -1 ? 99 : firstRank) - (secondRank === -1 ? 99 : secondRank);
+  }
+
+  return first.localeCompare(second);
 }
 
 function hasValidGtinChecksum(value) {
@@ -3349,6 +3892,24 @@ function mapOpenFoodFactsProduct(product, ean) {
   };
 }
 
+function mapExternalBarcodeProduct(product, ean) {
+  const name = formatProductName(product.title || product.description || product.brand || `EAN ${ean}`);
+  const quantity = inferQuantity([
+    product.size,
+    product.title,
+    product.description
+  ].filter(Boolean).join(" "));
+
+  return {
+    id: createId(),
+    name,
+    category: inferCategoryFromName(name),
+    amount: quantity.amount,
+    unit: quantity.unit,
+    ean
+  };
+}
+
 function inferQuantity(quantity) {
   const text = String(quantity || "").replace(/[×]/g, "x");
   const packageMatch = text.match(/(\d+(?:[,.]\d+)?)\s*x\s*(\d+(?:[,.]\d+)?)\s*(kg|g|l|ml|ks|pcs|pc|pieces|piece)\b/i);
@@ -3414,14 +3975,39 @@ function inferCategoryFromName(name) {
 function upsertCatalogItem(item) {
   const nextEans = normalizeEanList(item.eans || item.ean);
   const nextAliases = normalizeEanAliases(item.eanAliases);
+  const nextName = normalize(item.name);
+  const nextAliasNames = nextAliases.map((alias) => normalize(alias.name)).filter(Boolean);
+
+  if (nextEans.length || nextAliasNames.length) {
+    catalogItems.forEach((currentItem) => {
+      const sameItem = (item.id && currentItem.id === item.id) || normalize(currentItem.name) === nextName;
+
+      if (sameItem) {
+        return;
+      }
+
+      const eans = normalizeEanList(currentItem.eans || currentItem.ean).filter((ean) => !nextEans.includes(ean));
+      const aliases = normalizeEanAliases(currentItem.eanAliases).filter((alias) => {
+        return !nextEans.includes(alias.ean) && !nextAliasNames.includes(normalize(alias.name));
+      });
+      currentItem.ean = eans[0] || "";
+      currentItem.eans = eans;
+      currentItem.eanAliases = aliases;
+    });
+  }
+
   const existing = catalogItems.find((currentItem) => {
     return (item.id && currentItem.id === item.id)
-      || normalize(currentItem.name) === normalize(item.name);
+      || normalize(currentItem.name) === nextName;
   });
 
   if (existing) {
-    const mergedEans = normalizeEanList([...(existing.eans || []), existing.ean, ...nextEans]);
-    const mergedAliases = mergeEanAliases(existing.eanAliases, nextAliases);
+    const mergedEans = item.replaceAliases
+      ? nextEans
+      : normalizeEanList([...(existing.eans || []), existing.ean, ...nextEans]);
+    const mergedAliases = item.replaceAliases
+      ? nextAliases
+      : mergeEanAliases(existing.eanAliases, nextAliases);
     existing.name = item.name || existing.name;
     existing.category = item.category || existing.category || "Ostatní";
     existing.unit = item.unit || existing.unit || "ks";
@@ -3455,6 +4041,7 @@ function renderCatalog() {
       <td></td>
       <td></td>
       <td></td>
+      <td></td>
       <td class="icon-cell">
         <div class="row-actions">
           <button class="ghost-button" type="button" data-catalog-action="edit">Upravit</button>
@@ -3465,11 +4052,38 @@ function renderCatalog() {
     row.children[0].textContent = item.name;
     row.children[1].textContent = item.category;
     row.children[2].textContent = item.unit;
+    row.children[3].append(createCatalogAliasSummary(item));
     row.querySelectorAll("[data-catalog-action]").forEach((button) => {
       button.dataset.name = normalize(item.name);
     });
     catalogBody.append(row);
   });
+}
+
+function createCatalogAliasSummary(item) {
+  const aliases = normalizeEanAliases(item.eanAliases);
+  const wrapper = document.createElement("div");
+
+  wrapper.className = "catalog-alias-summary";
+
+  if (!aliases.length) {
+    wrapper.textContent = "Bez aliasů";
+    return wrapper;
+  }
+
+  aliases.slice(0, 3).forEach((alias) => {
+    const chip = document.createElement("span");
+    chip.textContent = alias.ean ? `${alias.name} · ${alias.ean}` : alias.name;
+    wrapper.append(chip);
+  });
+
+  if (aliases.length > 3) {
+    const more = document.createElement("span");
+    more.textContent = `+${aliases.length - 3}`;
+    wrapper.append(more);
+  }
+
+  return wrapper;
 }
 
 function getCatalogItems() {
@@ -3479,14 +4093,19 @@ function getCatalogItems() {
     const key = normalize(item.name);
 
     if (!map.has(key)) {
-      const eans = normalizeEanList(item.eans || item.ean);
+      const aliases = normalizeEanAliases(item.eanAliases);
+      const eans = normalizeEanList([
+        ...(Array.isArray(item.eans) ? item.eans : [item.eans]),
+        item.ean,
+        ...aliases.map((alias) => alias.ean)
+      ]);
       map.set(key, {
         name: item.name,
         category: item.category || "Ostatní",
         unit: item.unit || "ks",
         ean: eans[0] || "",
         eans,
-        eanAliases: normalizeEanAliases(item.eanAliases)
+        eanAliases: aliases
       });
     }
   });
@@ -3687,7 +4306,22 @@ function findCatalogItemByName(name) {
     return null;
   }
 
-  return getCatalogItems().find((item) => normalize(item.name) === normalizedName) || null;
+  const items = getCatalogItems();
+  const exactItem = items.find((item) => normalize(item.name) === normalizedName);
+
+  if (exactItem) {
+    return exactItem;
+  }
+
+  for (const item of items) {
+    const alias = normalizeEanAliases(item.eanAliases).find((currentAlias) => normalize(currentAlias.name) === normalizedName);
+
+    if (alias) {
+      return { ...item, _nameAlias: alias };
+    }
+  }
+
+  return null;
 }
 
 function findCatalogItemByEan(ean) {
@@ -3714,6 +4348,20 @@ function addEanToCatalogItem(item, product) {
     return;
   }
 
+  const targetName = normalize(item.name);
+
+  catalogItems.forEach((currentItem) => {
+    if (normalize(currentItem.name) === targetName) {
+      return;
+    }
+
+    const eans = normalizeEanList(currentItem.eans || currentItem.ean).filter((ean) => ean !== normalizedEan);
+    const aliases = normalizeEanAliases(currentItem.eanAliases).filter((alias) => alias.ean !== normalizedEan);
+    currentItem.ean = eans[0] || "";
+    currentItem.eans = eans;
+    currentItem.eanAliases = aliases;
+  });
+
   const alias = normalizeEanAlias({
     ean: normalizedEan,
     name: product?.name || item.name,
@@ -3722,7 +4370,7 @@ function addEanToCatalogItem(item, product) {
     category: product?.category || item.category || "Ostatní"
   });
 
-  const existing = catalogItems.find((currentItem) => normalize(currentItem.name) === normalize(item.name));
+  const existing = catalogItems.find((currentItem) => normalize(currentItem.name) === targetName);
 
   if (existing) {
     const eans = normalizeEanList([...(existing.eans || []), existing.ean, normalizedEan]);
@@ -3764,6 +4412,20 @@ function findCatalogMatchesForEanProduct(product) {
 }
 
 function getCatalogMatchScore(product, item) {
+  const aliasScore = normalizeEanAliases(item.eanAliases).reduce((bestScore, alias) => {
+    const score = getCatalogNameMatchScore(product, {
+      ...item,
+      name: alias.name,
+      category: alias.category || item.category,
+      unit: alias.unit || item.unit
+    }) + 12;
+    return Math.max(bestScore, score);
+  }, 0);
+
+  return Math.max(getCatalogNameMatchScore(product, item), aliasScore);
+}
+
+function getCatalogNameMatchScore(product, item) {
   const productName = normalize(product.name);
   const itemName = normalize(item.name);
 
@@ -3832,14 +4494,15 @@ function normalizeEanAliases(value) {
 
 function normalizeEanAlias(value) {
   const ean = normalizeEan(value?.ean);
+  const name = formatProductName(value?.name || (ean ? `EAN ${ean}` : ""));
 
-  if (!ean) {
+  if (!ean && !name) {
     return null;
   }
 
   return {
     ean,
-    name: formatProductName(value.name || `EAN ${ean}`),
+    name,
     amount: roundAmount(Number(value.amount) || 1),
     unit: normalizeImportUnit(value.unit || "ks"),
     category: tidyName(value.category || "Ostatní")
@@ -3847,17 +4510,36 @@ function normalizeEanAlias(value) {
 }
 
 function mergeEanAliases(existingAliases, nextAliases) {
-  const map = new Map();
+  const aliases = [];
 
   normalizeEanAliases(existingAliases).forEach((alias) => {
-    map.set(alias.ean, alias);
+    upsertEanAliasInList(aliases, alias);
   });
 
   normalizeEanAliases(nextAliases).forEach((alias) => {
-    map.set(alias.ean, alias);
+    upsertEanAliasInList(aliases, alias);
   });
 
-  return [...map.values()];
+  return aliases;
+}
+
+function upsertEanAliasInList(aliases, alias) {
+  const existingIndex = aliases.findIndex((currentAlias) => isSameEanAlias(currentAlias, alias));
+
+  if (existingIndex >= 0) {
+    aliases[existingIndex] = alias;
+    return;
+  }
+
+  aliases.push(alias);
+}
+
+function isSameEanAlias(first, second) {
+  if (first.ean && second.ean && first.ean === second.ean) {
+    return true;
+  }
+
+  return normalize(first.name) === normalize(second.name);
 }
 
 function findItemByName(name) {
