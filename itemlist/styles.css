@@ -957,6 +957,40 @@ body.dark-mode .modal {
   max-width: 100%;
 }
 
+.ean-result {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-strong);
+  padding: 12px;
+}
+
+.ean-result[hidden] {
+  display: none;
+}
+
+.ean-result-head {
+  display: grid;
+  gap: 4px;
+}
+
+.ean-result-head strong {
+  font-size: 1rem;
+}
+
+.ean-result-head span,
+.ean-result p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.ean-result-actions {
+  display: grid;
+  gap: 8px;
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--line);

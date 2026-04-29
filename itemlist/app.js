@@ -25,6 +25,7 @@ const eanTool = document.querySelector("#ean-tool");
 const eanInput = document.querySelector("#ean-input");
 const eanLookupButton = document.querySelector("#ean-lookup-button");
 const eanFileInput = document.querySelector("#ean-file-input");
+const eanResult = document.querySelector("#ean-result");
 const eanMessage = document.querySelector("#ean-message");
 const receiptTool = document.querySelector("#receipt-tool");
 const receiptFileInput = document.querySelector("#receipt-file-input");
@@ -167,6 +168,7 @@ let currentUser = null;
 let currentAccess = null;
 let listNameBeforeEdit = "";
 let editingCatalogId = null;
+let pendingEanProduct = null;
 let activeComboboxInput = null;
 let activeComboboxIndex = -1;
 
@@ -215,6 +217,7 @@ function setupEvents() {
   xmlExportButton.addEventListener("click", exportXml);
   eanLookupButton.addEventListener("click", lookupEanProduct);
   eanFileInput.addEventListener("change", scanEanFromFile);
+  eanResult.addEventListener("click", handleEanResultClick);
   receiptFileInput.addEventListener("change", importReceiptFromImage);
   toggleAdminPanelButton.addEventListener("click", toggleAdminPanel);
   adminForm.addEventListener("submit", saveAllowedUser);
@@ -1038,6 +1041,7 @@ function openEanImport() {
   switchView("tools");
   eanTool.hidden = false;
   receiptTool.hidden = true;
+  clearEanResult();
   eanMessage.textContent = "Naskenuj fotku čárového kódu nebo zadej EAN ručně.";
   eanInput.focus();
 }
@@ -1637,13 +1641,19 @@ function sanitizeCatalogItems(items) {
   return Array.isArray(items)
     ? items
       .filter((item) => item && typeof item.name === "string")
-      .map((item) => ({
-        id: typeof item.id === "string" ? item.id : createId(),
-        name: formatProductName(item.name),
-        category: tidyName(item.category || "Ostatní"),
-        unit: normalizeImportUnit(item.unit || "ks"),
-        ean: typeof item.ean === "string" ? item.ean : ""
-      }))
+      .map((item) => {
+        const eans = normalizeEanList(item.eans || item.ean);
+
+        return {
+          id: typeof item.id === "string" ? item.id : createId(),
+          name: formatProductName(item.name),
+          category: tidyName(item.category || "Ostatní"),
+          unit: normalizeImportUnit(item.unit || "ks"),
+          ean: eans[0] || "",
+          eans,
+          eanAliases: normalizeEanAliases(item.eanAliases)
+        };
+      })
       .filter((item) => item.name)
     : [];
 }
@@ -2709,6 +2719,21 @@ async function lookupEanProduct() {
     return;
   }
 
+  clearEanResult();
+
+  const localItem = findCatalogItemByEan(ean);
+
+  if (localItem) {
+    applyEanCatalogChoice(localItem, {
+      ean,
+      name: localItem.name,
+      category: localItem.category || "Ostatní",
+      amount: 1,
+      unit: localItem.unit || "ks"
+    }, "local");
+    return;
+  }
+
   eanMessage.textContent = "Hledám potravinu v Open Food Facts...";
 
   try {
@@ -2716,27 +2741,152 @@ async function lookupEanProduct() {
     const data = await response.json();
 
     if (!response.ok || data.status === 0 || !data.product) {
-      eanMessage.textContent = "EAN jsem nenašel. Můžeš položku doplnit ručně a uložit do číselníku.";
+      const product = createDefaultEanProduct(ean);
+      renderEanResolution(product, []);
+      eanMessage.textContent = "EAN jsem nenašel v databázi. Můžeš ho založit do číselníku se standardy.";
       return;
     }
 
     const product = mapOpenFoodFactsProduct(data.product, ean);
-    productInput.value = product.name;
-    categoryInput.value = product.category;
-    amountInput.value = product.amount;
-    unitSelect.value = product.unit;
-    upsertCatalogItem(product);
-    renderProductOptions();
-    renderCategoryOptions();
-    renderCatalog();
-    switchView("pantry");
-    eanMessage.textContent = `Načteno: ${product.name}.`;
-    showMessage(`EAN našel ${product.name}. Stačí potvrdit akci.`);
-    recordHistory(`EAN načten: ${product.name}.`, "catalog");
-    renderHistory();
-    await saveState();
+    const matches = findCatalogMatchesForEanProduct(product);
+    renderEanResolution(product, matches);
+    eanMessage.textContent = matches.length
+      ? `Načteno: ${product.name}. Vyber, jestli patří pod existující položku.`
+      : `Načteno: ${product.name}. V číselníku jsem nenašel podobnou položku.`;
   } catch (error) {
     eanMessage.textContent = "EAN API teď neodpovídá. Zkus to za chvíli nebo zadej položku ručně.";
+  }
+}
+
+function createDefaultEanProduct(ean) {
+  return {
+    id: createId(),
+    name: `EAN ${ean}`,
+    category: "Ostatní",
+    amount: 1,
+    unit: "ks",
+    ean
+  };
+}
+
+function renderEanResolution(product, matches) {
+  pendingEanProduct = product;
+  eanResult.replaceChildren();
+  eanResult.hidden = false;
+
+  const header = document.createElement("div");
+  const title = document.createElement("strong");
+  const meta = document.createElement("span");
+  const actions = document.createElement("div");
+  const createButton = document.createElement("button");
+
+  header.className = "ean-result-head";
+  title.textContent = product.name;
+  meta.textContent = `${product.category || "Ostatní"} | standard: ${formatAmount(product.amount || 1)} ${product.unit || "ks"}`;
+  header.append(title, meta);
+
+  if (matches.length) {
+    const hint = document.createElement("p");
+    hint.textContent = "Podobné položky v číselníku:";
+    eanResult.append(header, hint);
+
+    matches.forEach((match) => {
+      const button = document.createElement("button");
+      button.className = "ghost-button";
+      button.type = "button";
+      button.dataset.eanAction = "assign";
+      button.dataset.name = match.item.name;
+      button.textContent = `Použít ${match.item.name}`;
+      actions.append(button);
+    });
+  } else {
+    const hint = document.createElement("p");
+    hint.textContent = "Žádná jistá shoda v číselníku. Založení použije odhadnutou kategorii a jednotku.";
+    eanResult.append(header, hint);
+  }
+
+  createButton.className = "primary-button";
+  createButton.type = "button";
+  createButton.dataset.eanAction = "create";
+  createButton.textContent = `Založit jako ${product.name}`;
+  actions.className = "ean-result-actions";
+  actions.append(createButton);
+  eanResult.append(actions);
+}
+
+async function handleEanResultClick(event) {
+  const button = event.target.closest("button[data-ean-action]");
+
+  if (!button || !pendingEanProduct) {
+    return;
+  }
+
+  if (button.dataset.eanAction === "assign") {
+    const item = findCatalogItemByName(button.dataset.name);
+
+    if (item) {
+      await applyEanCatalogChoice(item, pendingEanProduct, "assigned");
+    }
+  }
+
+  if (button.dataset.eanAction === "create") {
+    await createCatalogItemFromEan(pendingEanProduct);
+  }
+}
+
+async function applyEanCatalogChoice(item, product, mode) {
+  const alias = item._eanAlias || product;
+  const amount = item.unit === alias.unit ? alias.amount : 1;
+  addEanToCatalogItem(item, product);
+  productInput.value = item.name;
+  categoryInput.value = item.category || "Ostatní";
+  amountInput.value = formatFormNumber(amount || 1);
+  unitSelect.value = item.unit || "ks";
+  renderProductOptions();
+  renderCategoryOptions();
+  renderCatalog();
+  clearEanResult();
+  switchView("pantry");
+  eanMessage.textContent = mode === "local"
+    ? `EAN je už přiřazený k položce ${item.name}.`
+    : `EAN ${product.name} je přiřazený pod ${item.name}.`;
+  showMessage(`Připraveno jako ${item.name}. Stačí potvrdit zápis.`);
+  recordHistory(`EAN ${product.ean} přiřazen k položce ${item.name}.`, "catalog");
+  renderHistory();
+  await saveState();
+}
+
+async function createCatalogItemFromEan(product) {
+  upsertCatalogItem({
+    ...product,
+    category: product.category || inferCategoryFromName(product.name),
+    unit: product.unit || "ks",
+    amount: product.amount || 1,
+    eans: [product.ean],
+    eanAliases: [product]
+  });
+  productInput.value = product.name;
+  categoryInput.value = product.category || inferCategoryFromName(product.name);
+  amountInput.value = formatFormNumber(product.amount || 1);
+  unitSelect.value = product.unit || "ks";
+  renderProductOptions();
+  renderCategoryOptions();
+  renderCatalog();
+  clearEanResult();
+  switchView("pantry");
+  eanMessage.textContent = `Založeno v číselníku: ${product.name}.`;
+  showMessage(`EAN založil ${product.name}. Stačí potvrdit zápis.`);
+  recordHistory(`EAN založil položku číselníku ${product.name}.`, "catalog");
+  renderHistory();
+  await saveState();
+}
+
+function clearEanResult() {
+  pendingEanProduct = null;
+
+  if (eanResult) {
+    eanResult.hidden = true;
+    eanResult.replaceChildren();
   }
 }
 
@@ -3067,16 +3217,22 @@ function inferCategoryFromName(name) {
 }
 
 function upsertCatalogItem(item) {
+  const nextEans = normalizeEanList(item.eans || item.ean);
+  const nextAliases = normalizeEanAliases(item.eanAliases);
   const existing = catalogItems.find((currentItem) => {
     return (item.id && currentItem.id === item.id)
       || normalize(currentItem.name) === normalize(item.name);
   });
 
   if (existing) {
+    const mergedEans = normalizeEanList([...(existing.eans || []), existing.ean, ...nextEans]);
+    const mergedAliases = mergeEanAliases(existing.eanAliases, nextAliases);
     existing.name = item.name || existing.name;
     existing.category = item.category || existing.category || "Ostatní";
     existing.unit = item.unit || existing.unit || "ks";
-    existing.ean = item.ean || existing.ean || "";
+    existing.ean = mergedEans[0] || "";
+    existing.eans = mergedEans;
+    existing.eanAliases = mergedAliases;
     return;
   }
 
@@ -3085,7 +3241,9 @@ function upsertCatalogItem(item) {
     name: item.name,
     category: item.category || "Ostatní",
     unit: item.unit || "ks",
-    ean: item.ean || ""
+    ean: nextEans[0] || "",
+    eans: nextEans,
+    eanAliases: nextAliases
   });
 }
 
@@ -3126,10 +3284,14 @@ function getCatalogItems() {
     const key = normalize(item.name);
 
     if (!map.has(key)) {
+      const eans = normalizeEanList(item.eans || item.ean);
       map.set(key, {
         name: item.name,
         category: item.category || "Ostatní",
-        unit: item.unit || "ks"
+        unit: item.unit || "ks",
+        ean: eans[0] || "",
+        eans,
+        eanAliases: normalizeEanAliases(item.eanAliases)
       });
     }
   });
@@ -3333,6 +3495,176 @@ function findCatalogItemByName(name) {
   return getCatalogItems().find((item) => normalize(item.name) === normalizedName) || null;
 }
 
+function findCatalogItemByEan(ean) {
+  const normalizedEan = normalizeEan(ean);
+
+  if (!normalizedEan) {
+    return null;
+  }
+
+  const item = getCatalogItems().find((currentItem) => normalizeEanList(currentItem.eans || currentItem.ean).includes(normalizedEan)) || null;
+
+  if (!item) {
+    return null;
+  }
+
+  const alias = normalizeEanAliases(item.eanAliases).find((currentAlias) => currentAlias.ean === normalizedEan) || null;
+  return alias ? { ...item, _eanAlias: alias } : item;
+}
+
+function addEanToCatalogItem(item, product) {
+  const normalizedEan = normalizeEan(product?.ean || product);
+
+  if (!item?.name || !normalizedEan) {
+    return;
+  }
+
+  const alias = normalizeEanAlias({
+    ean: normalizedEan,
+    name: product?.name || item.name,
+    amount: product?.amount || 1,
+    unit: product?.unit || item.unit || "ks",
+    category: product?.category || item.category || "Ostatní"
+  });
+
+  const existing = catalogItems.find((currentItem) => normalize(currentItem.name) === normalize(item.name));
+
+  if (existing) {
+    const eans = normalizeEanList([...(existing.eans || []), existing.ean, normalizedEan]);
+    const aliases = mergeEanAliases(existing.eanAliases, alias ? [alias] : []);
+    existing.ean = eans[0] || "";
+    existing.eans = eans;
+    existing.eanAliases = aliases;
+    existing.category = existing.category || item.category || "Ostatní";
+    existing.unit = existing.unit || item.unit || "ks";
+    return;
+  }
+
+  catalogItems.unshift({
+    id: createId(),
+    name: item.name,
+    category: item.category || "Ostatní",
+    unit: item.unit || "ks",
+    ean: normalizedEan,
+    eans: [normalizedEan],
+    eanAliases: alias ? [alias] : []
+  });
+}
+
+function findCatalogMatchesForEanProduct(product) {
+  const productName = normalize(product.name);
+
+  if (!productName) {
+    return [];
+  }
+
+  return getCatalogItems()
+    .map((item) => ({
+      item,
+      score: getCatalogMatchScore(product, item)
+    }))
+    .filter((match) => match.score >= 35)
+    .sort((a, b) => b.score - a.score || a.item.name.localeCompare(b.item.name, "cs"))
+    .slice(0, 4);
+}
+
+function getCatalogMatchScore(product, item) {
+  const productName = normalize(product.name);
+  const itemName = normalize(item.name);
+
+  if (!productName || !itemName) {
+    return 0;
+  }
+
+  if (productName === itemName) {
+    return 120;
+  }
+
+  const productTokens = getMeaningfulNameTokens(productName);
+  const itemTokens = getMeaningfulNameTokens(itemName);
+  const shared = itemTokens.filter((token) => productTokens.includes(token));
+  let score = 0;
+
+  if (productName.includes(itemName) || itemName.includes(productName)) {
+    score += 70;
+  }
+
+  if (itemTokens.length) {
+    score += (shared.length / itemTokens.length) * 55;
+  }
+
+  if (productTokens.length) {
+    score += (shared.length / productTokens.length) * 20;
+  }
+
+  if ((product.category || "") === (item.category || "")) {
+    score += 10;
+  }
+
+  if ((product.unit || "") === (item.unit || "")) {
+    score += 6;
+  }
+
+  return score;
+}
+
+function getMeaningfulNameTokens(value) {
+  const ignored = new Set(["light", "bio", "fresh", "extra", "fit", "bez", "novy", "nova", "new", "cz", "ks"]);
+
+  return normalize(value)
+    .split(" ")
+    .filter((token) => token.length > 2 && !ignored.has(token));
+}
+
+function normalizeEan(value) {
+  const ean = String(value || "").replace(/\D/g, "");
+  return /^\d{8,14}$/.test(ean) ? ean : "";
+}
+
+function normalizeEanList(value) {
+  const values = Array.isArray(value)
+    ? value
+    : String(value || "").split(/[,\s;]+/);
+
+  return [...new Set(values.map(normalizeEan).filter(Boolean))];
+}
+
+function normalizeEanAliases(value) {
+  return Array.isArray(value)
+    ? value.map(normalizeEanAlias).filter(Boolean)
+    : [];
+}
+
+function normalizeEanAlias(value) {
+  const ean = normalizeEan(value?.ean);
+
+  if (!ean) {
+    return null;
+  }
+
+  return {
+    ean,
+    name: formatProductName(value.name || `EAN ${ean}`),
+    amount: roundAmount(Number(value.amount) || 1),
+    unit: normalizeImportUnit(value.unit || "ks"),
+    category: tidyName(value.category || "Ostatní")
+  };
+}
+
+function mergeEanAliases(existingAliases, nextAliases) {
+  const map = new Map();
+
+  normalizeEanAliases(existingAliases).forEach((alias) => {
+    map.set(alias.ean, alias);
+  });
+
+  normalizeEanAliases(nextAliases).forEach((alias) => {
+    map.set(alias.ean, alias);
+  });
+
+  return [...map.values()];
+}
+
 function findItemByName(name) {
   const normalizedName = normalize(name);
 
@@ -3489,6 +3821,10 @@ function formatAmount(value) {
   return Number(value).toLocaleString("cs-CZ", {
     maximumFractionDigits: 2
   });
+}
+
+function formatFormNumber(value) {
+  return String(roundAmount(Number(value) || 1)).replace(",", ".");
 }
 
 function escapeAttribute(value) {
