@@ -944,9 +944,9 @@ body.dark-mode .modal {
 
 .price-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 12px 0 16px;
 }
 
 .price-stats:empty {
@@ -955,11 +955,14 @@ body.dark-mode .modal {
 
 .price-stats > div {
   display: grid;
-  gap: 3px;
+  gap: 5px;
   border: 1px solid var(--soft-line);
   border-radius: 8px;
-  background: var(--field);
-  padding: 12px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.58), transparent),
+    var(--field);
+  padding: 13px;
+  box-shadow: 0 10px 22px rgba(24, 33, 47, 0.05);
 }
 
 .price-stats span {
@@ -970,12 +973,42 @@ body.dark-mode .modal {
 }
 
 .price-stats strong {
-  font-size: 1.05rem;
+  font-size: clamp(1.05rem, 1.5vw, 1.35rem);
+}
+
+.price-stats small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.stats-kpi-spend {
+  border-left: 4px solid #14a36f !important;
+}
+
+.stats-kpi-count {
+  border-left: 4px solid #2f80ed !important;
+}
+
+.stats-kpi-purchase {
+  border-left: 4px solid #7c3aed !important;
+}
+
+.stats-kpi-average {
+  border-left: 4px solid #f59e0b !important;
+}
+
+.stats-kpi-positive {
+  border-left: 4px solid var(--accent) !important;
+}
+
+.stats-kpi-negative {
+  border-left: 4px solid var(--danger) !important;
 }
 
 .stats-panel {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   margin-bottom: 16px;
   border: 1px solid var(--soft-line);
   border-radius: 8px;
@@ -1018,18 +1051,64 @@ body.dark-mode .modal {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .stats-card {
   display: grid;
-  gap: 10px;
+  grid-column: span 6;
+  align-content: start;
+  gap: 12px;
   border: 1px solid var(--soft-line);
   border-radius: 8px;
   background: var(--panel-strong);
   box-shadow: 0 12px 24px rgba(24, 33, 47, 0.06);
-  padding: 12px;
+  padding: 14px;
+  overflow: hidden;
+}
+
+.stats-card-wide {
+  grid-column: span 12;
+}
+
+.stats-card h3 {
+  font-size: 1.05rem;
+}
+
+.stats-card > p {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.stats-card-teal {
+  border-top: 4px solid var(--accent);
+}
+
+.stats-card-green {
+  border-top: 4px solid #14a36f;
+}
+
+.stats-card-blue {
+  border-top: 4px solid #2f80ed;
+}
+
+.stats-card-red {
+  border-top: 4px solid var(--danger);
+}
+
+.stats-card-violet {
+  border-top: 4px solid #7c3aed;
+}
+
+.stats-card-amber {
+  border-top: 4px solid #f59e0b;
+}
+
+.stats-card-cyan {
+  border-top: 4px solid #0891b2;
 }
 
 .stats-card img {
@@ -1041,6 +1120,127 @@ body.dark-mode .modal {
 .stats-card table {
   min-width: 0;
   font-size: 0.86rem;
+}
+
+.stats-action-mix {
+  display: grid;
+  gap: 12px;
+}
+
+.stats-action-pills {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stats-action-pill {
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: var(--field);
+  padding: 10px;
+}
+
+.stats-action-pill span,
+.stats-action-pill small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.stats-action-pill strong {
+  font-size: 1.35rem;
+}
+
+.stats-action-pill.is-positive {
+  color: var(--accent);
+}
+
+.stats-action-pill.is-negative {
+  color: var(--danger);
+}
+
+.stats-action-pill.is-neutral {
+  color: #647084;
+}
+
+.stat-bars {
+  display: grid;
+  gap: 10px;
+}
+
+.stat-bar-row {
+  display: grid;
+  gap: 6px;
+}
+
+.stat-bar-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.stat-bar-top span {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stat-bar-top strong {
+  color: var(--muted);
+  font-size: 0.84rem;
+  white-space: nowrap;
+}
+
+.stat-bar-track {
+  height: 11px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--soft-line);
+}
+
+.stat-bar-fill {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), #36b7a6);
+}
+
+.stat-bars-green .stat-bar-fill {
+  background: linear-gradient(90deg, #16a34a, #86efac);
+}
+
+.stat-bars-blue .stat-bar-fill {
+  background: linear-gradient(90deg, #2563eb, #7dd3fc);
+}
+
+.stat-bars-red .stat-bar-fill {
+  background: linear-gradient(90deg, #dc2626, #fb7185);
+}
+
+.stat-bars-violet .stat-bar-fill {
+  background: linear-gradient(90deg, #7c3aed, #c4b5fd);
+}
+
+.stat-bars-amber .stat-bar-fill {
+  background: linear-gradient(90deg, #d97706, #fbbf24);
+}
+
+.stat-bars-cyan .stat-bar-fill {
+  background: linear-gradient(90deg, #0891b2, #67e8f9);
+}
+
+.stat-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .history-filters {
@@ -2676,6 +2876,15 @@ body.dark-mode .list-name-input {
   .stats-grid {
     grid-template-columns: 1fr;
     width: 100%;
+  }
+
+  .stats-card,
+  .stats-card-wide {
+    grid-column: 1 / -1;
+  }
+
+  .stats-action-pills {
+    grid-template-columns: 1fr;
   }
 
   .history-filters,

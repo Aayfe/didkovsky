@@ -4804,23 +4804,72 @@ function renderStatsDashboard(entries) {
   const cards = [];
 
   if (metrics.includes("count")) {
-    cards.push(createStatsCard("Počty změn", createBarChart("Změny podle dne", stats.countByDay, "ks"), createStatsTable(["Den", "Počet"], stats.countByDay)));
+    cards.push(createInsightCard(
+      "Pohyby podle akce",
+      "Rychle ukáže, jestli zásoby spíš přibývají, mizí, nebo se jen ručně dorovnávají.",
+      createActionMix(stats),
+      "teal"
+    ));
   }
 
   if (metrics.includes("spend")) {
-    cards.push(createStatsCard("Celková útrata", createBarChart("Útrata podle dne", stats.spendByDay, "Kč"), createStatsTable(["Den", "Útrata"], stats.spendByDay, formatPrice)));
-  }
-
-  if (metrics.includes("avgPrice")) {
-    cards.push(createStatsCard("Průměrná cena za produkt", createBarChart("Průměrná cena", stats.avgPriceByProduct, "Kč"), createStatsTable(["Produkt", "Průměr"], stats.avgPriceByProduct, formatPrice)));
+    cards.push(createInsightCard(
+      "Útrata v čase",
+      "Dny s nákupní cenou. Hodí se na hledání dražších nákupních špiček.",
+      createBarList(stats.spendByDay, { formatter: formatPrice, tone: "green" }),
+      "green",
+      true
+    ));
   }
 
   if (metrics.includes("consumed")) {
-    cards.push(createStatsCard("Projezeno / odečteno", createBarChart("Odečtené množství", stats.consumedByProduct, "jedn."), createStatsTable(["Produkt", "Množství"], stats.consumedByProduct)));
+    cards.push(createInsightCard(
+      "Přidané položky",
+      "Co se nejčastěji navyšovalo v lednici.",
+      createBarList(stats.addedByProduct, { formatter: formatAmount, tone: "blue" }),
+      "blue"
+    ));
+    cards.push(createInsightCard(
+      "Odečteno / projezeno",
+      "Co ze zásob mizí nejvíc podle zapsaného množství.",
+      createBarList(stats.consumedByProduct, { formatter: formatAmount, tone: "red" }),
+      "red"
+    ));
   }
 
   if (metrics.includes("topProducts")) {
-    cards.push(createStatsCard("Top produkty podle změn", createBarChart("Top produkty", stats.topProducts, "ks"), createStatsTable(["Produkt", "Počet"], stats.topProducts)));
+    cards.push(createInsightCard(
+      "Top produkty podle změn",
+      "Nejaktivnější položky bez ohledu na typ akce.",
+      createBarList(stats.topProducts, { formatter: (value) => `${formatAmount(value)}x`, tone: "violet" }),
+      "violet"
+    ));
+  }
+
+  if (metrics.includes("avgPrice")) {
+    cards.push(createInsightCard(
+      "Průměrná cena za produkt",
+      "Jen položky, u kterých byla vyplněná cena.",
+      createBarList(stats.avgPriceByProduct, { formatter: formatPrice, tone: "amber" }),
+      "amber"
+    ));
+  }
+
+  if (metrics.includes("categories")) {
+    cards.push(createInsightCard(
+      "Kategorie podle aktivity",
+      "Souhrn změn podle kategorií číselníku nebo odhadu z názvu.",
+      createBarList(stats.categoryActivity, { formatter: (value) => `${formatAmount(value)} změn`, tone: "cyan" }),
+      "cyan"
+    ));
+  }
+
+  if (!cards.length) {
+    const empty = document.createElement("p");
+    empty.className = "message";
+    empty.textContent = "Vyber aspoň jednu metriku.";
+    statsGrid.append(empty);
+    return;
   }
 
   cards.forEach((card) => statsGrid.append(card));
@@ -4829,45 +4878,123 @@ function renderStatsDashboard(entries) {
 function buildStatsModel(entries) {
   const countByDay = new Map();
   const spendByDay = new Map();
+  const actionCounts = new Map();
   const productCounts = new Map();
   const productPriceTotals = new Map();
   const productPriceCounts = new Map();
+  const addedByProduct = new Map();
   const consumedByProduct = new Map();
+  const categoryActivity = new Map();
+  let totalSpend = 0;
+  let purchaseCount = 0;
+  let positiveCount = 0;
+  let negativeCount = 0;
+  let neutralCount = 0;
 
   entries.forEach((entry) => {
     const day = getHistoryEventDate(entry);
     const product = entry.product || getProductNameFromHistoryText(entry.text) || "Ostatní";
+    const category = getStatsCategory(entry, product);
+    const actionLabel = getStatsActionLabel(entry);
     const price = Number(entry.price);
     const amount = Number(entry.amount);
 
     incrementMap(countByDay, day, 1);
+    incrementMap(actionCounts, actionLabel, 1);
     incrementMap(productCounts, product, 1);
+    incrementMap(categoryActivity, category, 1);
 
     if (Number.isFinite(price) && price > 0) {
       incrementMap(spendByDay, day, price);
       incrementMap(productPriceTotals, product, price);
       incrementMap(productPriceCounts, product, 1);
+      totalSpend += price;
+      purchaseCount += 1;
     }
 
-    if (["eaten", "discarded", "adjustMinus", "subtract"].includes(entry.action) && Number.isFinite(amount)) {
-      incrementMap(consumedByProduct, `${product} ${entry.unit || ""}`.trim(), amount);
+    if (isPositiveInventoryAction(entry.action)) {
+      positiveCount += 1;
+
+      if (Number.isFinite(amount) && amount > 0) {
+        incrementMap(addedByProduct, getStatsProductUnitLabel(product, entry.unit), amount);
+      }
+    } else if (isNegativeInventoryAction(entry.action)) {
+      negativeCount += 1;
+
+      if (Number.isFinite(amount) && amount > 0) {
+        incrementMap(consumedByProduct, getStatsProductUnitLabel(product, entry.unit), amount);
+      }
+    } else {
+      neutralCount += 1;
     }
   });
 
   return {
-    countByDay: mapToChartRows(countByDay, 12),
-    spendByDay: mapToChartRows(spendByDay, 12),
+    summary: {
+      totalEntries: entries.length,
+      totalSpend: roundAmount(totalSpend),
+      purchaseCount,
+      averagePurchase: purchaseCount ? roundAmount(totalSpend / purchaseCount) : 0,
+      positiveCount,
+      negativeCount,
+      neutralCount
+    },
+    countByDay: mapToDateRows(countByDay, 12),
+    spendByDay: mapToDateRows(spendByDay, 12),
+    actionMix: mapActionRows(actionCounts),
+    addedByProduct: mapToChartRows(addedByProduct, 8),
     avgPriceByProduct: [...productPriceTotals.entries()]
       .map(([product, total]) => [product, roundAmount(total / (productPriceCounts.get(product) || 1))])
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8),
     consumedByProduct: mapToChartRows(consumedByProduct, 8),
-    topProducts: mapToChartRows(productCounts, 8)
+    topProducts: mapToChartRows(productCounts, 8),
+    categoryActivity: mapToChartRows(categoryActivity, 8)
   };
+}
+
+function isPositiveInventoryAction(action) {
+  return ["purchase", "gift", "adjustPlus", "add"].includes(action);
+}
+
+function isNegativeInventoryAction(action) {
+  return ["eaten", "discarded", "adjustMinus", "subtract"].includes(action);
+}
+
+function getStatsActionLabel(entry) {
+  if (entry.action) {
+    return getActionLabel(entry.action);
+  }
+
+  const labels = {
+    shopping: "Nákupní list",
+    catalog: "Číselník",
+    combo: "Kombinace",
+    list: "Seznam"
+  };
+
+  return labels[entry.type] || "Ostatní";
+}
+
+function getStatsProductUnitLabel(product, unit) {
+  return `${product}${unit ? ` (${unit})` : ""}`;
+}
+
+function getStatsCategory(entry, product) {
+  const catalogItem = findCatalogItemByName(product);
+  const pantryItem = findItemByName(product);
+  return catalogItem?.category || pantryItem?.category || inferCategoryFromName(product) || "Ostatní";
 }
 
 function incrementMap(map, key, amount) {
   map.set(key, roundAmount((map.get(key) || 0) + amount));
+}
+
+function mapToDateRows(map, limit) {
+  return [...map.entries()]
+    .filter(([, value]) => Number(value) > 0)
+    .sort((a, b) => String(a[0]).localeCompare(String(b[0]), "cs"))
+    .slice(-limit);
 }
 
 function mapToChartRows(map, limit) {
@@ -4877,22 +5004,100 @@ function mapToChartRows(map, limit) {
     .slice(0, limit);
 }
 
+function mapActionRows(map) {
+  const order = ["Nákup", "Snězeno", "Korekce +", "Korekce -", "Dar", "Vyhozeno", "Nastavit", "Nákupní list", "Číselník", "Kombinace", "Seznam", "Ostatní"];
+  const used = new Set(order);
+  const orderedRows = order
+    .map((label) => [label, map.get(label) || 0])
+    .filter(([, value]) => value > 0);
+  const extraRows = [...map.entries()]
+    .filter(([label, value]) => !used.has(label) && value > 0)
+    .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), "cs"));
+
+  return [...orderedRows, ...extraRows];
+}
+
 function getProductNameFromHistoryText(text) {
   const match = String(text || "").match(/:\s*([^,+.-]+?)(?:\s+[+-]?\d|,|\.|$)/u);
   return match ? tidyName(match[1]) : "";
 }
 
-function createStatsCard(title, chartDataUrl, table) {
+function createInsightCard(title, subtitle, content, tone = "teal", wide = false) {
   const card = document.createElement("article");
   const heading = document.createElement("h3");
-  const image = document.createElement("img");
+  const copy = document.createElement("p");
 
-  card.className = "stats-card";
+  card.className = `stats-card stats-card-${tone}${wide ? " stats-card-wide" : ""}`;
   heading.textContent = title;
-  image.src = chartDataUrl;
-  image.alt = title;
-  card.append(heading, image, table);
+  copy.textContent = subtitle;
+  card.append(heading, copy, content);
   return card;
+}
+
+function createActionMix(stats) {
+  const wrapper = document.createElement("div");
+  const pills = document.createElement("div");
+  const summary = document.createElement("div");
+  const total = Math.max(1, stats.summary.totalEntries);
+
+  wrapper.className = "stats-action-mix";
+  pills.className = "stats-action-pills";
+  summary.className = "stats-action-summary";
+
+  [
+    ["Přibylo", stats.summary.positiveCount, "positive"],
+    ["Ubylo", stats.summary.negativeCount, "negative"],
+    ["Neutrální", stats.summary.neutralCount, "neutral"]
+  ].forEach(([label, value, tone]) => {
+    const pill = document.createElement("div");
+    pill.className = `stats-action-pill is-${tone}`;
+    pill.innerHTML = `<span>${label}</span><strong>${formatAmount(value)}</strong><small>${formatAmount(roundAmount((value / total) * 100))} %</small>`;
+    pills.append(pill);
+  });
+
+  summary.append(createBarList(stats.actionMix, { formatter: (value) => `${formatAmount(value)}x`, tone: "teal" }));
+  wrapper.append(pills, summary);
+  return wrapper;
+}
+
+function createBarList(rows, options = {}) {
+  const formatter = options.formatter || formatAmount;
+  const tone = options.tone || "teal";
+  const wrapper = document.createElement("div");
+  const max = Math.max(1, ...rows.map(([, value]) => Number(value)));
+
+  wrapper.className = `stat-bars stat-bars-${tone}`;
+
+  if (!rows.length) {
+    const empty = document.createElement("p");
+    empty.className = "stat-empty";
+    empty.textContent = "Bez dat pro vybrané období.";
+    wrapper.append(empty);
+    return wrapper;
+  }
+
+  rows.forEach(([label, value]) => {
+    const row = document.createElement("div");
+    const top = document.createElement("div");
+    const name = document.createElement("span");
+    const number = document.createElement("strong");
+    const track = document.createElement("div");
+    const fill = document.createElement("span");
+
+    row.className = "stat-bar-row";
+    top.className = "stat-bar-top";
+    track.className = "stat-bar-track";
+    fill.className = "stat-bar-fill";
+    fill.style.width = `${Math.max(4, Math.round((Number(value) / max) * 100))}%`;
+    name.textContent = label;
+    number.textContent = formatter(value);
+    top.append(name, number);
+    track.append(fill);
+    row.append(top, track);
+    wrapper.append(row);
+  });
+
+  return wrapper;
 }
 
 function createStatsTable(headers, rows, formatter = formatAmount) {
@@ -4995,23 +5200,28 @@ function exportStatsPdf() {
   const sections = [];
 
   if (metrics.includes("count")) {
-    sections.push(getExportSection("Počty změn", createBarChart("Změny podle dne", stats.countByDay, "ks"), ["Den", "Počet"], stats.countByDay));
+    sections.push(getExportSection("Pohyby podle akce", createBarChart("Pohyby podle akce", stats.actionMix, "x"), ["Akce", "Počet"], stats.actionMix));
   }
 
   if (metrics.includes("spend")) {
     sections.push(getExportSection("Celková útrata", createBarChart("Útrata podle dne", stats.spendByDay, "Kč"), ["Den", "Útrata"], stats.spendByDay, formatPrice));
   }
 
-  if (metrics.includes("avgPrice")) {
-    sections.push(getExportSection("Průměrná cena za produkt", createBarChart("Průměrná cena", stats.avgPriceByProduct, "Kč"), ["Produkt", "Průměr"], stats.avgPriceByProduct, formatPrice));
-  }
-
   if (metrics.includes("consumed")) {
+    sections.push(getExportSection("Přidané položky", createBarChart("Přidané položky", stats.addedByProduct, "jedn."), ["Produkt", "Množství"], stats.addedByProduct));
     sections.push(getExportSection("Projezeno / odečteno", createBarChart("Odečtené množství", stats.consumedByProduct, "jedn."), ["Produkt", "Množství"], stats.consumedByProduct));
   }
 
   if (metrics.includes("topProducts")) {
     sections.push(getExportSection("Top produkty podle změn", createBarChart("Top produkty", stats.topProducts, "ks"), ["Produkt", "Počet"], stats.topProducts));
+  }
+
+  if (metrics.includes("avgPrice")) {
+    sections.push(getExportSection("Průměrná cena za produkt", createBarChart("Průměrná cena", stats.avgPriceByProduct, "Kč"), ["Produkt", "Průměr"], stats.avgPriceByProduct, formatPrice));
+  }
+
+  if (metrics.includes("categories")) {
+    sections.push(getExportSection("Kategorie podle aktivity", createBarChart("Kategorie", stats.categoryActivity, "změn"), ["Kategorie", "Změny"], stats.categoryActivity));
   }
 
   const printWindow = window.open("", "_blank");
@@ -5170,24 +5380,24 @@ function renderPriceStats(entries) {
     return;
   }
 
-  const purchases = entries.filter((entry) => {
-    return ["purchase", "shopping"].includes(entry.action || entry.type)
-      && Number.isFinite(Number(entry.price))
-      && Number(entry.price) > 0;
-  });
-  const total = purchases.reduce((sum, entry) => sum + Number(entry.price), 0);
-  const average = purchases.length ? total / purchases.length : 0;
+  const stats = buildStatsModel(entries);
+  const items = [
+    ["Útrata", formatPrice(stats.summary.totalSpend), "Vyplněné nákupní ceny", "spend"],
+    ["Změn celkem", formatAmount(stats.summary.totalEntries), "Všechny záznamy ve filtru", "count"],
+    ["Nákupních cen", formatAmount(stats.summary.purchaseCount), "Zápisy s cenou", "purchase"],
+    ["Průměr ceny", formatPrice(stats.summary.averagePurchase), "Průměr z vyplněných cen", "average"],
+    ["Přidávací pohyby", formatAmount(stats.summary.positiveCount), "Nákup, dar, korekce +", "positive"],
+    ["Odečítací pohyby", formatAmount(stats.summary.negativeCount), "Snězeno, vyhozeno, korekce -", "negative"]
+  ];
 
   priceStats.replaceChildren();
 
-  const totalItem = document.createElement("div");
-  const countItem = document.createElement("div");
-  const averageItem = document.createElement("div");
-
-  totalItem.innerHTML = `<span>Útrata</span><strong>${formatPrice(total)}</strong>`;
-  countItem.innerHTML = `<span>Nákupních zápisů</span><strong>${purchases.length}</strong>`;
-  averageItem.innerHTML = `<span>Průměr</span><strong>${formatPrice(average)}</strong>`;
-  priceStats.append(totalItem, countItem, averageItem);
+  items.forEach(([label, value, detail, tone]) => {
+    const card = document.createElement("div");
+    card.className = `stats-kpi stats-kpi-${tone}`;
+    card.innerHTML = `<span>${label}</span><strong>${value}</strong><small>${detail}</small>`;
+    priceStats.append(card);
+  });
 }
 
 function resetForm() {
