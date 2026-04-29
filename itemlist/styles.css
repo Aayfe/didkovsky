@@ -603,30 +603,37 @@ h1 {
   }
 
   .changes-entry-form {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-columns:
+      minmax(190px, 1.6fr)
+      minmax(140px, 1fr)
+      minmax(140px, 1fr)
+      minmax(150px, 1.15fr)
+      minmax(118px, 0.75fr)
+      minmax(150px, 1fr)
+      max-content;
   }
 
   .changes-entry-form .product-field {
-    grid-column: span 3;
+    grid-column: auto;
   }
 
   .changes-entry-form .category-field,
   .changes-entry-form .action-field,
   .changes-entry-form .amount-field,
   .changes-entry-form .price-field {
-    grid-column: span 2;
+    grid-column: auto;
   }
 
   .changes-entry-form .unit-field {
-    grid-column: span 1;
+    grid-column: auto;
   }
 
   .changes-entry-form .event-date-field {
-    grid-column: 7 / 11;
+    grid-column: 4 / 7;
   }
 
   .changes-entry-form > .primary-button {
-    grid-column: 11 / 13;
+    grid-column: 7;
   }
 
   .changes-entry-form > .ghost-button {
@@ -663,9 +670,9 @@ h1 {
   }
 
   .list-panel {
-    width: clamp(860px, 58vw, 1180px);
+    width: 100%;
     min-width: 0;
-    justify-self: center;
+    justify-self: stretch;
   }
 }
 
@@ -1058,6 +1065,15 @@ body.dark-mode .modal {
 
 .changes-entry-form {
   margin-bottom: 10px;
+}
+
+.changes-entry-form .unit-field {
+  min-width: 112px;
+}
+
+.changes-entry-form .unit-field select {
+  padding-left: 16px;
+  padding-right: 34px;
 }
 
 #submit-button {
