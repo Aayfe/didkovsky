@@ -644,7 +644,8 @@ h1 {
 
 @media (min-width: 1280px) {
   .app-shell {
-    width: min(100%, 1800px);
+    width: 100%;
+    max-width: none;
     display: grid;
     grid-template-columns: 280px minmax(0, 1fr);
     align-items: start;
