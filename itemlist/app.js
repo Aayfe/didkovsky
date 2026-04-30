@@ -2804,19 +2804,33 @@ function normalizeCalorieDiaryResult(data, fallbackDate) {
   }
 
   normalizeCalorieDiaryItems(data?.items || data?.entries || [], "", fallbackDate).forEach((item) => rows.push(item));
-  if (Array.isArray(data?.raw?.data?.times)) {
+  if (!rows.length && Array.isArray(data?.raw?.data?.times)) {
     data.raw.data.times.forEach((meal) => {
       const mealName = normalizeCalorieMealName(meal?.title || meal?.name || meal?.meal || meal?.phase);
       normalizeCalorieDiaryItems(meal?.foodstuff || meal?.items || meal?.entries || [], mealName, fallbackDate).forEach((item) => rows.push(item));
     });
   }
-  normalizeCalorieDiaryItems(data?.raw?.data?.foodstuff || data?.raw?.data?.items || data?.raw?.data?.entries || [], "", fallbackDate).forEach((item) => rows.push(item));
+  if (!rows.length) {
+    normalizeCalorieDiaryItems(data?.raw?.data?.foodstuff || data?.raw?.data?.items || data?.raw?.data?.entries || [], "", fallbackDate).forEach((item) => rows.push(item));
+  }
 
   if (!rows.length) {
     extractCalorieDiaryRowsDeep(data?.raw?.data ?? data?.raw ?? data, fallbackDate).forEach((item) => rows.push(item));
   }
 
-  return rows
+  const uniqueRows = [];
+  const seenRows = new Set();
+
+  rows.forEach((row) => {
+    const key = `${normalize(row.name)}|${roundAmount(Number(row.amount) || 0)}|${row.unit}|${normalizeCalorieMealName(row.meal)}`;
+
+    if (!seenRows.has(key)) {
+      seenRows.add(key);
+      uniqueRows.push(row);
+    }
+  });
+
+  return uniqueRows
     .filter((row) => row.name && row.amount > 0)
     .sort((first, second) => getCalorieMealIndex(first.meal) - getCalorieMealIndex(second.meal)
       || first.name.localeCompare(second.name, "cs"))

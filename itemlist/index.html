@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux21">
+    <link rel="stylesheet" href="styles.css?v=ux23">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -419,6 +419,35 @@
             <button class="danger-button" id="delete-list-button" type="button">Odebrat aktuální prostor</button>
           </div>
 
+          <section class="settings-news-panel" aria-labelledby="settings-news-title">
+            <div class="settings-news-heading">
+              <p class="eyebrow">Novinky</p>
+              <h2 id="settings-news-title">Poslední úpravy</h2>
+            </div>
+            <ol class="settings-news-list">
+              <li>
+                <time datetime="2026-04-30">30.04.2026</time>
+                <span>Odečet z Kalorických tabulek načítá deník přes správný endpoint, řadí položky podle fáze dne a neduplikuje řádky.</span>
+              </li>
+              <li>
+                <time datetime="2026-04-30">30.04.2026</time>
+                <span>Řádky odečtu mají čistší responzivní UI, sjednocené vstupy, výběr párování a čitelnější stav neodečítaných položek.</span>
+              </li>
+              <li>
+                <time datetime="2026-04-30">30.04.2026</time>
+                <span>Kalorické tabulky lze propojit e-mailem a heslem nebo ručně vloženou session cookie pro Google/Facebook účty.</span>
+              </li>
+              <li>
+                <time datetime="2026-04-30">30.04.2026</time>
+                <span>Rozpoznávání účtenek umí při přetížení Gemini zkusit lehčí fallback model a případně OpenAI zálohu.</span>
+              </li>
+              <li>
+                <time datetime="2026-04-29">29.04.2026</time>
+                <span>Statistiky, grafy a PDF export jsou přesunuté do nastavení s vlastním filtrem období.</span>
+              </li>
+            </ol>
+          </section>
+
           <details class="calorie-import-panel">
             <summary>Propojení Kalorických tabulek</summary>
             <div class="calorie-import-layout">
@@ -609,6 +638,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux31"></script>
+    <script src="app.js?v=ux32"></script>
   </body>
 </html>
