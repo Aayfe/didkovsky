@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux20">
+    <link rel="stylesheet" href="styles.css?v=ux21">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -426,7 +426,18 @@
                 <span>E-mail účtu</span>
                 <input id="calorie-account-email" type="email" placeholder="ucet@domena.cz" autocomplete="email">
               </label>
-              <p class="message">Heslo ani session token se neukládá do GitHub Pages. Trvalé propojení nastav přes Supabase secrets pro funkci <strong>calorie-diary</strong>: buď <strong>KALORICKE_TABULKY_MCP_URL</strong> + <strong>APIFY_TOKEN</strong>, nebo vlastní <strong>CALORIE_DIARY_ENDPOINT</strong>.</p>
+              <label class="field">
+                <span>Heslo pro e-mailové přihlášení</span>
+                <input id="calorie-account-password" type="password" placeholder="Heslo do Kalorických tabulek" autocomplete="current-password">
+              </label>
+              <div class="calorie-import-actions">
+                <button class="primary-button" id="calorie-password-login-button" type="button">Připojit e-mailem a heslem</button>
+              </div>
+              <label class="field">
+                <span>Google/Facebook: session cookie z Kalorických tabulek</span>
+                <textarea id="calorie-session-cookie" rows="4" spellcheck="false" placeholder="sid=...; PHPSESSID=...; další hodnoty"></textarea>
+              </label>
+              <p class="message">Google a Facebook přihlášení nejde bezpečně automatizovat bez oficiálního API. Pro tyto účty se přihlas v Kalorických tabulkách a vlož session cookie. Heslo se neukládá, ukládá se jen získaná relace pro přihlášeného uživatele.</p>
               <div class="calorie-import-actions">
                 <button class="ghost-button" id="calorie-save-connection-button" type="button">Uložit propojení</button>
                 <button class="primary-button" id="calorie-test-connection-button" type="button">Otestovat propojení</button>
@@ -598,6 +609,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux26"></script>
+    <script src="app.js?v=ux27"></script>
   </body>
 </html>

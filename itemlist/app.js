@@ -101,7 +101,10 @@ const settingsPeriodFilter = document.querySelector("#settings-period-filter");
 const settingsDateFrom = document.querySelector("#settings-date-from");
 const settingsDateTo = document.querySelector("#settings-date-to");
 const calorieAccountEmail = document.querySelector("#calorie-account-email");
+const calorieAccountPassword = document.querySelector("#calorie-account-password");
+const calorieSessionCookie = document.querySelector("#calorie-session-cookie");
 const calorieSaveConnectionButton = document.querySelector("#calorie-save-connection-button");
+const caloriePasswordLoginButton = document.querySelector("#calorie-password-login-button");
 const calorieTestConnectionButton = document.querySelector("#calorie-test-connection-button");
 const calorieConnectionMessage = document.querySelector("#calorie-connection-message");
 const calorieImportText = document.querySelector("#calorie-import-text");
@@ -267,7 +270,8 @@ let combos = [];
 let catalogItems = [];
 let appSettings = {
   subtractStockFromShopping: false,
-  calorieAccountEmail: ""
+  calorieAccountEmail: "",
+  calorieSessionCookie: ""
 };
 let activeView = "pantry";
 let editingId = null;
@@ -368,6 +372,7 @@ function setupEvents() {
     renderHistory();
   });
   calorieSaveConnectionButton?.addEventListener("click", saveCalorieConnectionSettings);
+  caloriePasswordLoginButton?.addEventListener("click", connectCalorieAccountWithPassword);
   calorieTestConnectionButton?.addEventListener("click", testCalorieConnection);
   calorieParseButton?.addEventListener("click", parseCalorieImportFromText);
   calorieApplyButton?.addEventListener("click", applyCalorieImportDeduction);
@@ -1909,6 +1914,9 @@ function setState(state) {
     subtractStockFromShopping: Boolean(state.appSettings?.subtractStockFromShopping),
     calorieAccountEmail: typeof state.appSettings?.calorieAccountEmail === "string"
       ? state.appSettings.calorieAccountEmail
+      : "",
+    calorieSessionCookie: typeof state.appSettings?.calorieSessionCookie === "string"
+      ? state.appSettings.calorieSessionCookie
       : ""
   };
   ensureComboBuilderRows();
@@ -1926,7 +1934,8 @@ function createDefaultState() {
     catalogItems: [],
     appSettings: {
       subtractStockFromShopping: false,
-      calorieAccountEmail: ""
+      calorieAccountEmail: "",
+      calorieSessionCookie: ""
     }
   };
 }
@@ -2018,6 +2027,9 @@ function sanitizeState(state) {
       subtractStockFromShopping: Boolean(state.appSettings?.subtractStockFromShopping),
       calorieAccountEmail: typeof state.appSettings?.calorieAccountEmail === "string"
         ? state.appSettings.calorieAccountEmail
+        : "",
+      calorieSessionCookie: typeof state.appSettings?.calorieSessionCookie === "string"
+        ? state.appSettings.calorieSessionCookie
         : ""
     }
   };
@@ -2563,6 +2575,10 @@ function syncSettingsControls() {
     calorieAccountEmail.value = appSettings.calorieAccountEmail || getCurrentUserEmail();
   }
 
+  if (calorieSessionCookie) {
+    calorieSessionCookie.value = appSettings.calorieSessionCookie || "";
+  }
+
   if (calorieDiaryDate && !calorieDiaryDate.value) {
     calorieDiaryDate.value = getLocalDateValue(new Date());
   }
@@ -2570,11 +2586,58 @@ function syncSettingsControls() {
 
 async function saveCalorieConnectionSettings() {
   appSettings.calorieAccountEmail = tidyName(calorieAccountEmail?.value || getCurrentUserEmail());
+  appSettings.calorieSessionCookie = sanitizeCalorieSessionCookie(calorieSessionCookie?.value || "");
+  if (calorieAccountPassword) {
+    calorieAccountPassword.value = "";
+  }
   syncSettingsControls();
   await saveState();
 
   if (calorieConnectionMessage) {
-    calorieConnectionMessage.textContent = "Propojení uloženo. Citlivé údaje nastav v Supabase secrets, ne v GitHub Pages.";
+    calorieConnectionMessage.textContent = appSettings.calorieSessionCookie
+      ? "Propojení uloženo. Teď můžeš v Import / export načíst konkrétní den."
+      : "Propojení uloženo bez cookie. Pro automatické načtení dne vlož session cookie z Kalorických tabulek.";
+  }
+}
+
+async function connectCalorieAccountWithPassword() {
+  const email = tidyName(calorieAccountEmail?.value || "");
+  const password = calorieAccountPassword?.value || "";
+
+  if (!email || !password) {
+    setCalorieConnectionMessage("Vyplň e-mail a heslo do Kalorických tabulek.", true);
+    return;
+  }
+
+  if (!hasCalorieDiaryIntegration()) {
+    setCalorieConnectionMessage("Funkce calorie-diary není v supabase-config.js nastavená.", true);
+    return;
+  }
+
+  try {
+    setCalorieConnectionMessage("Přihlašuji se do Kalorických tabulek...");
+    appSettings.calorieAccountEmail = email;
+    const data = await fetchCalorieDiaryFromIntegration(getLocalDateValue(new Date()), {
+      loginOnly: true,
+      password
+    });
+
+    if (!data?.sessionCookie) {
+      throw new Error("Kalorické tabulky nevrátily session cookie.");
+    }
+
+    appSettings.calorieAccountEmail = email;
+    appSettings.calorieSessionCookie = sanitizeCalorieSessionCookie(data.sessionCookie);
+    if (calorieSessionCookie) {
+      calorieSessionCookie.value = appSettings.calorieSessionCookie;
+    }
+    if (calorieAccountPassword) {
+      calorieAccountPassword.value = "";
+    }
+    await saveState();
+    setCalorieConnectionMessage("Připojeno. Relace je uložená a můžeš načítat dny v Import / export.");
+  } catch (error) {
+    setCalorieConnectionMessage(`Přihlášení se nepovedlo: ${getErrorMessage(error)}`, true);
   }
 }
 
@@ -2622,6 +2685,14 @@ function hasCalorieDiaryIntegration() {
   return Boolean(config.calorieDiaryFunction || config.calorieDiaryEndpoint);
 }
 
+function sanitizeCalorieSessionCookie(value) {
+  return String(value || "")
+    .replace(/\r?\n/g, "; ")
+    .replace(/\s*;\s*/g, "; ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 async function loadCalorieDiaryEntries() {
   if (!calorieDiaryDate?.value) {
     setCalorieImportMessage("Vyber den, ze kterého chceš načíst položky.", true);
@@ -2653,6 +2724,9 @@ async function fetchCalorieDiaryFromIntegration(date, options = {}) {
   const payload = {
     date,
     email: appSettings.calorieAccountEmail || getCurrentUserEmail(),
+    sessionCookie: appSettings.calorieSessionCookie || "",
+    password: options.password || "",
+    loginOnly: Boolean(options.loginOnly),
     testOnly: Boolean(options.testOnly)
   };
 
