@@ -4284,8 +4284,8 @@ async function importReceiptFromImage(event) {
         });
         sourceInfo = `AI endpoint: ${parsed.provider || "externí AI"}.`;
       } catch (error) {
-        if (!window.Tesseract) {
-          receiptMessage.textContent = "AI rozpoznání není dostupné a lokální OCR se nenačetlo. Zkontroluj konfiguraci AI endpointu.";
+        if (!shouldFallbackToLocalReceiptOcr()) {
+          receiptMessage.textContent = "AI rozpoznání selhalo. Zkontroluj Supabase funkci receipt-ai a API klíč; lokální OCR teď kvůli přesnosti nemíchám do výsledku.";
           return;
         }
 
@@ -4294,6 +4294,11 @@ async function importReceiptFromImage(event) {
     }
 
     if (!parsed || !parsed.items.length) {
+      if (aiAvailable && !shouldFallbackToLocalReceiptOcr()) {
+        receiptMessage.textContent = "AI nenašla žádné jisté položky. Výsledek nebudu doplňovat lokálním OCR, aby se nepřidaly adresy, obchod nebo duplicitní řádky.";
+        return;
+      }
+
       if (!window.Tesseract) {
         receiptMessage.textContent = "AI nic použitelného nevrátila a lokální OCR se nenačetlo.";
         return;
@@ -4334,6 +4339,11 @@ function hasReceiptAiIntegration() {
   }
 
   return Boolean(config.receiptAiFunction || config.receiptAiEndpoint);
+}
+
+function shouldFallbackToLocalReceiptOcr() {
+  const config = window.SUPABASE_CONFIG || {};
+  return config.receiptAiFallbackToOcr === true;
 }
 
 async function recognizeReceiptWithExternalAi(file, onProgress = () => {}) {
@@ -4469,13 +4479,32 @@ function normalizeReceiptAiResult(data) {
   rawItems
     .map(normalizeReceiptAiItem)
     .filter(Boolean)
-    .forEach((item) => mergeReceiptItem(items, item));
+    .forEach((item) => mergeReceiptAiItem(items, item));
 
   return {
     items: items.slice(0, 80),
     skipped: Array.isArray(data?.skipped) ? data.skipped.map(tidyName).filter(Boolean) : [],
     provider: data?.provider || data?.model || "externí AI"
   };
+}
+
+function mergeReceiptAiItem(items, item) {
+  const duplicate = items.find((currentItem) => {
+    const sameProduct = normalize(currentItem.name) === normalize(item.name)
+      && currentItem.unit === item.unit;
+    const sameAmount = Math.abs((Number(currentItem.amount) || 0) - (Number(item.amount) || 0)) < 0.01;
+    const samePrice = Math.abs((Number(currentItem.price) || 0) - (Number(item.price) || 0)) < 0.01;
+    const sameLine = currentItem.sourceLine && item.sourceLine && normalize(currentItem.sourceLine) === normalize(item.sourceLine);
+
+    return sameProduct && (sameLine || (sameAmount && samePrice));
+  });
+
+  if (duplicate) {
+    duplicate.score = Math.max(duplicate.score || 0, item.score || 0);
+    return;
+  }
+
+  mergeReceiptItem(items, item);
 }
 
 function normalizeReceiptAiItem(item) {
