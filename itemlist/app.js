@@ -162,7 +162,7 @@ const CATEGORY_ICONS = {
   "Ostatní": "📦"
 };
 const RECEIPT_SKIP_PATTERNS = [
-  /^(celkem|suma|součet|subtotal|total|hotově|hotovost|kartou|visa|mastercard|cash|vráceno|zaplaceno|účtenka|ucet|datum|čas|dic|dič|ičo|ico|provozovna|pokladna|doklad|terminál|terminal|děkujeme|dekujeme|www|tel\.?|eet|fik|bkp|prodejna|adresa|otevírací|oteviraci)\b/iu,
+  /^(celkem|suma|součet|soucet|subtotal|total|hotově|hotovost|kartou|visa|mastercard|cash|vráceno|zaplaceno|účtenka|ucet|datum|čas|dic|dič|ičo|ico|provozovna|pokladna|doklad|terminál|terminal|děkujeme|dekujeme|www|tel\.?|eet|fik|bkp|prodejna|adresa|otevírací|oteviraci)\b/iu,
   /\b(dph|vat|sazba|základ|zaklad|sleva|platební|platebni|transakce|autorizační|autorizacni|faktura|fakturujeme|variabilní|variabilni|objednávka|objednavka)\b/iu,
   /^[\d\s.,:/\\-]+$/u
 ];
@@ -4798,6 +4798,7 @@ function parseReceiptOcrAttempts(attempts) {
 function parseReceiptText(text, sourceName = "OCR") {
   const items = [];
   const skipped = [];
+  let lastItem = null;
   let nextOrder = 0;
 
   String(text || "")
@@ -4805,12 +4806,20 @@ function parseReceiptText(text, sourceName = "OCR") {
     .map(normalizeReceiptLine)
     .filter(Boolean)
     .forEach((line) => {
+      const discount = parseReceiptDiscountLine(line);
+
+      if (discount && lastItem) {
+        applyReceiptDiscountToItem(lastItem, discount.amount);
+        skipped.push(`${line} -> sleva odečtena od ${lastItem.name}`);
+        return;
+      }
+
       const parsed = parseReceiptProductLine(line, sourceName);
 
       if (parsed) {
         parsed.firstSeen = nextOrder;
         nextOrder += 1;
-        mergeReceiptItem(items, parsed);
+        lastItem = mergeReceiptItem(items, parsed);
       } else {
         skipped.push(line);
       }
@@ -4828,6 +4837,63 @@ function formatReceiptItemsForImport(items) {
         : base;
     })
     .join("\n");
+}
+
+function parseReceiptDiscountLine(line) {
+  const text = tidyName(line);
+
+  if (!/\b(sleva|kupon|kup[oó]n|card|karta|clubcard|plus|věrnost|vernost|bonus|kaufland|lidl|tesco|billa)\b/iu.test(text)) {
+    return null;
+  }
+
+  const match = text.match(/(-\s*\d[\d\s\u00a0]*(?:[,.]\d{1,2})?)\s*(?:kč|kc|czk)?\s*$/iu);
+
+  if (!match) {
+    return null;
+  }
+
+  const amount = parseReceiptSignedPrice(match[1]);
+
+  if (!Number.isFinite(amount) || amount >= 0) {
+    return null;
+  }
+
+  return {
+    amount: Math.abs(amount)
+  };
+}
+
+function parseReceiptSignedPrice(value) {
+  const compact = String(value || "")
+    .replace(/[\s\u00a0]/g, "")
+    .replace(/[^\d,.-]/g, "")
+    .trim();
+  const commaIndex = compact.lastIndexOf(",");
+  const dotIndex = compact.lastIndexOf(".");
+  let normalized = compact;
+
+  if (commaIndex > -1 && dotIndex > -1) {
+    normalized = commaIndex > dotIndex
+      ? compact.replace(/\./g, "").replace(",", ".")
+      : compact.replace(/,/g, "");
+  } else if (commaIndex > -1) {
+    normalized = compact.replace(",", ".");
+  }
+
+  const price = Number(normalized);
+  return Number.isFinite(price) ? roundAmount(price) : null;
+}
+
+function applyReceiptDiscountToItem(item, discount) {
+  const price = Number(item.price);
+
+  if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(discount) || discount <= 0) {
+    return;
+  }
+
+  item.price = roundAmount(Math.max(0, price - discount));
+  item.score = (item.score || 0) + 8;
+  item.sourceLine = [item.sourceLine, `sleva -${formatPrice(discount)}`].filter(Boolean).join(" | ");
 }
 
 function parseReceiptProductLine(line, sourceName = "OCR") {
@@ -5153,10 +5219,11 @@ function mergeReceiptItem(items, item) {
     existing.price = mergeReceiptPrices(existing.price, item.price);
     existing.score = Math.max(existing.score || 0, item.score || 0) + 4;
     existing.sourceLine = [existing.sourceLine, item.sourceLine].filter(Boolean).join(" | ");
-    return;
+    return existing;
   }
 
   items.push(item);
+  return item;
 }
 
 function mergeReceiptAttemptItem(items, item, nextOrder) {
