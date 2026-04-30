@@ -338,6 +338,102 @@ textarea {
   padding: 14px;
 }
 
+.calorie-import-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  padding: 14px;
+}
+
+.calorie-import-panel summary {
+  margin: -14px;
+  cursor: pointer;
+  font-weight: 800;
+  list-style: none;
+  padding: 14px;
+}
+
+.calorie-import-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.calorie-import-panel[open] summary {
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--soft-line);
+}
+
+.calorie-import-layout {
+  display: grid;
+  gap: 12px;
+}
+
+.calorie-diary-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.calorie-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.calorie-import-rows {
+  display: grid;
+  gap: 10px;
+}
+
+.calorie-meal-heading {
+  margin: 10px 0 0;
+  color: var(--accent);
+  font-size: 0.9rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.calorie-import-row {
+  display: grid;
+  grid-template-columns: minmax(110px, auto) minmax(180px, 1.5fr) minmax(86px, 0.5fr) minmax(76px, 0.4fr) minmax(190px, 1fr);
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  padding: 10px;
+}
+
+.calorie-import-row input,
+.calorie-import-row select {
+  min-width: 0;
+}
+
+.calorie-import-row small {
+  grid-column: 2 / -1;
+}
+
+.calorie-skip-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.calorie-import-row.is-skipped {
+  opacity: 0.62;
+}
+
+.calorie-import-row.is-skipped input:not([type="checkbox"]),
+.calorie-import-row.is-skipped select,
+.calorie-import-row.is-skipped small {
+  text-decoration: line-through;
+}
+
 .list-management summary {
   margin: -14px;
   cursor: pointer;
@@ -2818,6 +2914,8 @@ body.dark-mode .list-name-input {
   .shopping-form,
   .catalog-form,
   .catalog-alias-form,
+  .calorie-diary-toolbar,
+  .calorie-import-row,
   .combo-item-row,
   .combo-form-actions,
   .compact-form,
@@ -2841,6 +2939,14 @@ body.dark-mode .list-name-input {
 
   .combo-form-actions {
     display: grid;
+  }
+
+  .calorie-import-row small {
+    grid-column: auto;
+  }
+
+  .calorie-import-actions {
+    justify-content: stretch;
   }
 
   .primary-button,

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux18">
+    <link rel="stylesheet" href="styles.css?v=ux20">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -339,6 +339,7 @@
             </section>
             <section class="tool-group">
               <h2>Import</h2>
+              <button class="primary-button" id="calorie-diary-button" type="button">Odečet z Kalorických tabulek</button>
               <button class="ghost-button" id="import-button" type="button">Hromadný import textem</button>
               <button class="ghost-button" id="xml-import-button" type="button">Import XML textem</button>
               <button class="ghost-button" id="xml-file-button" type="button">Import XML souborem</button>
@@ -385,6 +386,21 @@
             </label>
             <p class="message" id="receipt-message" role="status" aria-live="polite"></p>
           </div>
+          <div class="tool-card" id="calorie-diary-tool" hidden>
+            <h2>Odečet z Kalorických tabulek</h2>
+            <div class="calorie-diary-toolbar">
+              <label class="field">
+                <span>Den v Kalorických tabulkách</span>
+                <input id="calorie-diary-date" type="date">
+              </label>
+              <button class="primary-button" id="calorie-diary-load-button" type="button">Načíst den</button>
+            </div>
+            <p class="message" id="calorie-diary-message" role="status" aria-live="polite"></p>
+            <div class="calorie-import-rows" id="calorie-diary-rows"></div>
+            <div class="calorie-import-actions">
+              <button class="primary-button" id="calorie-diary-apply-button" type="button">Odečíst vybrané z lednice</button>
+            </div>
+          </div>
           <p class="message">EAN / barcode se načítá přes více veřejných databází a vlastní číselník aliasů. OCR účtenky běží v prohlížeči přes několik pokusů a lokální chytré vyhodnocení řádků.</p>
         </section>
 
@@ -402,6 +418,38 @@
             </label>
             <button class="danger-button" id="delete-list-button" type="button">Odebrat aktuální prostor</button>
           </div>
+
+          <details class="calorie-import-panel">
+            <summary>Propojení Kalorických tabulek</summary>
+            <div class="calorie-import-layout">
+              <label class="field">
+                <span>E-mail účtu</span>
+                <input id="calorie-account-email" type="email" placeholder="ucet@domena.cz" autocomplete="email">
+              </label>
+              <p class="message">Heslo ani session token se neukládá do GitHub Pages. Trvalé propojení nastav přes Supabase secrets pro funkci <strong>calorie-diary</strong>: buď <strong>KALORICKE_TABULKY_MCP_URL</strong> + <strong>APIFY_TOKEN</strong>, nebo vlastní <strong>CALORIE_DIARY_ENDPOINT</strong>.</p>
+              <div class="calorie-import-actions">
+                <button class="ghost-button" id="calorie-save-connection-button" type="button">Uložit propojení</button>
+                <button class="primary-button" id="calorie-test-connection-button" type="button">Otestovat propojení</button>
+              </div>
+              <p class="message" id="calorie-connection-message" role="status" aria-live="polite"></p>
+            </div>
+          </details>
+
+          <details class="calorie-import-panel">
+            <summary>Ruční odečet z Kalorických tabulek</summary>
+            <div class="calorie-import-layout">
+              <label class="field">
+                <span>Zkopírované položky</span>
+                <textarea id="calorie-import-text" rows="5" placeholder="Např. Čokoládové mléko tatra s přidanými vitamíny 250 g&#10;Rohlík 2 ks"></textarea>
+              </label>
+              <div class="calorie-import-actions">
+                <button class="ghost-button" id="calorie-parse-button" type="button">Načíst položky</button>
+                <button class="primary-button" id="calorie-apply-button" type="button">Odečíst z lednice</button>
+              </div>
+              <p class="message" id="calorie-import-message" role="status" aria-live="polite"></p>
+              <div class="calorie-import-rows" id="calorie-import-rows"></div>
+            </div>
+          </details>
 
           <section class="admin-panel" id="admin-panel" aria-label="Správa povolených účtů" hidden>
             <form class="admin-form" id="admin-form" autocomplete="off">
@@ -550,6 +598,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux24"></script>
+    <script src="app.js?v=ux26"></script>
   </body>
 </html>
