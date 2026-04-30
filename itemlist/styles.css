@@ -390,6 +390,8 @@ textarea {
 }
 
 .calorie-import-panel {
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--field);
@@ -416,6 +418,8 @@ textarea {
 .calorie-import-layout {
   display: grid;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .calorie-diary-toolbar {
@@ -423,6 +427,8 @@ textarea {
   grid-template-columns: minmax(180px, 1fr) auto;
   align-items: end;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .calorie-import-actions {
@@ -435,6 +441,9 @@ textarea {
 .calorie-import-rows {
   display: grid;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+  container-type: inline-size;
 }
 
 .calorie-meal-heading {
@@ -448,9 +457,17 @@ textarea {
 
 .calorie-import-row {
   display: grid;
-  grid-template-columns: minmax(112px, max-content) minmax(240px, 1.45fr) minmax(96px, 0.45fr) minmax(82px, 0.32fr) minmax(260px, 1fr);
+  grid-template-columns: minmax(108px, max-content) minmax(0, 1.45fr) minmax(84px, 0.34fr) minmax(74px, 0.28fr) minmax(0, 1.1fr);
+  grid-template-areas:
+    "skip name amount unit target"
+    "meta meta meta meta meta";
   align-items: center;
   gap: 10px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
   border: 1px solid var(--soft-line);
   border-radius: 8px;
   background: var(--panel-strong);
@@ -461,6 +478,9 @@ textarea {
 .calorie-import-row select {
   width: 100%;
   min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
   height: 46px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -488,13 +508,32 @@ textarea {
 }
 
 .calorie-import-row small {
-  grid-column: 2 / -1;
+  grid-area: meta;
+  min-width: 0;
   color: var(--muted);
   font-size: 0.88rem;
   line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.calorie-import-row [data-calorie-field="name"] {
+  grid-area: name;
+}
+
+.calorie-import-row [data-calorie-field="amount"] {
+  grid-area: amount;
+}
+
+.calorie-import-row [data-calorie-field="unit"] {
+  grid-area: unit;
+}
+
+.calorie-import-row [data-calorie-field="targetName"] {
+  grid-area: target;
 }
 
 .calorie-skip-check {
+  grid-area: skip;
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
@@ -521,6 +560,41 @@ textarea {
 .calorie-import-row.is-skipped select,
 .calorie-import-row.is-skipped small {
   text-decoration: line-through;
+}
+
+@container (max-width: 860px) {
+  .calorie-import-row {
+    grid-template-columns: minmax(108px, max-content) minmax(0, 1fr) minmax(82px, 0.34fr) minmax(74px, 0.26fr);
+    grid-template-areas:
+      "skip name amount unit"
+      ". target target target"
+      ". meta meta meta";
+  }
+}
+
+@container (max-width: 620px) {
+  .calorie-import-row {
+    grid-template-columns: minmax(0, 1fr) minmax(82px, 0.34fr) minmax(74px, 0.28fr);
+    grid-template-areas:
+      "skip skip skip"
+      "name name name"
+      "amount unit unit"
+      "target target target"
+      "meta meta meta";
+  }
+}
+
+@container (max-width: 420px) {
+  .calorie-import-row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "skip"
+      "name"
+      "amount"
+      "unit"
+      "target"
+      "meta";
+  }
 }
 
 .list-management summary {
@@ -1846,6 +1920,9 @@ body.dark-mode .modal {
 .tool-card {
   display: grid;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   margin-top: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2913,6 +2990,10 @@ body.dark-mode .list-name-input {
   margin-inline: auto;
 }
 
+#view-tools #calorie-diary-tool {
+  width: min(1120px, 100%);
+}
+
 #view-tools > .message {
   text-align: center;
 }
@@ -3037,6 +3118,17 @@ body.dark-mode .list-name-input {
 
   .settings-news-list li {
     grid-template-columns: 1fr;
+  }
+
+  .calorie-import-row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "skip"
+      "name"
+      "amount"
+      "unit"
+      "target"
+      "meta";
   }
 
   .calorie-import-row small {
