@@ -134,10 +134,10 @@
 
             <label class="field combo-field action-field">
               <span>Akce</span>
-              <input id="action-combo-input" type="text" data-combobox-source="action-options" data-select-combobox="action-select" value="Nákup" readonly>
+              <input id="action-combo-input" type="text" data-combobox-source="action-options" data-select-combobox="action-select" value="Snězeno" readonly>
               <select class="native-select-source" id="action-select" name="action" tabindex="-1" aria-hidden="true">
-                <option value="purchase">Nákup</option>
                 <option value="eaten">Snězeno</option>
+                <option value="purchase">Nákup</option>
                 <option value="adjustPlus">Korekce +</option>
                 <option value="adjustMinus">Korekce -</option>
                 <option value="gift">Dar</option>
@@ -145,8 +145,8 @@
                 <option value="set">Nastavit</option>
               </select>
               <datalist id="action-options">
-                <option value="Nákup" data-value="purchase" label="Přidat do zásob"></option>
                 <option value="Snězeno" data-value="eaten" label="Odečíst ze zásob"></option>
+                <option value="Nákup" data-value="purchase" label="Přidat do zásob"></option>
                 <option value="Korekce +" data-value="adjustPlus" label="Ruční navýšení"></option>
                 <option value="Korekce -" data-value="adjustMinus" label="Ruční snížení"></option>
                 <option value="Dar" data-value="gift" label="Přidat do zásob"></option>
@@ -550,6 +550,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux19"></script>
+    <script src="app.js?v=ux20"></script>
   </body>
 </html>

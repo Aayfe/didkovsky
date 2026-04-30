@@ -142,8 +142,8 @@ const DEFAULT_CATEGORIES = [
   "Ostatní"
 ];
 const ACTION_COMBOBOX_OPTIONS = [
-  { value: "Nákup", optionValue: "purchase", meta: "Přidat do zásob" },
   { value: "Snězeno", optionValue: "eaten", meta: "Odečíst ze zásob" },
+  { value: "Nákup", optionValue: "purchase", meta: "Přidat do zásob" },
   { value: "Korekce +", optionValue: "adjustPlus", meta: "Ruční navýšení" },
   { value: "Korekce -", optionValue: "adjustMinus", meta: "Ruční snížení" },
   { value: "Dar", optionValue: "gift", meta: "Přidat do zásob" },
@@ -162,12 +162,23 @@ const CATEGORY_ICONS = {
   "Ostatní": "📦"
 };
 const RECEIPT_SKIP_PATTERNS = [
-  /^(celkem|suma|součet|subtotal|total|hotově|hotovost|kartou|visa|mastercard|cash|vráceno|zaplaceno|účtenka|ucet|datum|čas|dic|dič|ičo|ico|provozovna|pokladna|doklad|terminál|terminal|děkujeme|dekujeme|www|tel\.?|eet|fik|bkp)\b/iu,
-  /\b(dph|vat|sazba|základ|zaklad|sleva|platební|platebni|transakce|autorizační|autorizacni)\b/iu,
+  /^(celkem|suma|součet|subtotal|total|hotově|hotovost|kartou|visa|mastercard|cash|vráceno|zaplaceno|účtenka|ucet|datum|čas|dic|dič|ičo|ico|provozovna|pokladna|doklad|terminál|terminal|děkujeme|dekujeme|www|tel\.?|eet|fik|bkp|prodejna|adresa|otevírací|oteviraci)\b/iu,
+  /\b(dph|vat|sazba|základ|zaklad|sleva|platební|platebni|transakce|autorizační|autorizacni|faktura|fakturujeme|variabilní|variabilni|objednávka|objednavka)\b/iu,
   /^[\d\s.,:/\\-]+$/u
+];
+const RECEIPT_HEADER_PATTERNS = [
+  /\b(kaufland|lidl|tesco|albert|billa|penny|globus|makro|coop|norma|dm drogerie|rossmann)\b/iu,
+  /\b(s\.?\s*r\.?\s*o\.?|a\.?\s*s\.?|spol\.|česká republika|ceska republika|czech republic)\b/iu,
+  /\b(ul\.|ulice|nám\.|nam\.|náměstí|namesti|třída|trida|č\.?\s*p\.?|čp|cp|psč|psc)\b/iu,
+  /\b(praha|brno|ostrava|plzeň|plzen|liberec|olomouc|hradec králové|hradec kralove|pardubice|zlín|zlin|jihlava|české budějovice|ceske budejovice)\b/iu,
+  /\b\d{3}\s?\d{2}\b/u,
+  /\b(?:\+420|00420)?\s?\d{3}\s?\d{3}\s?\d{3}\b/u,
+  /\b(www\.|\.cz|\.com|@)\b/iu
 ];
 const RECEIPT_UNIT_PATTERN = "(?:kg|g|l|ml|ks|kus|kusu|kusy|bal|baleni|balení)";
 const RECEIPT_MAX_OCR_ATTEMPTS = 7;
+const RECEIPT_AI_TIMEOUT_MS = 45000;
+const RECEIPT_AI_IMAGE_MAX_SIDE = 1800;
 const RECEIPT_OCR_ATTEMPTS = [
   { key: "original", label: "originál", language: "ces+eng", pageSegMode: "6" },
   { key: "gray", label: "šedá verze", language: "ces+eng", pageSegMode: "6" },
@@ -4251,36 +4262,274 @@ async function importReceiptFromImage(event) {
     return;
   }
 
-  if (!window.Tesseract) {
+  const aiAvailable = hasReceiptAiIntegration();
+
+  if (!aiAvailable && !window.Tesseract) {
     receiptMessage.textContent = "OCR knihovna se nenačetla. Účtenku můžeš zatím přepsat přes hromadný import.";
     return;
   }
 
-  receiptMessage.textContent = "Rozpoznávám účtenku: zkouším víc úprav fotky a skládám položky...";
+  receiptMessage.textContent = aiAvailable
+    ? "Posílám účtenku na AI rozpoznání..."
+    : "Rozpoznávám účtenku: zkouším víc úprav fotky a skládám položky...";
 
   try {
-    const result = await recognizeReceiptText(file, (progress) => {
-      receiptMessage.textContent = progress;
-    });
-    const parsed = parseReceiptOcrAttempts(result.attempts);
+    let parsed = null;
+    let sourceInfo = "";
+
+    if (aiAvailable) {
+      try {
+        parsed = await recognizeReceiptWithExternalAi(file, (progress) => {
+          receiptMessage.textContent = progress;
+        });
+        sourceInfo = `AI endpoint: ${parsed.provider || "externí AI"}.`;
+      } catch (error) {
+        if (!window.Tesseract) {
+          receiptMessage.textContent = "AI rozpoznání není dostupné a lokální OCR se nenačetlo. Zkontroluj konfiguraci AI endpointu.";
+          return;
+        }
+
+        receiptMessage.textContent = "AI endpoint teď není dostupný, zkouším lokální OCR...";
+      }
+    }
+
+    if (!parsed || !parsed.items.length) {
+      if (!window.Tesseract) {
+        receiptMessage.textContent = "AI nic použitelného nevrátila a lokální OCR se nenačetlo.";
+        return;
+      }
+
+      const result = await recognizeReceiptText(file, (progress) => {
+        receiptMessage.textContent = progress;
+      });
+      parsed = parseReceiptOcrAttempts(result.attempts);
+      sourceInfo = `Lokální OCR pokusů: ${result.attempts.length}.`;
+    }
+
     const text = formatReceiptItemsForImport(parsed.items);
 
     if (!text) {
-      receiptMessage.textContent = `Z účtenky jsem nevyčetl žádné použitelné položky ani po ${result.attempts.length} pokusech.`;
+      receiptMessage.textContent = "Z účtenky jsem nevyčetl žádné použitelné položky.";
       return;
     }
 
     openImportModal("Import z účtenky", "Rozpoznané položky uprav a potvrď.");
     importText.value = text;
     importError.textContent = parsed.skipped.length
-      ? `Zkontroluj množství, jednotky a cenu. OCR pokusů: ${result.attempts.length}, řádků k ruční kontrole: ${parsed.skipped.length}.`
-      : `Zkontroluj množství, jednotky a cenu. OCR prošlo ${result.attempts.length} variant fotky.`;
+      ? `Zkontroluj množství, jednotky a cenu. ${sourceInfo} Řádků k ruční kontrole: ${parsed.skipped.length}.`
+      : `Zkontroluj množství, jednotky a cenu. ${sourceInfo}`;
     receiptMessage.textContent = `Hotovo. Našel jsem ${parsed.items.length} položek k importu. Cena za řádkem se uloží do statistik.`;
   } catch (error) {
     receiptMessage.textContent = "OCR se nepovedlo. Zkus ostřejší fotku nebo ruční hromadný import.";
   } finally {
     receiptFileInput.value = "";
   }
+}
+
+function hasReceiptAiIntegration() {
+  const config = window.SUPABASE_CONFIG || {};
+
+  if (config.receiptAiEnabled === false) {
+    return false;
+  }
+
+  return Boolean(config.receiptAiFunction || config.receiptAiEndpoint);
+}
+
+async function recognizeReceiptWithExternalAi(file, onProgress = () => {}) {
+  const config = window.SUPABASE_CONFIG || {};
+  const payload = {
+    image: await createReceiptAiImageDataUrl(file),
+    fileName: file.name || "receipt.jpg",
+    mimeType: file.type || "image/jpeg",
+    language: "cs",
+    categories: DEFAULT_CATEGORIES,
+    catalog: getReceiptAiCatalogContext()
+  };
+
+  onProgress("AI čte fotku účtenky a vrací jen reálné položky...");
+
+  const data = config.receiptAiFunction && supabaseClient?.functions?.invoke
+    ? await invokeReceiptAiFunction(config.receiptAiFunction, payload)
+    : await invokeReceiptAiEndpoint(config.receiptAiEndpoint, payload);
+
+  const parsed = normalizeReceiptAiResult(data);
+
+  if (!parsed.items.length) {
+    throw new Error("Receipt AI returned no usable items.");
+  }
+
+  return parsed;
+}
+
+async function invokeReceiptAiFunction(functionName, payload) {
+  const result = await withTimeout(
+    supabaseClient.functions.invoke(functionName, { body: payload }),
+    RECEIPT_AI_TIMEOUT_MS,
+    "AI rozpoznání trvá moc dlouho."
+  );
+
+  if (result.error) {
+    throw new Error(result.error.message || "AI endpoint selhal.");
+  }
+
+  return result.data;
+}
+
+async function invokeReceiptAiEndpoint(endpoint, payload) {
+  if (!endpoint) {
+    throw new Error("AI endpoint není nastavený.");
+  }
+
+  const headers = { "Content-Type": "application/json" };
+
+  if (supabaseClient?.auth) {
+    const { data } = await supabaseClient.auth.getSession();
+
+    if (data?.session?.access_token) {
+      headers.Authorization = `Bearer ${data.session.access_token}`;
+    }
+  }
+
+  const response = await withTimeout(fetch(endpoint, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload)
+  }), RECEIPT_AI_TIMEOUT_MS, "AI rozpoznání trvá moc dlouho.");
+
+  if (!response.ok) {
+    throw new Error(`AI endpoint vrátil ${response.status}.`);
+  }
+
+  return response.json();
+}
+
+async function createReceiptAiImageDataUrl(file) {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, RECEIPT_AI_IMAGE_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      bitmap.close?.();
+      return fileToDataUrl(file);
+    }
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close?.();
+
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob((result) => resolve(result), "image/jpeg", 0.88);
+    });
+
+    return fileToDataUrl(blob || file);
+  } catch (error) {
+    return fileToDataUrl(file);
+  }
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")));
+    reader.addEventListener("error", reject);
+    reader.readAsDataURL(file);
+  });
+}
+
+function getReceiptAiCatalogContext() {
+  return getCatalogItems()
+    .slice(0, 160)
+    .map((item) => ({
+      name: item.name,
+      category: item.category || "Ostatní",
+      unit: item.unit || "ks",
+      aliases: normalizeEanAliases(item.eanAliases)
+        .map((alias) => alias.name)
+        .filter(Boolean)
+        .slice(0, 8)
+    }));
+}
+
+function normalizeReceiptAiResult(data) {
+  const rawItems = Array.isArray(data?.items)
+    ? data.items
+    : Array.isArray(data?.receipt?.items)
+      ? data.receipt.items
+      : [];
+  const items = [];
+
+  rawItems
+    .map(normalizeReceiptAiItem)
+    .filter(Boolean)
+    .forEach((item) => mergeReceiptItem(items, item));
+
+  return {
+    items: items.slice(0, 80),
+    skipped: Array.isArray(data?.skipped) ? data.skipped.map(tidyName).filter(Boolean) : [],
+    provider: data?.provider || data?.model || "externí AI"
+  };
+}
+
+function normalizeReceiptAiItem(item) {
+  const rawName = item?.name || item?.product || item?.title || "";
+  const sourceLine = item?.sourceLine || item?.raw || rawName;
+  const name = cleanReceiptProductName(rawName);
+  const rawAmount = item?.amount ?? item?.quantity ?? item?.count ?? 1;
+  const rawUnit = item?.unit || item?.measure || "ks";
+  const normalized = normalizeImportAmountAndUnit(parseImportAmount(rawAmount) || 1, rawUnit);
+  const price = parseOptionalPrice(item?.price ?? item?.totalPrice ?? item?.total ?? item?.amountPaid);
+  const catalogItem = findCatalogItemByName(name);
+  const finalName = catalogItem?.name || name;
+
+  if (!finalName || normalize(finalName).length < 3) {
+    return null;
+  }
+
+  if (isLikelyReceiptNonProductName(finalName, sourceLine)) {
+    return null;
+  }
+
+  if (!Number.isFinite(price) && normalized.unit === "ks" && normalized.amount === 1 && !catalogItem) {
+    return null;
+  }
+
+  return {
+    name: finalName,
+    amount: normalized.amount,
+    unit: normalized.unit,
+    category: catalogItem?.category || normalizeReceiptAiCategory(item?.category, finalName),
+    price,
+    score: 120,
+    sourceName: "externí AI",
+    sourceLine,
+    strategy: "external-ai"
+  };
+}
+
+function normalizeReceiptAiCategory(category, productName) {
+  const cleanCategory = tidyName(category);
+  const matchedCategory = DEFAULT_CATEGORIES.find((item) => normalize(item) === normalize(cleanCategory));
+
+  return matchedCategory || inferCategoryFromName(productName);
+}
+
+function withTimeout(promise, timeoutMs, message) {
+  let timeoutId = null;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    window.clearTimeout(timeoutId);
+  });
 }
 
 async function recognizeReceiptText(file, onProgress = () => {}) {
@@ -4510,7 +4759,7 @@ function parseReceiptOcrAttempts(attempts) {
 
   return {
     items: items
-      .filter((item) => (item.score || 0) >= 30)
+      .filter((item) => (item.score || 0) >= 48)
       .sort((first, second) => (first.firstSeen || 0) - (second.firstSeen || 0))
       .slice(0, 80),
     skipped: [...skipped.values()].slice(0, 120)
@@ -4717,12 +4966,21 @@ function normalizeReceiptCandidate(candidate, line, sourceName) {
   const normalized = normalizeImportAmountAndUnit(parseImportAmount(candidate.amount) || 1, candidate.unit || "ks");
   const name = cleanReceiptProductName(candidate.name);
   const price = Number.isFinite(Number(candidate.price)) ? roundAmount(Number(candidate.price)) : null;
+  const hasPrice = Number.isFinite(price) && price > 0;
+  const catalogItem = findCatalogItemByName(name);
 
-  if (!name || normalize(name).length < 3 || isReceiptNoiseLine(name)) {
+  if (!name || normalize(name).length < 3) {
     return null;
   }
 
-  const catalogItem = findCatalogItemByName(name);
+  if (!hasPrice && !hasReceiptItemSignal(line) && !catalogItem) {
+    return null;
+  }
+
+  if (isLikelyReceiptNonProductName(name, line)) {
+    return null;
+  }
+
   const finalName = catalogItem?.name || name;
   const score = scoreReceiptCandidate({
     name: finalName,
@@ -4942,7 +5200,73 @@ function isReceiptNoiseLine(line) {
     return true;
   }
 
-  return RECEIPT_SKIP_PATTERNS.some((pattern) => pattern.test(normalizedLine));
+  if (RECEIPT_SKIP_PATTERNS.some((pattern) => pattern.test(normalizedLine))) {
+    return true;
+  }
+
+  return isReceiptHeaderOrAddressLine(normalizedLine) && !hasReceiptItemSignal(normalizedLine);
+}
+
+function isLikelyReceiptNonProductName(name, line = "") {
+  const normalizedName = tidyName(name);
+  const normalizedLine = tidyName(line);
+  const category = inferCategoryFromName(normalizedName);
+
+  if (RECEIPT_SKIP_PATTERNS.some((pattern) => pattern.test(normalizedName))) {
+    return true;
+  }
+
+  if (isReceiptHeaderOrAddressLine(normalizedName) && category === "Ostatní") {
+    return true;
+  }
+
+  if (isReceiptHeaderOrAddressLine(normalizedLine) && !hasReceiptItemSignal(normalizedLine)) {
+    return true;
+  }
+
+  return isLikelyReceiptGibberishName(normalizedName);
+}
+
+function isReceiptHeaderOrAddressLine(line) {
+  const normalizedLine = tidyName(line);
+  return RECEIPT_HEADER_PATTERNS.some((pattern) => pattern.test(normalizedLine));
+}
+
+function hasReceiptItemSignal(line) {
+  const text = tidyName(line);
+  const unitPattern = new RegExp(`\\b\\d+(?:[,.]\\d+)?\\s*${RECEIPT_UNIT_PATTERN}\\b`, "iu");
+
+  return Boolean(
+    extractReceiptTrailingPrice(text)
+    || unitPattern.test(text)
+    || /\b\d+(?:[,.]\d+)?\s*[x×]\s*\d+(?:[,.]\d+)?/iu.test(text)
+  );
+}
+
+function isLikelyReceiptGibberishName(name) {
+  const normalizedName = normalize(name);
+
+  if (!normalizedName) {
+    return true;
+  }
+
+  const letters = (normalizedName.match(/\p{L}/gu) || []).length;
+  const digits = (normalizedName.match(/\d/g) || []).length;
+  const words = normalizedName.split(/\s+/).filter(Boolean);
+
+  if (letters < 3) {
+    return true;
+  }
+
+  if (digits > letters && digits > 3) {
+    return true;
+  }
+
+  if (words.length > 8 && inferCategoryFromName(name) === "Ostatní") {
+    return true;
+  }
+
+  return false;
 }
 
 function normalizeReceiptLine(line) {
@@ -5562,7 +5886,7 @@ function mapToChartRows(map, limit) {
 }
 
 function mapActionRows(map) {
-  const order = ["Nákup", "Snězeno", "Korekce +", "Korekce -", "Dar", "Vyhozeno", "Nastavit", "Nákupní list", "Číselník", "Kombinace", "Seznam", "Ostatní"];
+  const order = ["Snězeno", "Nákup", "Korekce +", "Korekce -", "Dar", "Vyhozeno", "Nastavit", "Nákupní list", "Číselník", "Kombinace", "Seznam", "Ostatní"];
   const used = new Set(order);
   const orderedRows = order
     .map((label) => [label, map.get(label) || 0])
@@ -5962,7 +6286,7 @@ function resetForm() {
   form.reset();
   setDefaultEventDate();
   unlockEntryProductMeta();
-  setActionState("purchase");
+  setActionState("eaten");
   setActionButtonsDisabled(false);
   updateSubmitButtonText();
   cancelEditButton.hidden = true;
