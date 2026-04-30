@@ -2713,10 +2713,18 @@ async function loadCalorieDiaryEntries() {
     renderCalorieImportRows();
     setCalorieImportMessage(calorieImportRowsState.length
       ? `Načteno ${calorieImportRowsState.length} položek. Jsou seřazené podle fází dne, zkontroluj párování a odečti vybrané.`
-      : "Kalorické tabulky pro vybraný den nevrátily žádné položky.", !calorieImportRowsState.length);
+      : `Kalorické tabulky odpověděly, ale nenašel jsem položky k odečtu. ${summarizeCalorieDiaryPayload(data)}`, !calorieImportRowsState.length);
   } catch (error) {
     setCalorieImportMessage(`Načtení Kalorických tabulek selhalo: ${getErrorMessage(error)}`, true);
   }
+}
+
+function summarizeCalorieDiaryPayload(data) {
+  const provider = data?.provider ? `Zdroj: ${data.provider}.` : "";
+  const root = data?.raw && typeof data.raw === "object" ? data.raw : data;
+  const keys = root && typeof root === "object" ? Object.keys(root).slice(0, 8).join(", ") : "";
+
+  return keys ? `${provider} Klíče odpovědi: ${keys}.` : provider;
 }
 
 async function fetchCalorieDiaryFromIntegration(date, options = {}) {
@@ -2783,6 +2791,10 @@ function normalizeCalorieDiaryResult(data, fallbackDate) {
 
   normalizeCalorieDiaryItems(data?.items || data?.entries || [], "", fallbackDate).forEach((item) => rows.push(item));
 
+  if (!rows.length) {
+    extractCalorieDiaryRowsDeep(data?.raw ?? data, fallbackDate).forEach((item) => rows.push(item));
+  }
+
   return rows
     .filter((row) => row.name && row.amount > 0)
     .sort((first, second) => getCalorieMealIndex(first.meal) - getCalorieMealIndex(second.meal)
@@ -2805,13 +2817,35 @@ function normalizeCalorieDiaryItem(item, mealName, fallbackDate) {
     return null;
   }
 
-  const rawLine = tidyName(item.rawLine || item.sourceLine || item.text || item.title || item.name || "");
+  const nestedFood = item.food || item.product || item.item || {};
+  const rawLine = tidyName(stripCalorieHtml(item.rawLine || item.sourceLine || item.text || item.html || item.title || item.name || nestedFood.title || nestedFood.name || ""));
   const parsedLine = parseCalorieImportLine(rawLine);
-  const rawAmount = item.amount ?? item.quantity ?? item.grams ?? item.weight ?? parsedLine?.amount;
-  const rawUnit = item.unit || item.measure || (Number.isFinite(Number(item.grams ?? item.weight)) ? "g" : parsedLine?.unit || "g");
+  const rawAmount = item.amount
+    ?? item.quantity
+    ?? item.qty
+    ?? item.grams
+    ?? item.weight
+    ?? item.weightValue
+    ?? item.weight_value
+    ?? item.mnozstvi
+    ?? nestedFood.amount
+    ?? nestedFood.quantity
+    ?? nestedFood.grams
+    ?? nestedFood.weight
+    ?? parsedLine?.amount;
+  const rawUnit = item.unit
+    || item.measure
+    || item.unitName
+    || item.unit_name
+    || item.weightUnit
+    || item.weight_unit
+    || item.jednotka
+    || nestedFood.unit
+    || nestedFood.measure
+    || (Number.isFinite(Number(item.grams ?? item.weight ?? nestedFood.grams ?? nestedFood.weight)) ? "g" : parsedLine?.unit || "g");
   const normalized = normalizeImportAmountAndUnit(parseImportAmount(rawAmount) || parsedLine?.amount || 1, rawUnit);
-  const name = cleanCalorieImportName(item.name || item.title || item.foodName || parsedLine?.name || rawLine.replace(parsedLine?.raw || "", ""));
-  const meal = normalizeCalorieMealName(item.meal || item.phase || item.section || mealName);
+  const name = cleanCalorieImportName(stripCalorieHtml(item.name || item.title || item.foodName || item.food_name || item.nazev || item.label || nestedFood.name || nestedFood.title || parsedLine?.name || rawLine.replace(parsedLine?.raw || "", "")));
+  const meal = normalizeCalorieMealName(item.meal || item.phase || item.section || item.group || item.mealName || item.meal_name || mealName);
   const occurredAt = normalizeCalorieDiaryOccurredAt(item.occurredAt || item.time, meal, item.date || fallbackDate);
 
   if (!name || normalize(name).length < 3) {
@@ -2826,6 +2860,90 @@ function normalizeCalorieDiaryItem(item, mealName, fallbackDate) {
     occurredAt,
     rawLine
   };
+}
+
+function extractCalorieDiaryRowsDeep(value, fallbackDate, mealName = "") {
+  const rows = [];
+  const visited = new Set();
+
+  function visit(current, currentMeal) {
+    if (!current || visited.has(current)) {
+      return;
+    }
+
+    if (typeof current === "string") {
+      parseCalorieTextDiaryLines(current).forEach((line) => {
+        const parsed = parseCalorieImportLine(line);
+
+        if (parsed) {
+          rows.push({
+            ...parsed,
+            meal: normalizeCalorieMealName(currentMeal),
+            occurredAt: normalizeCalorieDiaryOccurredAt("", currentMeal, fallbackDate)
+          });
+        }
+      });
+      return;
+    }
+
+    if (typeof current !== "object") {
+      return;
+    }
+
+    visited.add(current);
+
+    if (Array.isArray(current)) {
+      const normalized = normalizeCalorieDiaryItems(current, currentMeal, fallbackDate);
+
+      if (normalized.length) {
+        rows.push(...normalized);
+        return;
+      }
+
+      current.forEach((item) => visit(item, currentMeal));
+      return;
+    }
+
+    const nextMeal = current.meal || current.phase || current.section || current.group || current.mealName || current.meal_name || current.title || current.name || currentMeal;
+    const direct = normalizeCalorieDiaryItem(current, currentMeal, fallbackDate);
+
+    if (direct && (current.amount || current.quantity || current.grams || current.weight || current.rawLine || current.text)) {
+      rows.push(direct);
+    }
+
+    Object.entries(current).forEach(([key, nestedValue]) => {
+      if (["parent", "owner"].includes(key)) {
+        return;
+      }
+
+      visit(nestedValue, nextMeal);
+    });
+  }
+
+  visit(value, mealName);
+  return rows;
+}
+
+function parseCalorieTextDiaryLines(value) {
+  return stripCalorieHtml(value)
+    .split(/\r?\n| {2,}|;/)
+    .map(tidyName)
+    .filter((line) => /(\d+(?:[,.]\d+)?)\s*(kg|g|gramů|gramu|gramy|gram|ml|l|ks|kusů|kusu|kus|kusy|porce|porcí)\b/iu.test(line));
+}
+
+function stripCalorieHtml(value) {
+  return String(value || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(?:div|p|li|tr|td|th|span|section|article|h1|h2|h3|h4)>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#039;|&apos;/gi, "'")
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n\s+/g, "\n")
+    .replace(/[ \t]+/g, " ")
+    .trim();
 }
 
 function normalizeCalorieMealName(value) {
