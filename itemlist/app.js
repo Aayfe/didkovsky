@@ -4285,7 +4285,7 @@ async function importReceiptFromImage(event) {
         sourceInfo = `AI endpoint: ${parsed.provider || "externí AI"}.`;
       } catch (error) {
         if (!shouldFallbackToLocalReceiptOcr()) {
-          receiptMessage.textContent = "AI rozpoznání selhalo. Zkontroluj Supabase funkci receipt-ai a API klíč; lokální OCR teď kvůli přesnosti nemíchám do výsledku.";
+          receiptMessage.textContent = `AI rozpoznání selhalo: ${getErrorMessage(error)}. Lokální OCR teď kvůli přesnosti nemíchám do výsledku.`;
           return;
         }
 
@@ -4380,10 +4380,36 @@ async function invokeReceiptAiFunction(functionName, payload) {
   );
 
   if (result.error) {
-    throw new Error(result.error.message || "AI endpoint selhal.");
+    throw new Error(await getSupabaseFunctionErrorMessage(result.error));
   }
 
   return result.data;
+}
+
+async function getSupabaseFunctionErrorMessage(error) {
+  try {
+    const context = error.context;
+
+    if (context?.json) {
+      const body = await context.json();
+      return body.detail || body.error || error.message || "AI endpoint selhal.";
+    }
+
+    if (context?.text) {
+      const text = await context.text();
+      return text || error.message || "AI endpoint selhal.";
+    }
+  } catch (parseError) {
+    return error.message || "AI endpoint selhal.";
+  }
+
+  return error.message || "AI endpoint selhal.";
+}
+
+function getErrorMessage(error) {
+  return error instanceof Error && error.message
+    ? error.message
+    : String(error || "neznámá chyba");
 }
 
 async function invokeReceiptAiEndpoint(endpoint, payload) {
