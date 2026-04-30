@@ -2713,7 +2713,7 @@ async function loadCalorieDiaryEntries() {
     renderCalorieImportRows();
     setCalorieImportMessage(calorieImportRowsState.length
       ? `Načteno ${calorieImportRowsState.length} položek. Jsou seřazené podle fází dne, zkontroluj párování a odečti vybrané.`
-      : `Kalorické tabulky odpověděly, ale nenašel jsem položky k odečtu. ${summarizeCalorieDiaryPayload(data)}`, !calorieImportRowsState.length);
+      : `Kalorické tabulky odpověděly, ale parser ux29 nenašel položky k odečtu. ${summarizeCalorieDiaryPayload(data)}`, !calorieImportRowsState.length);
   } catch (error) {
     setCalorieImportMessage(`Načtení Kalorických tabulek selhalo: ${getErrorMessage(error)}`, true);
   }
@@ -2723,8 +2723,22 @@ function summarizeCalorieDiaryPayload(data) {
   const provider = data?.provider ? `Zdroj: ${data.provider}.` : "";
   const root = data?.raw && typeof data.raw === "object" ? data.raw : data;
   const keys = root && typeof root === "object" ? Object.keys(root).slice(0, 8).join(", ") : "";
+  const nestedData = root?.data && typeof root.data === "object" ? root.data : null;
+  const dataKeys = nestedData ? Object.keys(nestedData).slice(0, 12).join(", ") : "";
+  const foodstuffCount = Number(root?.data?.foodstuffCount ?? root?.foodstuffCount);
+  const sourceUrl = root?.__sourceUrl ? `Endpoint: ${root.__sourceUrl}.` : "";
+  const returnedDate = Number.isFinite(Number(root?.data?.date))
+    ? `Vrácené datum: ${new Date(Number(root.data.date)).toLocaleDateString("cs-CZ")}.`
+    : "";
 
-  return keys ? `${provider} Klíče odpovědi: ${keys}.` : provider;
+  return [
+    provider,
+    sourceUrl,
+    returnedDate,
+    Number.isFinite(foodstuffCount) ? `foodstuffCount: ${foodstuffCount}.` : "",
+    keys ? `Klíče odpovědi: ${keys}.` : "",
+    dataKeys ? `Klíče v data: ${dataKeys}.` : ""
+  ].filter(Boolean).join(" ");
 }
 
 async function fetchCalorieDiaryFromIntegration(date, options = {}) {
@@ -2785,14 +2799,21 @@ function normalizeCalorieDiaryResult(data, fallbackDate) {
   if (Array.isArray(data?.meals)) {
     data.meals.forEach((meal) => {
       const mealName = normalizeCalorieMealName(meal?.name || meal?.meal || meal?.phase);
-      normalizeCalorieDiaryItems(meal?.items || meal?.entries || [], mealName, fallbackDate).forEach((item) => rows.push(item));
+      normalizeCalorieDiaryItems(meal?.foodstuff || meal?.items || meal?.entries || [], mealName, fallbackDate).forEach((item) => rows.push(item));
     });
   }
 
   normalizeCalorieDiaryItems(data?.items || data?.entries || [], "", fallbackDate).forEach((item) => rows.push(item));
+  if (Array.isArray(data?.raw?.data?.times)) {
+    data.raw.data.times.forEach((meal) => {
+      const mealName = normalizeCalorieMealName(meal?.title || meal?.name || meal?.meal || meal?.phase);
+      normalizeCalorieDiaryItems(meal?.foodstuff || meal?.items || meal?.entries || [], mealName, fallbackDate).forEach((item) => rows.push(item));
+    });
+  }
+  normalizeCalorieDiaryItems(data?.raw?.data?.foodstuff || data?.raw?.data?.items || data?.raw?.data?.entries || [], "", fallbackDate).forEach((item) => rows.push(item));
 
   if (!rows.length) {
-    extractCalorieDiaryRowsDeep(data?.raw ?? data, fallbackDate).forEach((item) => rows.push(item));
+    extractCalorieDiaryRowsDeep(data?.raw?.data ?? data?.raw ?? data, fallbackDate).forEach((item) => rows.push(item));
   }
 
   return rows
@@ -2843,7 +2864,11 @@ function normalizeCalorieDiaryItem(item, mealName, fallbackDate) {
     || nestedFood.unit
     || nestedFood.measure
     || (Number.isFinite(Number(item.grams ?? item.weight ?? nestedFood.grams ?? nestedFood.weight)) ? "g" : parsedLine?.unit || "g");
-  const normalized = normalizeImportAmountAndUnit(parseImportAmount(rawAmount) || parsedLine?.amount || 1, rawUnit);
+  const unitQuantity = parseCalorieDiaryUnitValue(rawUnit);
+  const normalized = normalizeImportAmountAndUnit(
+    parseImportAmount(rawAmount) || unitQuantity?.amount || parsedLine?.amount || 1,
+    unitQuantity?.unit || rawUnit
+  );
   const name = cleanCalorieImportName(stripCalorieHtml(item.name || item.title || item.foodName || item.food_name || item.nazev || item.label || nestedFood.name || nestedFood.title || parsedLine?.name || rawLine.replace(parsedLine?.raw || "", "")));
   const meal = normalizeCalorieMealName(item.meal || item.phase || item.section || item.group || item.mealName || item.meal_name || mealName);
   const occurredAt = normalizeCalorieDiaryOccurredAt(item.occurredAt || item.time, meal, item.date || fallbackDate);
@@ -2860,6 +2885,41 @@ function normalizeCalorieDiaryItem(item, mealName, fallbackDate) {
     occurredAt,
     rawLine
   };
+}
+
+function parseCalorieDiaryUnitValue(value) {
+  const text = tidyName(stripCalorieHtml(value));
+
+  if (!text) {
+    return null;
+  }
+
+  const multiplierMatch = text.match(/(\d+(?:[,.]\d+)?)\s*(?:x|×|\*)\s*(\d+(?:[,.]\d+)?)\s*(kg|g|gramů|gramu|gramy|gram|ml|l|ks|kusů|kusu|kus|kusy|porce|porcí)\b/iu);
+
+  if (multiplierMatch) {
+    return normalizeImportAmountAndUnit(
+      roundAmount((parseImportAmount(multiplierMatch[1]) || 1) * (parseImportAmount(multiplierMatch[2]) || 1)),
+      multiplierMatch[3]
+    );
+  }
+
+  const parenthesized = [...text.matchAll(/\(([^)]*)\)/g)]
+    .map((match) => match[1])
+    .reverse();
+
+  for (const part of parenthesized) {
+    const quantity = findCalorieQuantity(part);
+
+    if (quantity) {
+      return normalizeImportAmountAndUnit(quantity.amount, quantity.unit);
+    }
+  }
+
+  const quantity = findCalorieQuantity(text);
+
+  return quantity
+    ? normalizeImportAmountAndUnit(quantity.amount, quantity.unit)
+    : null;
 }
 
 function extractCalorieDiaryRowsDeep(value, fallbackDate, mealName = "") {
