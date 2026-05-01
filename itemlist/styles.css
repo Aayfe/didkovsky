@@ -1155,6 +1155,30 @@ body.dark-mode .modal {
   min-width: 0;
 }
 
+.field input[type="date"],
+.field input[type="datetime-local"] {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.field input[type="date"]::-webkit-date-and-time-value,
+.field input[type="datetime-local"]::-webkit-date-and-time-value {
+  min-width: 0;
+  text-align: left;
+}
+
+.field input[type="date"]::-webkit-calendar-picker-indicator,
+.field input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  flex: 0 0 auto;
+  margin-left: 6px;
+}
+
 .scan-shortcut-button {
   display: inline-flex;
   align-items: center;
@@ -3349,17 +3373,21 @@ body.dark-mode .list-name-input {
   align-items: end;
   gap: clamp(10px, 1.1vw, 18px);
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .changes-entry-form .field,
 .changes-entry-form .number-control {
   min-width: 0;
+  max-width: 100%;
 }
 
 .changes-entry-form #submit-button {
   justify-self: end;
   width: max-content;
-  min-width: max-content;
+  min-width: 0;
+  max-width: 100%;
   padding-inline: 18px;
   white-space: nowrap;
 }
@@ -3372,17 +3400,10 @@ body.dark-mode .list-name-input {
 
 @media (min-width: 1280px) {
   .changes-entry-form {
-    grid-template-columns:
-      minmax(180px, 1.7fr)
-      minmax(140px, 1fr)
-      minmax(140px, 1fr)
-      minmax(155px, 1.08fr)
-      minmax(124px, 0.74fr)
-      minmax(140px, 0.95fr)
-      max-content;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     grid-template-areas:
-      "product category action amount unit price price"
-      ". . . event event event submit";
+      "product product product category category action action amount amount unit price price"
+      ". . . . event event event event event submit submit submit";
   }
 
   .changes-entry-form .product-field {
@@ -3424,11 +3445,11 @@ body.dark-mode .list-name-input {
 
 @media (min-width: 721px) and (max-width: 1279px) {
   .changes-entry-form {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     grid-template-areas:
-      "product product category action"
-      "amount unit price price"
-      ". event event submit";
+      "product product category category action action"
+      "amount amount unit price price price"
+      ". . event event submit submit";
   }
 
   .changes-entry-form .product-field {
@@ -3514,6 +3535,7 @@ body.dark-mode .list-name-input {
     justify-self: stretch;
     width: 100%;
     min-width: 0;
+    padding-inline: 12px;
   }
 
   .changes-entry-form #cancel-edit {
