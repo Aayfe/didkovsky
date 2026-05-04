@@ -37,6 +37,10 @@ const calorieDiaryLoadButton = document.querySelector("#calorie-diary-load-butto
 const calorieDiaryApplyButton = document.querySelector("#calorie-diary-apply-button");
 const calorieDiaryRows = document.querySelector("#calorie-diary-rows");
 const calorieDiaryMessage = document.querySelector("#calorie-diary-message");
+const fridgeExportTool = document.querySelector("#fridge-export-tool");
+const fridgeExportText = document.querySelector("#fridge-export-text");
+const fridgeExportCopyButton = document.querySelector("#fridge-export-copy-button");
+const fridgeExportMessage = document.querySelector("#fridge-export-message");
 const toggleAdminPanelButton = document.querySelector("#toggle-admin-panel");
 const adminPanel = document.querySelector("#admin-panel");
 const adminForm = document.querySelector("#admin-form");
@@ -329,6 +333,7 @@ function setupEvents() {
   importButton.addEventListener("click", () => openImportModal());
   exportButton.addEventListener("click", exportData);
   exportFridgeButton.addEventListener("click", exportFridge);
+  fridgeExportCopyButton?.addEventListener("click", copyFridgeExportToClipboard);
   exportCatalogButton.addEventListener("click", exportCatalog);
   anonymousExportButton.addEventListener("click", exportAnonymousData);
   receiptImportButton.addEventListener("click", openReceiptImport);
@@ -1206,10 +1211,112 @@ function exportData() {
 }
 
 function exportFridge() {
-  downloadJson("lednice", getActiveItems());
+  const text = buildFridgeTextExport();
+
+  switchView("tools");
+  receiptTool.hidden = true;
+  eanTool.hidden = true;
+  if (calorieDiaryTool) {
+    calorieDiaryTool.hidden = true;
+  }
+  if (fridgeExportTool) {
+    fridgeExportTool.hidden = false;
+  }
+  if (fridgeExportText) {
+    fridgeExportText.value = text;
+    fridgeExportText.focus();
+    fridgeExportText.select();
+  }
+  if (fridgeExportMessage) {
+    fridgeExportMessage.textContent = "Export lednice je připravený.";
+    fridgeExportMessage.classList.remove("is-error");
+  }
+
   recordHistory("Export lednice.", "export");
   renderHistory();
   queueSaveState();
+}
+
+function buildFridgeTextExport() {
+  const list = getActiveList();
+  const items = [...getActiveItems()].sort((first, second) => {
+    const categoryCompare = normalize(first.category).localeCompare(normalize(second.category), "cs");
+
+    if (categoryCompare !== 0) {
+      return categoryCompare;
+    }
+
+    return normalize(first.name).localeCompare(normalize(second.name), "cs");
+  });
+  const lines = [
+    `Lednice: ${getDisplayListName(list)}`,
+    `Export: ${new Date().toLocaleString("cs-CZ", { dateStyle: "short", timeStyle: "short" })}`,
+    ""
+  ];
+
+  if (!items.length) {
+    lines.push("Lednice je prázdná.");
+    return lines.join("\n");
+  }
+
+  items.forEach((item, index) => {
+    const category = tidyName(item.category || "Ostatní");
+    const unit = item.unit || "ks";
+    lines.push(`${index + 1}. ${item.name} - ${formatAmount(item.amount)} ${unit} (${category})`);
+  });
+
+  return lines.join("\n");
+}
+
+async function copyFridgeExportToClipboard() {
+  const text = fridgeExportText?.value || "";
+
+  if (!text.trim()) {
+    exportFridge();
+    return;
+  }
+
+  try {
+    if (!navigator.clipboard?.writeText) {
+      throw new Error("Clipboard API není dostupné.");
+    }
+
+    await navigator.clipboard.writeText(text);
+    setFridgeExportMessage("Export zkopírovaný do schránky.");
+  } catch (error) {
+    const copied = copyTextFromTextarea(fridgeExportText);
+    setFridgeExportMessage(
+      copied
+        ? "Export zkopírovaný do schránky."
+        : "Kopírování se nepovedlo. Označ text a zkopíruj ho ručně.",
+      !copied
+    );
+  }
+}
+
+function copyTextFromTextarea(textarea) {
+  if (!textarea) {
+    return false;
+  }
+
+  textarea.focus();
+  textarea.select();
+
+  try {
+    return document.execCommand("copy");
+  } catch (error) {
+    return false;
+  }
+}
+
+function setFridgeExportMessage(text, isError = false) {
+  if (!fridgeExportMessage) {
+    showMessage(text, isError);
+    return;
+  }
+
+  fridgeExportMessage.textContent = text;
+  fridgeExportMessage.classList.toggle("is-error", isError);
 }
 
 function exportXml() {
@@ -1300,6 +1407,9 @@ function openReceiptImport() {
   if (calorieDiaryTool) {
     calorieDiaryTool.hidden = true;
   }
+  if (fridgeExportTool) {
+    fridgeExportTool.hidden = true;
+  }
   receiptMessage.textContent = "Vyber fotku účtenky. Rozpoznání zkusí několik verzí fotky a výsledek ještě můžeš upravit před importem.";
   receiptFileInput.focus();
 }
@@ -1310,6 +1420,9 @@ function openEanImport() {
   receiptTool.hidden = true;
   if (calorieDiaryTool) {
     calorieDiaryTool.hidden = true;
+  }
+  if (fridgeExportTool) {
+    fridgeExportTool.hidden = true;
   }
   clearEanResult();
   eanMessage.textContent = "Naskenuj fotku čárového kódu nebo zadej EAN ručně.";
@@ -1326,6 +1439,9 @@ function openCalorieDiaryImport() {
   }
 
   calorieDiaryTool.hidden = false;
+  if (fridgeExportTool) {
+    fridgeExportTool.hidden = true;
+  }
 
   if (calorieDiaryDate && !calorieDiaryDate.value) {
     calorieDiaryDate.value = getLocalDateValue(new Date());

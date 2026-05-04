@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux25">
+    <link rel="stylesheet" href="styles.css?v=ux26">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -401,6 +401,15 @@
               <button class="primary-button" id="calorie-diary-apply-button" type="button">Odečíst vybrané z lednice</button>
             </div>
           </div>
+          <div class="tool-card" id="fridge-export-tool" hidden>
+            <h2>Textový export lednice</h2>
+            <p class="message">Text je připravený ke zkopírování nebo vložení jinam.</p>
+            <textarea class="export-textarea" id="fridge-export-text" rows="12" readonly spellcheck="false"></textarea>
+            <div class="export-text-actions">
+              <button class="primary-button" id="fridge-export-copy-button" type="button">Kopírovat do schránky</button>
+            </div>
+            <p class="message" id="fridge-export-message" role="status" aria-live="polite"></p>
+          </div>
           <p class="message">EAN / barcode se načítá přes více veřejných databází a vlastní číselník aliasů. OCR účtenky běží v prohlížeči přes několik pokusů a lokální chytré vyhodnocení řádků.</p>
         </section>
 
@@ -638,6 +647,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux32"></script>
+    <script src="app.js?v=ux33"></script>
   </body>
 </html>

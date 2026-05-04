@@ -1959,6 +1959,33 @@ body.dark-mode .modal {
   font-size: 1.1rem;
 }
 
+.export-textarea {
+  width: 100%;
+  min-height: 260px;
+  max-height: 56vh;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font: 0.92rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  padding: 12px;
+  resize: vertical;
+}
+
+.export-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  outline: none;
+}
+
+.export-text-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .file-drop {
   display: grid;
   gap: 8px;
@@ -3016,6 +3043,10 @@ body.dark-mode .list-name-input {
 
 #view-tools #calorie-diary-tool {
   width: min(1120px, 100%);
+}
+
+#view-tools #fridge-export-tool {
+  width: min(760px, 100%);
 }
 
 #view-tools > .message {
