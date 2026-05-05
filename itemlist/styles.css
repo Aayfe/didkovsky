@@ -561,13 +561,6 @@ textarea {
   opacity: 0.62;
 }
 
-.calorie-import-row.is-memory-only {
-  border-color: rgba(245, 158, 11, 0.42);
-  background:
-    linear-gradient(135deg, rgba(245, 158, 11, 0.1), transparent 42%),
-    var(--panel-strong);
-}
-
 .calorie-import-row.is-skipped input:not([type="checkbox"]),
 .calorie-import-row.is-skipped select,
 .calorie-import-row.is-skipped small {
