@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux29">
+    <link rel="stylesheet" href="styles.css?v=ux30">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -417,6 +417,7 @@
             <div class="calorie-import-actions">
               <button class="primary-button" id="calorie-diary-apply-button" type="button">Odečíst vybrané z lednice</button>
             </div>
+            <p class="message calorie-apply-message" id="calorie-diary-apply-message" role="status" aria-live="polite"></p>
           </div>
           <div class="tool-card" id="fridge-export-tool" hidden>
             <h2 id="fridge-export-title">Export</h2>
@@ -513,6 +514,7 @@
                 <button class="ghost-button" id="calorie-parse-button" type="button">Načíst položky</button>
                 <button class="primary-button" id="calorie-apply-button" type="button">Odečíst z lednice</button>
               </div>
+              <p class="message calorie-apply-message" id="calorie-apply-message" role="status" aria-live="polite"></p>
               <p class="message" id="calorie-import-message" role="status" aria-live="polite"></p>
               <div class="calorie-import-rows" id="calorie-import-rows"></div>
             </div>
@@ -666,6 +668,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux35"></script>
+    <script src="app.js?v=ux36"></script>
   </body>
 </html>

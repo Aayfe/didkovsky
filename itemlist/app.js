@@ -38,6 +38,7 @@ const calorieDiaryLoadButton = document.querySelector("#calorie-diary-load-butto
 const calorieDiaryApplyButton = document.querySelector("#calorie-diary-apply-button");
 const calorieDiaryRows = document.querySelector("#calorie-diary-rows");
 const calorieDiaryMessage = document.querySelector("#calorie-diary-message");
+const calorieDiaryApplyMessage = document.querySelector("#calorie-diary-apply-message");
 const fridgeExportTool = document.querySelector("#fridge-export-tool");
 const fridgeExportTitle = document.querySelector("#fridge-export-title");
 const fridgeExportText = document.querySelector("#fridge-export-text");
@@ -123,6 +124,7 @@ const calorieParseButton = document.querySelector("#calorie-parse-button");
 const calorieApplyButton = document.querySelector("#calorie-apply-button");
 const calorieImportRows = document.querySelector("#calorie-import-rows");
 const calorieImportMessage = document.querySelector("#calorie-import-message");
+const calorieApplyMessage = document.querySelector("#calorie-apply-message");
 const catalogBody = document.querySelector("#catalog-body");
 const catalogForm = document.querySelector("#catalog-form");
 const catalogName = document.querySelector("#catalog-name");
@@ -1569,6 +1571,7 @@ function openCalorieDiaryImport() {
     ? "Vyber den a načti položky z Kalorických tabulek. Před odečtem je můžeš upravit nebo vynechat."
     : "Backend pro Kalorické tabulky zatím není nastavený. Ruční odečet najdeš v Nastavení.");
   renderCalorieImportRows();
+  setCalorieApplyMessage("");
   calorieDiaryDate?.focus();
 }
 
@@ -3060,6 +3063,17 @@ function setCalorieImportMessage(text, isError = false) {
   });
 }
 
+function setCalorieApplyMessage(text, isError = false) {
+  [calorieApplyMessage, calorieDiaryApplyMessage].forEach((element) => {
+    if (!element) {
+      return;
+    }
+
+    element.textContent = text;
+    element.classList.toggle("is-error", isError);
+  });
+}
+
 function hasCalorieDiaryIntegration() {
   const config = window.SUPABASE_CONFIG || {};
   return Boolean(config.calorieDiaryFunction || config.calorieDiaryEndpoint);
@@ -3091,6 +3105,7 @@ async function loadCalorieDiaryEntries() {
     const rows = normalizeCalorieDiaryResult(data, calorieDiaryDate.value);
     calorieImportRowsState = rows.map((row) => createCalorieImportRowState(row));
     renderCalorieImportRows();
+    setCalorieApplyMessage("");
     setCalorieImportMessage(calorieImportRowsState.length
       ? `Načteno ${calorieImportRowsState.length} položek. Jsou seřazené podle fází dne, zkontroluj párování a odečti vybrané.`
       : `Kalorické tabulky odpověděly, ale parser ux29 nenašel položky k odečtu. ${summarizeCalorieDiaryPayload(data)}`, !calorieImportRowsState.length);
@@ -3503,6 +3518,7 @@ function parseCalorieImportFromText() {
   calorieImportRowsState = rows.map((row) => createCalorieImportRowState(row));
 
   renderCalorieImportRows();
+  setCalorieApplyMessage("");
 
   setCalorieImportMessage(calorieImportRowsState.length
     ? `Načteno ${calorieImportRowsState.length} položek. Zkontroluj párování a případně zaškrtni řádky, které se nemají odečíst.`
@@ -3629,6 +3645,7 @@ function renderCalorieImportRowsInto(container) {
     }
 
     group.rows.forEach((row) => {
+      syncCalorieRowWithStock(row);
       const article = document.createElement("article");
       const skipLabel = document.createElement("label");
       const skipInput = document.createElement("input");
@@ -3639,27 +3656,33 @@ function renderCalorieImportRowsInto(container) {
       const targetSelect = document.createElement("select");
       const meta = document.createElement("small");
 
-      article.className = `calorie-import-row${row.skipped ? " is-skipped" : ""}`;
+      article.className = `calorie-import-row${row.skipped ? " is-skipped" : ""}${row.lockedNoStock ? " is-memory-only" : ""}`;
       article.dataset.calorieRow = row.id;
 
       skipLabel.className = "calorie-skip-check";
       skipInput.type = "checkbox";
       skipInput.checked = Boolean(row.skipped);
       skipInput.dataset.calorieField = "skipped";
+      skipInput.disabled = Boolean(row.lockedNoStock);
       skipText.textContent = "Neodečítat";
       skipLabel.append(skipInput, skipText);
 
       nameInput.type = "text";
       nameInput.value = row.name;
       nameInput.dataset.calorieField = "name";
+      nameInput.disabled = Boolean(row.lockedNoStock);
       nameInput.setAttribute("aria-label", "Položka z Kalorických tabulek");
 
       amountInputElement.type = "number";
-      amountInputElement.min = "0.01";
+      amountInputElement.min = row.lockedNoStock ? "0" : "0.01";
       amountInputElement.step = "0.01";
       amountInputElement.inputMode = "decimal";
-      amountInputElement.value = formatFormNumber(row.amount);
+      amountInputElement.value = formatCalorieAmountInput(row.amount);
       amountInputElement.dataset.calorieField = "amount";
+      amountInputElement.disabled = Boolean(row.lockedNoStock);
+      if (Number.isFinite(row.maxAmount)) {
+        amountInputElement.max = formatCalorieAmountInput(row.maxAmount);
+      }
       amountInputElement.setAttribute("aria-label", "Množství");
 
       ["g", "ml", "ks", "kg"].forEach((unit) => {
@@ -3670,6 +3693,7 @@ function renderCalorieImportRowsInto(container) {
       });
       unitSelectElement.value = row.unit;
       unitSelectElement.dataset.calorieField = "unit";
+      unitSelectElement.disabled = Boolean(row.targetName);
       unitSelectElement.setAttribute("aria-label", "Jednotka");
 
       const emptyOption = document.createElement("option");
@@ -3691,9 +3715,12 @@ function renderCalorieImportRowsInto(container) {
       targetSelect.setAttribute("aria-label", "Položka v lednici");
 
       meta.className = "muted-text";
-      meta.textContent = row.targetName
+      meta.textContent = getCalorieRowMetaText(row);
+      if (!meta.textContent) {
+        meta.textContent = row.targetName
         ? `${row.meal ? `${row.meal} · ` : ""}Párování: ${Math.round(row.matchScore)} %, jednotka z číselníku`
         : `${row.meal ? `${row.meal} · ` : ""}Vyber položku z číselníku.`;
+      }
 
       article.append(skipLabel, nameInput, amountInputElement, unitSelectElement, targetSelect, meta);
       container.append(article);
@@ -3717,18 +3744,51 @@ function handleCalorieImportRowChange(event) {
   const previousTargetName = row.targetName;
   row.skipped = Boolean(rowElement.querySelector('[data-calorie-field="skipped"]')?.checked);
   row.name = tidyName(rowElement.querySelector('[data-calorie-field="name"]')?.value || row.name);
-  row.amount = parseImportAmount(rowElement.querySelector('[data-calorie-field="amount"]')?.value) || row.amount;
+  row.amount = parseCalorieAmountInput(rowElement.querySelector('[data-calorie-field="amount"]')?.value, row.amount);
   row.unit = rowElement.querySelector('[data-calorie-field="unit"]')?.value || row.unit;
   row.targetName = rowElement.querySelector('[data-calorie-field="targetName"]')?.value || "";
 
-  if (row.targetName && row.targetName !== previousTargetName) {
-    applyCalorieTargetToRow(row, row.targetName, { remember: true, score: 100, fromCurrent: true });
-    rowElement.querySelector('[data-calorie-field="amount"]').value = formatFormNumber(row.amount);
-    rowElement.querySelector('[data-calorie-field="unit"]').value = row.unit;
-    rowElement.querySelector('[data-calorie-field="targetName"]').value = row.targetName;
+  if (row.targetName !== previousTargetName) {
+    if (row.targetName) {
+      applyCalorieTargetToRow(row, row.targetName, { remember: true, score: 100, fromCurrent: true });
+    } else {
+      row.lockedNoStock = false;
+      row.lockReason = "";
+      row.maxAmount = null;
+    }
+    renderCalorieImportRows();
+    setCalorieApplyMessage(row.targetName
+      ? (row.lockedNoStock
+        ? `${row.targetName} není v lednici. Párování jsem uložil, odečet bude 0.`
+        : `${row.name} je napárované na ${row.targetName}.`)
+      : "Párování řádku je zrušené.");
+    return;
+  }
+
+  syncCalorieRowWithStock(row);
+  const amountInputElement = rowElement.querySelector('[data-calorie-field="amount"]');
+  const unitSelectElement = rowElement.querySelector('[data-calorie-field="unit"]');
+  const meta = rowElement.querySelector("small");
+
+  if (amountInputElement) {
+    amountInputElement.value = formatCalorieAmountInput(row.amount);
+    if (Number.isFinite(row.maxAmount)) {
+      amountInputElement.max = formatCalorieAmountInput(row.maxAmount);
+    } else {
+      amountInputElement.removeAttribute("max");
+    }
+  }
+
+  if (unitSelectElement) {
+    unitSelectElement.value = row.unit;
+  }
+
+  if (meta) {
+    meta.textContent = getCalorieRowMetaText(row) || meta.textContent;
   }
 
   rowElement.classList.toggle("is-skipped", row.skipped);
+  rowElement.classList.toggle("is-memory-only", Boolean(row.lockedNoStock));
 }
 
 async function applyCalorieImportDeduction() {
@@ -3740,6 +3800,8 @@ async function applyCalorieImportDeduction() {
   let changed = 0;
   let skipped = 0;
   let missing = 0;
+  let rememberedOnly = 0;
+  let capped = 0;
 
   calorieImportRowsState.forEach((row) => {
     if (row.skipped) {
@@ -3752,16 +3814,36 @@ async function applyCalorieImportDeduction() {
     const target = findExactActiveItemByName(pairedTarget?.name || row.targetName);
 
     if (!target) {
-      missing += 1;
+      if (pairedTarget) {
+        row.amount = 0;
+        row.lockedNoStock = true;
+        rememberedOnly += 1;
+      } else {
+        missing += 1;
+      }
       return;
     }
 
-    const convertedAmount = convertCalorieAmountToTargetUnit(row.amount, row.unit, target.unit);
+    const beforeSyncAmount = Number(row.amount) || 0;
+    syncCalorieRowWithStock(row);
+
+    if (beforeSyncAmount > row.amount) {
+      capped += 1;
+    }
+
+    if (row.lockedNoStock || row.amount <= 0) {
+      rememberedOnly += 1;
+      return;
+    }
+
+    let convertedAmount = convertCalorieAmountToTargetUnit(row.amount, row.unit, target.unit);
 
     if (!convertedAmount) {
       missing += 1;
       return;
     }
+
+    convertedAmount = Math.min(convertedAmount, target.amount);
 
     const result = upsertItemAmount({
       name: target.name,
@@ -3789,9 +3871,20 @@ async function applyCalorieImportDeduction() {
 
   renderItems();
   renderHistory();
+  renderCalorieImportRows();
   await saveState();
 
-  setCalorieImportMessage(`Odečet hotový: odečteno ${changed}, vynecháno ${skipped}, nenapárováno/nekompatibilní ${missing}.`, missing > 0 && changed === 0);
+  const summary = [
+    `Odečteno ${changed}`,
+    skipped ? `vynecháno ${skipped}` : "",
+    rememberedOnly ? `jen uloženo párování ${rememberedOnly}` : "",
+    capped ? `sníženo na stav lednice ${capped}` : "",
+    missing ? `nenapárováno/nešlo odečíst ${missing}` : ""
+  ].filter(Boolean).join(", ");
+  const isError = changed === 0 && rememberedOnly === 0 && missing > 0;
+
+  setCalorieImportMessage(`Odečet hotový: ${summary}.`, isError);
+  setCalorieApplyMessage(`Hotovo: ${summary}.`, isError);
 }
 
 function convertCalorieAmountToTargetUnit(amount, unit, targetUnit) {
@@ -3824,6 +3917,86 @@ function convertCalorieAmountToTargetUnit(amount, unit, targetUnit) {
   }
 
   return null;
+}
+
+function parseCalorieAmountInput(value, fallback = 0) {
+  const amount = Number(String(value ?? "").replace(/[\s\u00a0]/g, "").replace(",", "."));
+  return Number.isFinite(amount) && amount >= 0 ? roundAmount(amount) : roundAmount(Number(fallback) || 0);
+}
+
+function formatCalorieAmountInput(value) {
+  return String(roundAmount(Number(value) || 0)).replace(",", ".");
+}
+
+function syncCalorieRowWithStock(row) {
+  row.lockedNoStock = false;
+  row.lockReason = "";
+  row.cappedToStock = false;
+  row.maxAmount = null;
+
+  if (!row?.targetName) {
+    return row;
+  }
+
+  const target = findCalorieTargetByName(row.targetName);
+
+  if (!target) {
+    return row;
+  }
+
+  row.targetName = target.name;
+  row.unit = target.unit || row.unit;
+
+  const stockedItem = findExactActiveItemByName(target.name);
+
+  if (!stockedItem) {
+    row.amount = 0;
+    row.maxAmount = 0;
+    row.lockedNoStock = true;
+    row.lockReason = "Položka není v lednici, uloží se jen párování.";
+    return row;
+  }
+
+  const availableAmount = convertCalorieAmountToTargetUnit(stockedItem.amount, stockedItem.unit, row.unit);
+
+  if (!Number.isFinite(availableAmount)) {
+    row.amount = 0;
+    row.maxAmount = 0;
+    row.lockedNoStock = true;
+    row.lockReason = "Jednotky nejdou převést, uloží se jen párování.";
+    return row;
+  }
+
+  row.maxAmount = roundAmount(availableAmount);
+
+  if ((Number(row.amount) || 0) > row.maxAmount) {
+    row.amount = row.maxAmount;
+    row.cappedToStock = true;
+  }
+
+  return row;
+}
+
+function getCalorieRowMetaText(row) {
+  const prefix = row.meal ? `${row.meal} · ` : "";
+
+  if (!row.targetName) {
+    return `${prefix}Vyber položku z číselníku.`;
+  }
+
+  if (row.lockedNoStock) {
+    return `${prefix}${row.lockReason || "Položka není v lednici, uloží se jen párování."}`;
+  }
+
+  if (row.cappedToStock && Number.isFinite(row.maxAmount)) {
+    return `${prefix}V lednici je jen ${formatAmountWithUnit(row.maxAmount, row.unit)}, odečte se maximum.`;
+  }
+
+  if (Number.isFinite(row.maxAmount)) {
+    return `${prefix}Párování uloženo, max. odečet ${formatAmountWithUnit(row.maxAmount, row.unit)}.`;
+  }
+
+  return `${prefix}Párování: ${Math.round(row.matchScore || 0)} %, jednotka z číselníku.`;
 }
 
 function getCaloriePairingKey(name) {
@@ -3867,6 +4040,7 @@ function applyCalorieTargetToRow(row, targetName, options = {}) {
   }
 
   row.matchScore = options.score ?? row.matchScore ?? 100;
+  syncCalorieRowWithStock(row);
 
   if (options.remember) {
     rememberCaloriePairing(row, target.name);
