@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux26">
+    <link rel="stylesheet" href="styles.css?v=ux27">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -58,15 +58,31 @@
               <p class="eyebrow">Co mám doma</p>
               <h1 id="page-title">Lednice</h1>
             </div>
-            <button class="ghost-button scan-shortcut-button" id="pantry-scan-button" type="button" aria-label="Naskenovat EAN nebo barcode">
-              <span class="button-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                  <path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path>
-                  <circle cx="12" cy="13.5" r="3.5"></circle>
-                </svg>
-              </span>
-            </button>
+            <div class="section-actions">
+              <button class="ghost-button pantry-export-shortcut" id="pantry-export-text-button" type="button" aria-label="Zkopírovat textový export lednice">
+                <span class="button-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M8 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-2"></path>
+                    <path d="M4 7h10v14H4z"></path>
+                    <path d="M7 11h4"></path>
+                    <path d="M7 15h4"></path>
+                  </svg>
+                </span>
+              </button>
+              <button class="ghost-button scan-shortcut-button" id="pantry-scan-button" type="button" aria-label="Naskenovat EAN nebo barcode">
+                <span class="button-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M4 8h3l1.5-2h7L17 8h3v11H4z"></path>
+                    <circle cx="12" cy="13.5" r="3.5"></circle>
+                  </svg>
+                </span>
+              </button>
+            </div>
           </div>
+          <label class="field pantry-search-field">
+            <span>Hledat v lednici</span>
+            <input id="pantry-search-input" type="search" placeholder="Např. mléko, pečivo, 500 g">
+          </label>
           <div class="category-filter-panel" id="pantry-category-filters" aria-label="Filtr kategorií"></div>
 
           <div class="table-wrap">
@@ -101,7 +117,7 @@
               <input id="shopping-product" type="text" data-combobox-source="product-options" placeholder="Např. máslo">
             </label>
             <label class="field">
-              <span>Množství</span>
+              <span>Limit / množství</span>
               <input id="shopping-amount" type="number" min="0.01" step="any" inputmode="decimal" placeholder="1">
             </label>
             <label class="field">
@@ -124,6 +140,7 @@
               <span>Potravina</span>
               <input id="product-input" name="product" type="text" data-combobox-source="product-options" placeholder="Např. rohlík" required>
               <datalist id="product-options"></datalist>
+              <small class="field-hint" id="entry-stock-info">Vyber položku a ukážu, kolik jí je v lednici.</small>
             </label>
 
             <label class="field combo-field category-field">
@@ -246,11 +263,11 @@
                 <option value="kg">kg</option>
               </select>
             </label>
-            <section class="catalog-alias-editor" aria-label="Aliasy a EANy">
-              <div class="catalog-alias-heading">
+            <details class="catalog-alias-editor" aria-label="Aliasy a EANy">
+              <summary class="catalog-alias-heading">
                 <strong>Aliasy a EAN/barcody</strong>
                 <span>Varianty, které mají patřit pod tuhle jednu položku.</span>
-              </div>
+              </summary>
               <div class="catalog-alias-list" id="catalog-alias-list"></div>
               <div class="catalog-alias-form">
                 <label class="field">
@@ -276,7 +293,7 @@
                 </label>
                 <button class="ghost-button" id="catalog-alias-add-button" type="button">Přidat alias</button>
               </div>
-            </section>
+            </details>
             <button class="primary-button catalog-submit-button" id="catalog-submit-button" type="submit">Přidat do číselníku</button>
           </form>
           <div class="table-wrap">
@@ -314,7 +331,7 @@
               <button class="ghost-button" id="cancel-combo-edit" type="button" hidden>Zrušit úpravu</button>
             </div>
           </form>
-          <div class="combo-runner">
+          <div class="combo-runner" hidden>
             <label class="field combo-runner-field">
               <span>Kombinace</span>
               <select id="combo-select"></select>
@@ -341,8 +358,7 @@
               <h2>Import</h2>
               <button class="primary-button" id="calorie-diary-button" type="button">Odečet z Kalorických tabulek</button>
               <button class="ghost-button" id="import-button" type="button">Hromadný import textem</button>
-              <button class="ghost-button" id="xml-import-button" type="button">Import XML textem</button>
-              <button class="ghost-button" id="xml-file-button" type="button">Import XML souborem</button>
+              <button class="ghost-button" id="xml-import-button" type="button">Import XML</button>
               <input class="visually-hidden" id="xml-file-input" type="file" accept=".xml,application/xml,text/xml">
             </section>
             <section class="tool-group">
@@ -402,11 +418,12 @@
             </div>
           </div>
           <div class="tool-card" id="fridge-export-tool" hidden>
-            <h2>Textový export lednice</h2>
-            <p class="message">Text je připravený ke zkopírování nebo vložení jinam.</p>
+            <h2 id="fridge-export-title">Export</h2>
+            <p class="message">Text je připravený ke zkopírování nebo stažení jako XML.</p>
             <textarea class="export-textarea" id="fridge-export-text" rows="12" readonly spellcheck="false"></textarea>
             <div class="export-text-actions">
               <button class="primary-button" id="fridge-export-copy-button" type="button">Kopírovat do schránky</button>
+              <button class="ghost-button" id="fridge-export-download-button" type="button">Stáhnout XML</button>
             </div>
             <p class="message" id="fridge-export-message" role="status" aria-live="polite"></p>
           </div>
@@ -435,6 +452,10 @@
             </div>
             <ol class="settings-news-list">
               <li>
+                <time datetime="2026-05-05">05.05.2026</time>
+                <span>Vylepšené Změny, exporty, lednice a práce s kombinacemi.</span>
+              </li>
+              <li>
                 <time datetime="2026-05-01">01.05.2026</time>
                 <span>Vylepšené rozložení aplikace na mobilu i počítači.</span>
               </li>
@@ -449,10 +470,6 @@
               <li>
                 <time datetime="2026-04-30">30.04.2026</time>
                 <span>Rozpoznávání účtenek lépe pracuje s AI a slevami.</span>
-              </li>
-              <li>
-                <time datetime="2026-04-29">29.04.2026</time>
-                <span>Přidané statistiky, grafy a PDF export v nastavení.</span>
               </li>
             </ol>
           </section>
@@ -613,6 +630,7 @@
           <span>Položky</span>
           <textarea id="import-text" rows="9" placeholder="Rohlík 4 ks&#10;Šunka 100 g&#10;Mléko 1000 ml"></textarea>
         </label>
+        <button class="ghost-button" id="import-file-pick-button" type="button">Vybrat XML soubor</button>
         <p class="modal-error" id="import-error" role="status" aria-live="polite"></p>
         <div class="modal-actions">
           <button class="ghost-button" id="cancel-import" type="button">Zrušit</button>
@@ -647,6 +665,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux33"></script>
+    <script src="app.js?v=ux34"></script>
   </body>
 </html>

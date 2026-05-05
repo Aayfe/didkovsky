@@ -22,6 +22,7 @@ const xmlImportButton = document.querySelector("#xml-import-button");
 const xmlFileButton = document.querySelector("#xml-file-button");
 const xmlFileInput = document.querySelector("#xml-file-input");
 const xmlExportButton = document.querySelector("#xml-export-button");
+const importFilePickButton = document.querySelector("#import-file-pick-button");
 const eanTool = document.querySelector("#ean-tool");
 const eanInput = document.querySelector("#ean-input");
 const eanLookupButton = document.querySelector("#ean-lookup-button");
@@ -38,8 +39,10 @@ const calorieDiaryApplyButton = document.querySelector("#calorie-diary-apply-but
 const calorieDiaryRows = document.querySelector("#calorie-diary-rows");
 const calorieDiaryMessage = document.querySelector("#calorie-diary-message");
 const fridgeExportTool = document.querySelector("#fridge-export-tool");
+const fridgeExportTitle = document.querySelector("#fridge-export-title");
 const fridgeExportText = document.querySelector("#fridge-export-text");
 const fridgeExportCopyButton = document.querySelector("#fridge-export-copy-button");
+const fridgeExportDownloadButton = document.querySelector("#fridge-export-download-button");
 const fridgeExportMessage = document.querySelector("#fridge-export-message");
 const toggleAdminPanelButton = document.querySelector("#toggle-admin-panel");
 const adminPanel = document.querySelector("#admin-panel");
@@ -64,7 +67,10 @@ const unitSelect = document.querySelector("#unit-select");
 const priceInput = document.querySelector("#price-input");
 const eventDateInput = document.querySelector("#event-date-input");
 const submitButton = document.querySelector("#submit-button");
+const entryStockInfo = document.querySelector("#entry-stock-info");
 const pantryScanButton = document.querySelector("#pantry-scan-button");
+const pantryExportTextButton = document.querySelector("#pantry-export-text-button");
+const pantrySearchInput = document.querySelector("#pantry-search-input");
 const pantryCategoryFilters = document.querySelector("#pantry-category-filters");
 const cancelEditButton = document.querySelector("#cancel-edit");
 const deleteListButton = document.querySelector("#delete-list-button");
@@ -296,6 +302,10 @@ let pendingCatalogEanProduct = null;
 let calorieImportRowsState = [];
 let activeComboboxInput = null;
 let activeComboboxIndex = -1;
+let currentTextExport = {
+  fileName: "export",
+  text: ""
+};
 
 const COMBOBOX_INPUT_SELECTOR = "[data-combobox-source]";
 
@@ -334,13 +344,15 @@ function setupEvents() {
   exportButton.addEventListener("click", exportData);
   exportFridgeButton.addEventListener("click", exportFridge);
   fridgeExportCopyButton?.addEventListener("click", copyFridgeExportToClipboard);
+  fridgeExportDownloadButton?.addEventListener("click", downloadCurrentTextExport);
   exportCatalogButton.addEventListener("click", exportCatalog);
   anonymousExportButton.addEventListener("click", exportAnonymousData);
   receiptImportButton.addEventListener("click", openReceiptImport);
   eanImportButton.addEventListener("click", openEanImport);
   calorieDiaryButton?.addEventListener("click", openCalorieDiaryImport);
   xmlImportButton.addEventListener("click", openXmlImport);
-  xmlFileButton.addEventListener("click", () => xmlFileInput.click());
+  xmlFileButton?.addEventListener("click", () => xmlFileInput.click());
+  importFilePickButton?.addEventListener("click", () => xmlFileInput.click());
   xmlFileInput.addEventListener("change", importXmlFromFile);
   xmlExportButton.addEventListener("click", exportXml);
   eanLookupButton.addEventListener("click", lookupEanProduct);
@@ -355,6 +367,8 @@ function setupEvents() {
   adminForm.addEventListener("submit", saveAllowedUser);
   allowedUsersList.addEventListener("click", handleAllowedUsersClick);
   pantryScanButton.addEventListener("click", openEanImport);
+  pantryExportTextButton?.addEventListener("click", copyPantryTextExportShortcut);
+  pantrySearchInput?.addEventListener("input", renderItems);
   pantryCategoryFilters?.addEventListener("change", handlePantryCategoryFilterChange);
   historyPeriodFilter.addEventListener("change", handleHistoryFilterChange);
   historyDateFrom.addEventListener("input", () => {
@@ -434,11 +448,29 @@ function setupEvents() {
     const combo = findComboByName(name);
 
     if (combo && !editingId) {
-      await applyComboChange(combo, amount, action);
+      openComboChangeModal(combo.id);
+      if (comboChangeAction) {
+        comboChangeAction.value = action === "set" ? "purchase" : action;
+      }
+      comboChangeItems?.querySelectorAll("[data-combo-change-amount]").forEach((input, index) => {
+        const item = combo.items[index];
+        input.value = formatFormNumber(roundAmount((item?.amount || 1) * amount));
+      });
+      showMessage("Zkontroluj položky kombinace a potvrď změnu.");
       return;
     }
 
     unitSelect.value = unit;
+
+    const maxAmount = getMaxAmountForNegativeAction(name, unit, action);
+
+    if (Number.isFinite(maxAmount) && amount > maxAmount) {
+      amountInput.value = formatFormNumber(maxAmount);
+      showMessage(`V lednici je jen ${formatAmountWithUnit(maxAmount, unit)}. Víc odečíst nejde.`, true);
+      amountInput.focus();
+      amountInput.select();
+      return;
+    }
 
     if (editingId) {
       await updateEditedItem(name, amount, unit);
@@ -452,6 +484,8 @@ function setupEvents() {
     if (Number(amountInput.value) < 0) {
       amountInput.value = "";
     }
+
+    clampAmountToAvailableStock();
   });
 
   productInput.addEventListener("input", syncUnitFromProduct);
@@ -460,6 +494,10 @@ function setupEvents() {
   productInput.addEventListener("change", syncCategoryFromProduct);
   productInput.addEventListener("input", syncEntryProductLock);
   productInput.addEventListener("change", syncEntryProductLock);
+  productInput.addEventListener("input", syncEntryProductInfo);
+  productInput.addEventListener("change", syncEntryProductInfo);
+  productInput.addEventListener("input", clampAmountToAvailableStock);
+  productInput.addEventListener("change", clampAmountToAvailableStock);
   addListButton.addEventListener("click", addList);
 
   listTabs.addEventListener("click", (event) => {
@@ -509,6 +547,7 @@ function setupEvents() {
   });
   actionSelect.addEventListener("change", () => {
     setActionState(actionSelect.value);
+    clampAmountToAvailableStock();
   });
 
   amountStepButtons.forEach((button) => {
@@ -1192,18 +1231,12 @@ function exportData() {
     user: getCurrentUserEmail(),
     ...serializeState()
   };
-  const blob = new Blob([JSON.stringify(exportedState, null, 2)], {
-    type: "application/json"
-  });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
 
-  link.href = url;
-  link.download = `itemlist-${new Date().toISOString().slice(0, 10)}.json`;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  openTextExport({
+    title: "Export všech dat",
+    fileName: "domaci-zasoby-vse",
+    text: buildStateXml(exportedState)
+  });
   recordHistory("Export dat.", "export");
   renderHistory();
   queueSaveState();
@@ -1211,26 +1244,11 @@ function exportData() {
 }
 
 function exportFridge() {
-  const text = buildFridgeTextExport();
-
-  switchView("tools");
-  receiptTool.hidden = true;
-  eanTool.hidden = true;
-  if (calorieDiaryTool) {
-    calorieDiaryTool.hidden = true;
-  }
-  if (fridgeExportTool) {
-    fridgeExportTool.hidden = false;
-  }
-  if (fridgeExportText) {
-    fridgeExportText.value = text;
-    fridgeExportText.focus();
-    fridgeExportText.select();
-  }
-  if (fridgeExportMessage) {
-    fridgeExportMessage.textContent = "Export lednice je připravený.";
-    fridgeExportMessage.classList.remove("is-error");
-  }
+  openTextExport({
+    title: "Export lednice",
+    fileName: "lednice",
+    text: buildItemsXml(getActiveItems(), getDisplayListName(getActiveList()))
+  });
 
   recordHistory("Export lednice.", "export");
   renderHistory();
@@ -1268,6 +1286,46 @@ function buildFridgeTextExport() {
   return lines.join("\n");
 }
 
+function openTextExport({ title, fileName, text }) {
+  switchView("tools");
+  receiptTool.hidden = true;
+  eanTool.hidden = true;
+  if (calorieDiaryTool) {
+    calorieDiaryTool.hidden = true;
+  }
+  if (fridgeExportTool) {
+    fridgeExportTool.hidden = false;
+  }
+  currentTextExport = {
+    fileName: fileName || "export",
+    text: text || ""
+  };
+
+  if (fridgeExportTitle) {
+    fridgeExportTitle.textContent = title || "Export";
+  }
+
+  if (fridgeExportText) {
+    fridgeExportText.value = currentTextExport.text;
+    fridgeExportText.focus();
+    fridgeExportText.select();
+  }
+
+  setFridgeExportMessage("Export je připravený.");
+}
+
+function downloadCurrentTextExport() {
+  const text = fridgeExportText?.value || currentTextExport.text || "";
+
+  if (!text.trim()) {
+    setFridgeExportMessage("Nejdřív připrav export.", true);
+    return;
+  }
+
+  downloadText(currentTextExport.fileName || "export", "xml", text, "application/xml");
+  setFridgeExportMessage("XML soubor připravený ke stažení.");
+}
+
 async function copyFridgeExportToClipboard() {
   const text = fridgeExportText?.value || "";
 
@@ -1276,21 +1334,47 @@ async function copyFridgeExportToClipboard() {
     return;
   }
 
+  const copied = await copyTextToClipboard(text);
+  setFridgeExportMessage(
+    copied
+      ? "Export zkopírovaný do schránky."
+      : "Kopírování se nepovedlo. Označ text a zkopíruj ho ručně.",
+    !copied
+  );
+}
+
+async function copyPantryTextExportShortcut() {
+  const text = buildFridgeTextExport();
+
+  if (fridgeExportText) {
+    fridgeExportText.value = text;
+  }
+
+  const copied = await copyTextToClipboard(text);
+  showMessage(copied
+    ? "Textový export lednice zkopírovaný do schránky."
+    : "Kopírování se nepovedlo. Otevři export lednice a zkopíruj text ručně.", !copied);
+}
+
+async function copyTextToClipboard(text) {
   try {
     if (!navigator.clipboard?.writeText) {
       throw new Error("Clipboard API není dostupné.");
     }
 
     await navigator.clipboard.writeText(text);
-    setFridgeExportMessage("Export zkopírovaný do schránky.");
+    return true;
   } catch (error) {
-    const copied = copyTextFromTextarea(fridgeExportText);
-    setFridgeExportMessage(
-      copied
-        ? "Export zkopírovaný do schránky."
-        : "Kopírování se nepovedlo. Označ text a zkopíruj ho ručně.",
-      !copied
-    );
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "0";
+    document.body.append(textarea);
+    const copied = copyTextFromTextarea(textarea);
+    textarea.remove();
+    return copied;
   }
 }
 
@@ -1321,7 +1405,11 @@ function setFridgeExportMessage(text, isError = false) {
 
 function exportXml() {
   const xml = buildItemsXml(getActiveItems(), getDisplayListName(getActiveList()));
-  downloadText("lednice", "xml", xml, "application/xml");
+  openTextExport({
+    title: "Export XML lednice",
+    fileName: "lednice",
+    text: xml
+  });
   recordHistory("Export XML lednice.", "export");
   renderHistory();
   queueSaveState();
@@ -1329,7 +1417,11 @@ function exportXml() {
 }
 
 function exportCatalog() {
-  downloadJson("ciselnik-potravin", getCatalogItems());
+  openTextExport({
+    title: "Export číselníku",
+    fileName: "ciselnik-potravin",
+    text: buildCatalogXml(getCatalogItems())
+  });
   recordHistory("Export číselníku potravin.", "export");
   renderHistory();
   queueSaveState();
@@ -1363,7 +1455,11 @@ function exportAnonymousData() {
     }))
   };
 
-  downloadJson("itemlist-anonymizovano", anonymized);
+  openTextExport({
+    title: "Anonymizovaný export",
+    fileName: "domaci-zasoby-anonymizovano",
+    text: buildStateXml(anonymized)
+  });
   recordHistory("Anonymizovaný export dat.", "export");
   renderHistory();
   queueSaveState();
@@ -1522,6 +1618,14 @@ async function importShoppingList() {
     const itemName = existingItem ? existingItem.name : importedItem.name;
     const price = Number.isFinite(Number(importedItem.price)) ? roundAmount(Number(importedItem.price)) : null;
 
+    if (result !== "missing" && result !== "too-much") {
+      ensureCatalogItemFromEntry({
+        name: itemName,
+        category: importedItem.category || "Ostatní",
+        unit: importedItem.unit
+      });
+    }
+
     recordHistory(getItemHistoryText(itemName, importedItem.amount, importedItem.unit, "purchase", result, price), "item", list, {
       action: "purchase",
       product: itemName,
@@ -1580,7 +1684,10 @@ function parseXmlItems(value) {
     return { items, skipped: [value] };
   }
 
-  doc.querySelectorAll("item").forEach((node) => {
+  const itemNodes = doc.querySelectorAll("items > item, list > item");
+  const nodes = itemNodes.length ? itemNodes : doc.querySelectorAll("item");
+
+  nodes.forEach((node) => {
     const rawName = readXmlValue(node, "name");
     const rawAmount = parseImportAmount(readXmlValue(node, "amount") || "1") || 1;
     const rawUnit = readXmlValue(node, "unit") || unitSelect.value;
@@ -1634,6 +1741,91 @@ function buildItemsXml(items, listName) {
     '  </items>',
     '</domaci-zasoby>',
     ''
+  ].join("\n");
+}
+
+function buildCatalogXml(items = getCatalogItems()) {
+  const rows = items
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name, "cs"))
+    .map((item) => {
+      const aliases = normalizeEanAliases(item.eanAliases)
+        .map((alias) => {
+          return `      <alias name="${escapeXml(alias.name)}" ean="${escapeXml(alias.ean || "")}" amount="${escapeXml(formatXmlAmount(alias.amount || 1))}" unit="${escapeXml(alias.unit || item.unit || "ks")}" />`;
+        })
+        .join("\n");
+
+      return [
+        `    <catalogItem name="${escapeXml(item.name)}" category="${escapeXml(item.category || "Ostatní")}" unit="${escapeXml(item.unit || "ks")}" ean="${escapeXml(item.ean || "")}">`,
+        aliases || "      <!-- žádné aliasy -->",
+        "    </catalogItem>"
+      ].join("\n");
+    })
+    .join("\n");
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<domaci-zasoby version="1">',
+    "  <catalog>",
+    rows || "    <!-- žádné položky -->",
+    "  </catalog>",
+    "</domaci-zasoby>",
+    ""
+  ].join("\n");
+}
+
+function buildStateXml(state = serializeState()) {
+  const listRows = (state.lists || [])
+    .map((list) => {
+      return [
+        `    <list id="${escapeXml(list.id || "")}" name="${escapeXml(list.name || "Lednice")}">`,
+        ...((list.items || []).map((item) => {
+          return `      <item id="${escapeXml(item.id || "")}" name="${escapeXml(item.name)}" category="${escapeXml(item.category || "Ostatní")}" amount="${escapeXml(formatXmlAmount(item.amount))}" unit="${escapeXml(item.unit || "ks")}" />`;
+        })),
+        "    </list>"
+      ].join("\n");
+    })
+    .join("\n");
+  const shoppingRows = (state.shoppingItems || [])
+    .map((item) => `    <shoppingItem id="${escapeXml(item.id || "")}" name="${escapeXml(item.name)}" done="${Boolean(item.done)}" />`)
+    .join("\n");
+  const comboRows = (state.combos || [])
+    .map((combo) => {
+      return [
+        `    <combo id="${escapeXml(combo.id || "")}" name="${escapeXml(combo.name)}">`,
+        ...((combo.items || []).map((item) => `      <item name="${escapeXml(item.name)}" amount="${escapeXml(formatXmlAmount(item.amount))}" unit="${escapeXml(item.unit || "ks")}" />`)),
+        "    </combo>"
+      ].join("\n");
+    })
+    .join("\n");
+  const historyRows = (state.history || [])
+    .slice(0, 120)
+    .map((entry) => `    <historyEntry type="${escapeXml(entry.type || "")}" action="${escapeXml(entry.action || "")}" createdAt="${escapeXml(entry.createdAt || "")}" occurredAt="${escapeXml(entry.occurredAt || "")}" text="${escapeXml(entry.text || "")}" />`)
+    .join("\n");
+  const catalogXml = buildCatalogXml(state.catalogItems || [])
+    .split("\n")
+    .slice(2, -2)
+    .join("\n");
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<domaci-zasoby version="1">',
+    `  <meta exportedAt="${escapeXml(state.exportedAt || new Date().toISOString())}" user="${escapeXml(state.user || getCurrentUserEmail() || "")}" activeListId="${escapeXml(state.activeListId || "")}" />`,
+    "  <lists>",
+    listRows || "    <!-- žádné seznamy -->",
+    "  </lists>",
+    catalogXml || "  <catalog />",
+    "  <shoppingList>",
+    shoppingRows || "    <!-- žádný nákupní list -->",
+    "  </shoppingList>",
+    "  <combos>",
+    comboRows || "    <!-- žádné kombinace -->",
+    "  </combos>",
+    "  <history>",
+    historyRows || "    <!-- žádná historie -->",
+    "  </history>",
+    "</domaci-zasoby>",
+    ""
   ].join("\n");
 }
 
@@ -2365,6 +2557,11 @@ async function applyItemChange({ name, amount, unit, action, category, price = n
     return;
   }
 
+  if (result === "too-much") {
+    showMessage(`V lednici je jen ${formatAmountWithUnit(existingItem.amount, existingItem.unit)}. Víc odečíst nejde.`, true);
+    return;
+  }
+
   if (result === "created") {
     showMessage("Položka přidána.");
   }
@@ -2387,6 +2584,7 @@ async function applyItemChange({ name, amount, unit, action, category, price = n
     }
   }
 
+  ensureCatalogItemFromEntry({ name: itemName, category, unit });
   const historyText = getItemHistoryText(itemName, amount, unit, action, result, price);
   recordHistory(historyText, "item", getActiveList(), {
     action,
@@ -2418,7 +2616,7 @@ async function applyComboChange(combo, multiplier, action) {
       action
     });
 
-    if (result === "missing") {
+    if (result === "missing" || result === "too-much") {
       missing += 1;
     } else {
       changed += 1;
@@ -2467,6 +2665,10 @@ function upsertItemAmount({ name, amount, unit, action, category = "Ostatní" })
     existingItem.unit = unit;
     existingItem.category = category || existingItem.category || "Ostatní";
     return "set";
+  }
+
+  if (negativeActions.includes(action) && amount > existingItem.amount) {
+    return "too-much";
   }
 
   const nextAmount = positiveActions.includes(action)
@@ -2831,8 +3033,18 @@ async function loadCalorieDiaryEntries() {
       ? `Načteno ${calorieImportRowsState.length} položek. Jsou seřazené podle fází dne, zkontroluj párování a odečti vybrané.`
       : `Kalorické tabulky odpověděly, ale parser ux29 nenašel položky k odečtu. ${summarizeCalorieDiaryPayload(data)}`, !calorieImportRowsState.length);
   } catch (error) {
-    setCalorieImportMessage(`Načtení Kalorických tabulek selhalo: ${getErrorMessage(error)}`, true);
+    setCalorieImportMessage(getCalorieDiaryUserError(error), true);
   }
+}
+
+function getCalorieDiaryUserError(error) {
+  const message = getErrorMessage(error);
+
+  if (/session cookie|CALORIE_DIARY_ENDPOINT|KALORICKE_TABULKY_MCP_URL|APIFY_TOKEN|cookie/i.test(message)) {
+    return "Kalorické tabulky nejdou načíst. V Nastavení nejdřív propoj účet nebo vlož session cookie z Kalorických tabulek.";
+  }
+
+  return `Načtení Kalorických tabulek selhalo: ${message}`;
 }
 
 function summarizeCalorieDiaryPayload(data) {
@@ -3725,7 +3937,8 @@ function getShoppingDisplayTitle(item, parsed, summary) {
     return `${parsed.name}: není potřeba kupovat`;
   }
 
-  return `${parsed.name}: koupit ${formatAmountWithUnit(summary.missing, parsed.unit)}`;
+  const suggestion = getShoppingPackageSuggestion(parsed, summary);
+  return `${parsed.name}: ${suggestion || `koupit ${formatAmountWithUnit(summary.missing, parsed.unit)}`}`;
 }
 
 function getShoppingItemMeta(item, parsed = parseImportLine(item.name), summary = parsed ? getShoppingNeedSummary(parsed) : null) {
@@ -3741,7 +3954,27 @@ function getShoppingItemMeta(item, parsed = parseImportLine(item.name), summary 
     return `Cíl ${formatAmountWithUnit(summary.totalWanted, parsed.unit)}, v zásobách ${formatAmountWithUnit(summary.currentAmount, parsed.unit)}.`;
   }
 
-  return `Zadáno ${formatAmountWithUnit(summary.totalWanted, parsed.unit)}, v zásobách ${formatAmountWithUnit(summary.currentAmount, parsed.unit)}.`;
+  const suggestion = getShoppingPackageSuggestion(parsed, summary);
+  const recommendation = suggestion ? ` Doporučení: ${suggestion}.` : "";
+  return `Limit ${formatAmountWithUnit(summary.totalWanted, parsed.unit)}, v lednici ${formatAmountWithUnit(summary.currentAmount, parsed.unit)}.${recommendation}`;
+}
+
+function getShoppingPackageSuggestion(parsed, summary) {
+  if (!summary || summary.missing <= 0) {
+    return "";
+  }
+
+  const catalogItem = findCatalogItemByName(parsed.name);
+  const aliases = normalizeEanAliases(catalogItem?.eanAliases)
+    .filter((alias) => alias.unit === parsed.unit && Number(alias.amount) >= summary.missing)
+    .sort((a, b) => Number(a.amount) - Number(b.amount));
+  const alias = aliases[0];
+
+  if (alias) {
+    return `koupit 1x ${alias.name} (${formatAmountWithUnit(alias.amount, alias.unit)})`;
+  }
+
+  return "";
 }
 
 function getShoppingNeedSummary(parsed) {
@@ -3773,7 +4006,7 @@ async function saveCombo(event) {
   const items = getComboBuilderItems();
 
   if (!name || !items.length) {
-    showMessage("Vyplň název kombinace a aspoň jednu položku.", true);
+    showMessage("Vyplň název kombinace a aspoň jednu položku z číselníku.", true);
     return;
   }
 
@@ -3847,17 +4080,13 @@ function addComboItemRow(item = {}) {
         <option value="kg">kg</option>
       </select>
     </label>
-    <label class="field combo-field">
-      <span>Kategorie</span>
-      <input class="combo-category" type="text" data-combobox-source="category-options" placeholder="Ostatní">
-    </label>
     <button class="ghost-button combo-remove-button" type="button" data-combo-builder-action="remove">Odebrat</button>
   `;
 
   row.querySelector(".combo-product").value = item.name || "";
   row.querySelector(".combo-amount").value = item.amount ? String(item.amount) : "";
   row.querySelector(".combo-unit").value = item.unit || "ks";
-  row.querySelector(".combo-category").value = item.category || "";
+  row.querySelector(".combo-unit").disabled = true;
   comboItemsList.append(row);
   updateComboRemoveButtons();
 }
@@ -3887,8 +4116,8 @@ function handleComboBuilderInput(event) {
     return;
   }
 
+  input.value = item.name;
   row.querySelector(".combo-unit").value = item.unit;
-  row.querySelector(".combo-category").value = item.category || "Ostatní";
 }
 
 function updateComboRemoveButtons() {
@@ -3902,10 +4131,12 @@ function updateComboRemoveButtons() {
 function getComboBuilderItems() {
   return [...comboItemsList.querySelectorAll(".combo-item-row")]
     .map((row) => {
-      const name = formatProductName(row.querySelector(".combo-product").value);
+      const typedName = formatProductName(row.querySelector(".combo-product").value);
       const amount = Number(row.querySelector(".combo-amount").value);
-      const unit = row.querySelector(".combo-unit").value;
-      const category = tidyName(row.querySelector(".combo-category").value) || "Ostatní";
+      const sourceItem = findCatalogItemByName(typedName);
+      const name = sourceItem?.name || "";
+      const unit = sourceItem?.unit || "ks";
+      const category = sourceItem?.category || inferCategoryFromName(name) || "Ostatní";
 
       if (!name || !Number.isFinite(amount) || amount <= 0) {
         return null;
@@ -4031,7 +4262,7 @@ async function applyComboChangeFromModal() {
       action
     });
 
-    if (result === "missing") {
+    if (result === "missing" || result === "too-much") {
       missing += 1;
     } else {
       changed += 1;
@@ -4185,7 +4416,7 @@ function renderItems() {
   tableWrap.classList.toggle("has-items", visibleItems.length > 0);
   if (emptyState) {
     emptyState.textContent = items.length && !visibleItems.length
-      ? "Žádná položka neodpovídá vybraným kategoriím."
+      ? (pantrySearchInput?.value ? "Žádná položka neodpovídá hledání." : "Žádná položka neodpovídá vybraným kategoriím.")
       : "Lednice je zatím prázdná.";
   }
 
@@ -4276,7 +4507,24 @@ function getVisiblePantryItems(items) {
     return [];
   }
 
-  return items.filter((item) => selectedPantryCategories.has(tidyName(item.category) || "Ostatní"));
+  const query = normalize(pantrySearchInput?.value || "");
+
+  return items.filter((item) => {
+    if (!selectedPantryCategories.has(tidyName(item.category) || "Ostatní")) {
+      return false;
+    }
+
+    if (!query) {
+      return true;
+    }
+
+    return normalize([
+      item.name,
+      item.category,
+      item.unit,
+      formatAmount(item.amount)
+    ].join(" ")).includes(query);
+  });
 }
 
 function formatCategoryLabel(category) {
@@ -4406,6 +4654,7 @@ function resetCatalogEditor(unit = "ks") {
   catalogAliasUnit.value = unit;
   catalogAliasAddButton.textContent = "Přidat alias";
   catalogSubmitButton.textContent = "Přidat do číselníku";
+  document.querySelector(".catalog-alias-editor")?.removeAttribute("open");
   renderCatalogAliasEditor();
 }
 
@@ -7516,12 +7765,12 @@ function renderPriceStats(entries) {
 
   const stats = buildStatsModel(entries);
   const items = [
-    ["Útrata", formatPrice(stats.summary.totalSpend), "Vyplněné nákupní ceny", "spend"],
-    ["Změn celkem", formatAmount(stats.summary.totalEntries), "Všechny záznamy ve filtru", "count"],
-    ["Nákupních cen", formatAmount(stats.summary.purchaseCount), "Zápisy s cenou", "purchase"],
-    ["Průměr ceny", formatPrice(stats.summary.averagePurchase), "Průměr z vyplněných cen", "average"],
-    ["Přidávací pohyby", formatAmount(stats.summary.positiveCount), "Nákup, dar, korekce +", "positive"],
-    ["Odečítací pohyby", formatAmount(stats.summary.negativeCount), "Snězeno, vyhozeno, korekce -", "negative"]
+    ["Utraceno", formatPrice(stats.summary.totalSpend), "Součet zadaných nákupních cen", "spend"],
+    ["Záznamů", formatAmount(stats.summary.totalEntries), "Počet změn ve vybraném období", "count"],
+    ["Nákupů s cenou", formatAmount(stats.summary.purchaseCount), "Kolikrát byla vyplněná cena", "purchase"],
+    ["Průměr za nákup", formatPrice(stats.summary.averagePurchase), "Průměr jen z nákupů s cenou", "average"],
+    ["Přidáno", formatAmount(stats.summary.positiveCount), "Nákup, dar a korekce +", "positive"],
+    ["Odebráno", formatAmount(stats.summary.negativeCount), "Snězeno, vyhozeno a korekce -", "negative"]
   ];
 
   priceStats.replaceChildren();
@@ -7542,6 +7791,8 @@ function resetForm() {
   setActionState("eaten");
   setActionButtonsDisabled(false);
   updateSubmitButtonText();
+  syncEntryProductInfo();
+  updateEntryTabOrder();
   cancelEditButton.hidden = true;
   productInput.focus();
 }
@@ -7571,6 +7822,7 @@ function syncEntryProductLock() {
 
   if (!item) {
     unlockEntryProductMeta();
+    updateEntryTabOrder();
     return;
   }
 
@@ -7580,6 +7832,7 @@ function syncEntryProductLock() {
   unitSelect.disabled = true;
   categoryInput.closest(".field")?.classList.add("is-locked");
   unitSelect.closest(".field")?.classList.add("is-locked");
+  updateEntryTabOrder();
 }
 
 function unlockEntryProductMeta() {
@@ -7587,6 +7840,92 @@ function unlockEntryProductMeta() {
   unitSelect.disabled = false;
   categoryInput.closest(".field")?.classList.remove("is-locked");
   unitSelect.closest(".field")?.classList.remove("is-locked");
+}
+
+function syncEntryProductInfo() {
+  if (!entryStockInfo) {
+    return;
+  }
+
+  const name = productInput.value;
+  const combo = findComboByName(name);
+
+  if (combo) {
+    entryStockInfo.textContent = `Kombinace obsahuje ${combo.items.length} položek. Použij tlačítko Kombinace níže.`;
+    return;
+  }
+
+  const stockedItem = findItemByName(name);
+  const catalogItem = findCatalogItemByName(name);
+
+  if (stockedItem) {
+    entryStockInfo.textContent = `V lednici: ${formatAmountWithUnit(stockedItem.amount, stockedItem.unit)}.`;
+    return;
+  }
+
+  if (catalogItem) {
+    entryStockInfo.textContent = `V lednici zatím není. V číselníku: ${catalogItem.category || "Ostatní"} · ${catalogItem.unit || "ks"}.`;
+    return;
+  }
+
+  entryStockInfo.textContent = name
+    ? "Nová položka se při přidání uloží i do číselníku."
+    : "Vyber položku a ukážu, kolik jí je v lednici.";
+}
+
+function updateEntryTabOrder() {
+  const hasCatalogItem = Boolean(findCatalogItemByName(productInput.value));
+  const priceVisible = !priceInput.disabled;
+  const order = hasCatalogItem
+    ? [productInput, actionComboInput, amountInput, priceVisible ? priceInput : null, eventDateInput, submitButton]
+    : [productInput, categoryInput, actionComboInput, amountInput, unitSelect, priceVisible ? priceInput : null, eventDateInput, submitButton];
+
+  [productInput, categoryInput, actionComboInput, amountInput, unitSelect, priceInput, eventDateInput, submitButton]
+    .forEach((element) => {
+      if (element) {
+        element.tabIndex = -1;
+      }
+    });
+
+  order.filter(Boolean).forEach((element, index) => {
+    element.tabIndex = index + 1;
+  });
+}
+
+function isNegativeEntryAction(action = actionSelect.value) {
+  return ["eaten", "discarded", "adjustMinus", "subtract"].includes(action);
+}
+
+function getMaxAmountForNegativeAction(name, unit, action = actionSelect.value) {
+  if (!isNegativeEntryAction(action)) {
+    return Number.NaN;
+  }
+
+  const item = findItemByName(name);
+
+  if (!item || item.unit !== unit) {
+    return Number.NaN;
+  }
+
+  return roundAmount(item.amount);
+}
+
+function clampAmountToAvailableStock() {
+  const name = formatProductName(productInput.value);
+  const unit = findItemByName(name)?.unit || unitSelect.value;
+  const maxAmount = getMaxAmountForNegativeAction(name, unit);
+  const amount = Number(amountInput.value);
+
+  if (Number.isFinite(maxAmount)) {
+    amountInput.max = String(maxAmount);
+  } else {
+    amountInput.removeAttribute("max");
+  }
+
+  if (Number.isFinite(maxAmount) && Number.isFinite(amount) && amount > maxAmount) {
+    amountInput.value = formatFormNumber(maxAmount);
+    showMessage(`V lednici je jen ${formatAmountWithUnit(maxAmount, unit)}.`, true);
+  }
 }
 
 function showMessage(text, isError = false) {
@@ -7610,6 +7949,8 @@ function setActionState(action) {
 
   updatePriceInputLock();
   updateSubmitButtonText();
+  syncEntryProductInfo();
+  updateEntryTabOrder();
 }
 
 function updatePriceInputLock() {
@@ -7617,13 +7958,13 @@ function updatePriceInputLock() {
     return;
   }
 
-  const lockedActions = new Set(["eaten", "discarded", "adjustPlus", "adjustMinus", "subtract", "set"]);
-  const locked = lockedActions.has(actionSelect.value);
+  const visible = actionSelect.value === "purchase";
 
-  priceInput.disabled = locked;
-  priceInput.closest(".field")?.classList.toggle("is-locked", locked);
+  priceInput.disabled = !visible;
+  priceInput.closest(".field")?.toggleAttribute("hidden", !visible);
+  form.classList.toggle("is-price-hidden", !visible);
 
-  if (locked) {
+  if (!visible) {
     priceInput.value = "";
   }
 }
@@ -7731,6 +8072,27 @@ function findCatalogItemByName(name) {
   }
 
   return null;
+}
+
+function ensureCatalogItemFromEntry({ name, category, unit }) {
+  const cleanName = formatProductName(name);
+
+  if (!cleanName || findCatalogItemByName(cleanName)) {
+    return;
+  }
+
+  catalogItems.unshift({
+    id: createId(),
+    name: cleanName,
+    category: tidyName(category) || inferCategoryFromName(cleanName) || "Ostatní",
+    unit: normalizeImportUnit(unit || "ks"),
+    ean: "",
+    eans: [],
+    eanAliases: []
+  });
+  renderProductOptions();
+  renderCategoryOptions();
+  renderCatalog();
 }
 
 function findCatalogItemByEan(ean) {

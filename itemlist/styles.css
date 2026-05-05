@@ -989,7 +989,7 @@ h1 {
 
 .combo-item-row {
   display: grid;
-  grid-template-columns: minmax(170px, 1fr) 120px 100px minmax(140px, 180px) auto;
+  grid-template-columns: minmax(190px, 1fr) 120px 110px auto;
   align-items: end;
   gap: 10px;
   border: 1px solid var(--soft-line);
@@ -1029,6 +1029,27 @@ h1 {
 .catalog-alias-heading {
   display: grid;
   gap: 2px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.catalog-alias-heading::-webkit-details-marker {
+  display: none;
+}
+
+.catalog-alias-heading::after {
+  content: "Rozbalit";
+  justify-self: start;
+  border-radius: 999px;
+  background: var(--panel-strong);
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 4px 9px;
+}
+
+.catalog-alias-editor[open] .catalog-alias-heading::after {
+  content: "Sbalit";
 }
 
 .catalog-alias-heading strong {
@@ -1191,14 +1212,28 @@ body.dark-mode .modal {
   box-shadow: var(--button-shadow);
 }
 
+.pantry-export-shortcut {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 62px;
+  border-color: var(--line);
+}
+
 .scan-shortcut-button:hover {
   background: var(--accent-hover);
 }
 
+.pantry-export-shortcut .button-icon,
 .scan-shortcut-button .button-icon {
   width: 34px;
   height: 34px;
   border-radius: 8px;
+}
+
+.pantry-search-field {
+  max-width: 520px;
+  margin: 0 0 12px;
 }
 
 .category-filter-panel {
@@ -1549,11 +1584,11 @@ body.dark-mode .modal {
 .history-combo-actions {
   display: flex;
   justify-content: flex-end;
-  margin: 6px 0 12px;
+  margin: 4px 0 6px;
 }
 
 .changes-entry-form {
-  margin-bottom: 10px;
+  margin-bottom: 4px;
 }
 
 .changes-entry-form .unit-field {
@@ -1574,7 +1609,7 @@ body.dark-mode .modal {
 }
 
 .history-title-heading {
-  margin-top: 8px;
+  margin-top: 2px;
 }
 
 .field {
@@ -1587,6 +1622,12 @@ body.dark-mode .modal {
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.field-hint {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
 }
 
 .field input,
@@ -2343,6 +2384,13 @@ tbody tr:last-child td {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .section-heading h2 {
@@ -3433,8 +3481,14 @@ body.dark-mode .list-name-input {
   .changes-entry-form {
     grid-template-columns: repeat(12, minmax(0, 1fr));
     grid-template-areas:
-      "product product product category category action action amount amount unit price price"
-      ". . . . event event event event event submit submit submit";
+      "product product product category category action action amount amount unit unit unit"
+      "price price event event event event . . . submit submit submit";
+  }
+
+  .changes-entry-form.is-price-hidden {
+    grid-template-areas:
+      "product product product category category action action amount amount unit unit unit"
+      "event event event event event . . . . submit submit submit";
   }
 
   .changes-entry-form .product-field {
@@ -3479,8 +3533,15 @@ body.dark-mode .list-name-input {
     grid-template-columns: repeat(6, minmax(0, 1fr));
     grid-template-areas:
       "product product category category action action"
-      "amount amount unit price price price"
-      ". . event event submit submit";
+      "amount amount unit unit . ."
+      "price price event event submit submit";
+  }
+
+  .changes-entry-form.is-price-hidden {
+    grid-template-areas:
+      "product product category category action action"
+      "amount amount unit unit . ."
+      "event event event event submit submit";
   }
 
   .changes-entry-form .product-field {
@@ -3528,6 +3589,16 @@ body.dark-mode .list-name-input {
       "category action"
       "amount unit"
       "price price"
+      "event event"
+      "submit submit"
+      "cancel cancel";
+  }
+
+  .changes-entry-form.is-price-hidden {
+    grid-template-areas:
+      "product product"
+      "category action"
+      "amount unit"
       "event event"
       "submit submit"
       "cancel cancel";
@@ -3587,6 +3658,18 @@ body.dark-mode .list-name-input {
       "amount"
       "unit"
       "price"
+      "event"
+      "submit"
+      "cancel";
+  }
+
+  .changes-entry-form.is-price-hidden {
+    grid-template-areas:
+      "product"
+      "category"
+      "action"
+      "amount"
+      "unit"
       "event"
       "submit"
       "cancel";
