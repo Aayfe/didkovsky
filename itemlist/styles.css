@@ -3712,28 +3712,25 @@ body.dark-mode .list-name-input {
 
 @media (min-width: 1280px) {
   .changes-entry-form {
-    grid-template-columns:
-      minmax(0, 1.55fr)
-      minmax(0, 1fr)
-      minmax(0, 1fr)
-      minmax(150px, 0.9fr)
-      minmax(88px, 0.68fr)
-      minmax(108px, 0.78fr)
-      minmax(210px, 1.25fr)
-      max-content;
-    grid-template-areas: "product category action amount unit price event submit";
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-areas:
+      "product product product category category action action amount amount unit unit unit"
+      "price price event event event event . . . submit submit submit";
+    align-items: end;
   }
 
   .changes-entry-form.is-price-hidden {
-    grid-template-columns:
-      minmax(0, 1.8fr)
-      minmax(0, 1.05fr)
-      minmax(0, 1.05fr)
-      minmax(165px, 0.95fr)
-      minmax(92px, 0.72fr)
-      minmax(210px, 1.35fr)
-      max-content;
-    grid-template-areas: "product category action amount unit event submit";
+    grid-template-areas:
+      "product product product category category action action amount amount unit unit unit"
+      "event event event event event . . . . submit submit submit";
+  }
+
+  .changes-entry-form .product-field,
+  .changes-entry-form .category-field,
+  .changes-entry-form .action-field,
+  .changes-entry-form .amount-field,
+  .changes-entry-form .unit-field {
+    align-self: end;
   }
 
   .changes-entry-form #cancel-edit {
