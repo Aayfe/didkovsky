@@ -3709,3 +3709,47 @@ body.dark-mode .list-name-input {
     margin-left: 0;
   }
 }
+
+@media (min-width: 1280px) {
+  .changes-entry-form {
+    grid-template-columns:
+      minmax(0, 1.55fr)
+      minmax(0, 1fr)
+      minmax(0, 1fr)
+      minmax(150px, 0.9fr)
+      minmax(88px, 0.68fr)
+      minmax(108px, 0.78fr)
+      minmax(210px, 1.25fr)
+      max-content;
+    grid-template-areas: "product category action amount unit price event submit";
+  }
+
+  .changes-entry-form.is-price-hidden {
+    grid-template-columns:
+      minmax(0, 1.8fr)
+      minmax(0, 1.05fr)
+      minmax(0, 1.05fr)
+      minmax(165px, 0.95fr)
+      minmax(92px, 0.72fr)
+      minmax(210px, 1.35fr)
+      max-content;
+    grid-template-areas: "product category action amount unit event submit";
+  }
+
+  .changes-entry-form #cancel-edit {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+}
+
+.changes-entry-form .field > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-combo-actions[hidden],
+.field-hint[hidden] {
+  display: none !important;
+}

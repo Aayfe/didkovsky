@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux27">
+    <link rel="stylesheet" href="styles.css?v=ux28">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -137,10 +137,10 @@
         <section class="app-view" id="view-history" data-view-panel="history" hidden>
           <form class="entry-form changes-entry-form" id="entry-form" autocomplete="off">
             <label class="field combo-field product-field">
-              <span>Potravina</span>
+              <span id="product-field-label">Potravina</span>
               <input id="product-input" name="product" type="text" data-combobox-source="product-options" placeholder="Např. rohlík" required>
               <datalist id="product-options"></datalist>
-              <small class="field-hint" id="entry-stock-info">Vyber položku a ukážu, kolik jí je v lednici.</small>
+              <small class="field-hint" id="entry-stock-info" hidden></small>
             </label>
 
             <label class="field combo-field category-field">
@@ -168,6 +168,7 @@
                 <option value="Korekce -" data-value="adjustMinus" label="Ruční snížení"></option>
                 <option value="Dar" data-value="gift" label="Přidat do zásob"></option>
                 <option value="Vyhozeno" data-value="discarded" label="Odečíst ze zásob"></option>
+                <option value="Nastavit" data-value="set" label="Nastavit přesný stav"></option>
               </datalist>
             </label>
 
@@ -175,7 +176,7 @@
               <span id="amount-label">Množství</span>
               <div class="number-control">
                 <button class="number-step" type="button" data-amount-step="down" aria-label="Snížit množství">-</button>
-                <input id="amount-input" name="amount" type="number" min="0.01" step="any" inputmode="decimal" placeholder="1" aria-labelledby="amount-label" required>
+                <input id="amount-input" name="amount" type="number" min="0" step="any" inputmode="decimal" placeholder="1" aria-labelledby="amount-label" required>
                 <button class="number-step" type="button" data-amount-step="up" aria-label="Zvýšit množství">+</button>
               </div>
             </div>
@@ -203,7 +204,7 @@
             <button class="primary-button" id="submit-button" type="submit">Zapsat</button>
             <button class="ghost-button" id="cancel-edit" type="button" hidden>Zrušit úpravu</button>
           </form>
-          <div class="history-combo-actions">
+          <div class="history-combo-actions" hidden>
             <button class="ghost-button" id="open-combo-change" type="button">Kombinace</button>
           </div>
           <p class="message" id="message" role="status" aria-live="polite"></p>
@@ -665,6 +666,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux34"></script>
+    <script src="app.js?v=ux35"></script>
   </body>
 </html>

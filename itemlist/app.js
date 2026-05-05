@@ -67,6 +67,7 @@ const unitSelect = document.querySelector("#unit-select");
 const priceInput = document.querySelector("#price-input");
 const eventDateInput = document.querySelector("#event-date-input");
 const submitButton = document.querySelector("#submit-button");
+const productFieldLabel = document.querySelector("#product-field-label");
 const entryStockInfo = document.querySelector("#entry-stock-info");
 const pantryScanButton = document.querySelector("#pantry-scan-button");
 const pantryExportTextButton = document.querySelector("#pantry-export-text-button");
@@ -194,8 +195,10 @@ const ACTION_COMBOBOX_OPTIONS = [
   { value: "Korekce +", optionValue: "adjustPlus", meta: "Ruční navýšení" },
   { value: "Korekce -", optionValue: "adjustMinus", meta: "Ruční snížení" },
   { value: "Dar", optionValue: "gift", meta: "Přidat do zásob" },
-  { value: "Vyhozeno", optionValue: "discarded", meta: "Odečíst ze zásob" }
+  { value: "Vyhozeno", optionValue: "discarded", meta: "Odečíst ze zásob" },
+  { value: "Nastavit", optionValue: "set", meta: "Nastavit přesný stav" }
 ];
+const NEGATIVE_ENTRY_ACTIONS = new Set(["eaten", "discarded", "adjustMinus", "subtract"]);
 const CATEGORY_ICONS = {
   "Pečivo": "🥖",
   "Mléčné": "🥛",
@@ -281,7 +284,8 @@ let catalogItems = [];
 let appSettings = {
   subtractStockFromShopping: false,
   calorieAccountEmail: "",
-  calorieSessionCookie: ""
+  calorieSessionCookie: "",
+  caloriePairings: {}
 };
 let activeView = "pantry";
 let editingId = null;
@@ -439,8 +443,14 @@ function setupEvents() {
       return;
     }
 
-    if (!Number.isFinite(amount) || amount <= 0) {
-      showMessage("Počet musí být číslo větší než nula.", true);
+    if (!isEntryActionAvailable(action)) {
+      showMessage("Tuhle akci můžeš použít až u položky, která je v lednici.", true);
+      actionComboInput.focus();
+      return;
+    }
+
+    if (!Number.isFinite(amount) || amount < 0 || (action !== "set" && amount <= 0)) {
+      showMessage(action === "set" ? "Počet musí být číslo nula nebo větší." : "Počet musí být číslo větší než nula.", true);
       amountInput.focus();
       return;
     }
@@ -768,6 +778,7 @@ function getComboboxOptions(input) {
 
 function getActionComboboxOptions(query = "") {
   return ACTION_COMBOBOX_OPTIONS
+    .filter((item) => isEntryActionAvailable(item.optionValue))
     .filter((item) => {
       if (!query) {
         return true;
@@ -850,9 +861,10 @@ function handleComboboxKeydown(event) {
     setComboboxIndex(input, Math.max(activeComboboxIndex - 1, 0));
   }
 
-  if (event.key === "Enter" && options.length && activeComboboxIndex >= 0) {
+  if (event.key === "Enter" && options.length) {
     event.preventDefault();
-    selectComboboxValue(input, options[activeComboboxIndex].dataset.value, options[activeComboboxIndex].dataset.optionValue);
+    const selectedIndex = activeComboboxIndex >= 0 ? activeComboboxIndex : 0;
+    selectComboboxValue(input, options[selectedIndex].dataset.value, options[selectedIndex].dataset.optionValue);
   }
 
   if (event.key === "Escape") {
@@ -894,6 +906,8 @@ function selectComboboxValue(input, value, optionValue = value) {
   hideComboboxMenu(input);
 
   if (input === productInput) {
+    focusNextEntryFieldAfterProductSelect();
+  } else if (input === actionComboInput) {
     amountInput.focus();
     amountInput.select();
   } else if (input === shoppingProduct) {
@@ -902,6 +916,14 @@ function selectComboboxValue(input, value, optionValue = value) {
   } else {
     input.focus();
   }
+}
+
+function focusNextEntryFieldAfterProductSelect() {
+  const hasKnownProduct = Boolean(findCatalogItemByName(productInput.value) || findItemByName(productInput.value) || findComboByName(productInput.value));
+  const nextField = hasKnownProduct ? actionComboInput : categoryInput;
+
+  nextField.focus();
+  nextField.select?.();
 }
 
 function hideComboboxMenu(input) {
@@ -2225,7 +2247,8 @@ function setState(state) {
       : "",
     calorieSessionCookie: typeof state.appSettings?.calorieSessionCookie === "string"
       ? state.appSettings.calorieSessionCookie
-      : ""
+      : "",
+    caloriePairings: sanitizeCaloriePairings(state.appSettings?.caloriePairings)
   };
   ensureComboBuilderRows();
 }
@@ -2243,7 +2266,8 @@ function createDefaultState() {
     appSettings: {
       subtractStockFromShopping: false,
       calorieAccountEmail: "",
-      calorieSessionCookie: ""
+      calorieSessionCookie: "",
+      caloriePairings: {}
     }
   };
 }
@@ -2338,9 +2362,27 @@ function sanitizeState(state) {
         : "",
       calorieSessionCookie: typeof state.appSettings?.calorieSessionCookie === "string"
         ? state.appSettings.calorieSessionCookie
-        : ""
+        : "",
+      caloriePairings: sanitizeCaloriePairings(state.appSettings?.caloriePairings)
     }
   };
+}
+
+function sanitizeCaloriePairings(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.entries(value).reduce((pairings, [sourceName, targetName]) => {
+    const key = normalize(sourceName);
+    const target = formatProductName(targetName);
+
+    if (key && target) {
+      pairings[key] = target;
+    }
+
+    return pairings;
+  }, {});
 }
 
 function sanitizeCatalogItems(items) {
@@ -2646,6 +2688,10 @@ function upsertItemAmount({ name, amount, unit, action, category = "Ostatní" })
   const positiveActions = ["purchase", "gift", "adjustPlus", "add"];
 
   if (!existingItem) {
+    if (action === "set" && amount <= 0) {
+      return "missing";
+    }
+
     if (negativeActions.includes(action)) {
       return "missing";
     }
@@ -2661,6 +2707,11 @@ function upsertItemAmount({ name, amount, unit, action, category = "Ostatní" })
   }
 
   if (action === "set") {
+    if (amount <= 0) {
+      list.items = items.filter((item) => item.id !== existingItem.id);
+      return "removed";
+    }
+
     existingItem.amount = roundAmount(amount);
     existingItem.unit = unit;
     existingItem.category = category || existingItem.category || "Ostatní";
@@ -2741,6 +2792,17 @@ async function updateEditedItem(name, amount, unit) {
 
   if (!editedItem) {
     resetForm();
+    return;
+  }
+
+  if (amount <= 0) {
+    list.items = items.filter((item) => item.id !== editingId);
+    renderItems();
+    resetForm();
+    recordHistory(`Nastaveno ${name}: 0 ${unit}.`, "item");
+    renderHistory();
+    showMessage("Položka nastavena na nulu.");
+    await saveState();
     return;
   }
 
@@ -3410,15 +3472,26 @@ function normalizeCalorieDiaryOccurredAt(value, meal, fallbackDate) {
 }
 
 function createCalorieImportRowState(row) {
-  const match = findBestCaloriePantryMatch(row.name, row.unit);
-
-  return {
+  const rememberedTarget = findRememberedCaloriePairing(row.name);
+  const match = rememberedTarget
+    ? { item: rememberedTarget, score: 100 }
+    : findBestCalorieCatalogMatch(row.name, row.unit);
+  const state = {
     ...row,
     id: createId(),
     skipped: false,
-    targetName: match?.item?.name || "",
+    sourceName: row.name,
+    sourceAmount: row.amount,
+    sourceUnit: row.unit,
+    targetName: "",
     matchScore: match?.score || 0
   };
+
+  if (match?.item) {
+    applyCalorieTargetToRow(state, match.item.name, { remember: false, score: match.score });
+  }
+
+  return state;
 }
 
 function parseCalorieImportFromText() {
@@ -3536,7 +3609,7 @@ function renderCalorieImportRowsInto(container) {
     return;
   }
 
-  const pantryItems = getActiveItems().slice().sort((a, b) => a.name.localeCompare(b.name, "cs"));
+  const pairingTargets = getCaloriePairingTargets();
   const hasMealGroups = calorieImportRowsState.some((row) => row.meal);
   const groupedRows = hasMealGroups
     ? CALORIE_MEAL_ORDER
@@ -3604,10 +3677,13 @@ function renderCalorieImportRowsInto(container) {
       emptyOption.textContent = "Nenapárováno";
       targetSelect.append(emptyOption);
 
-      pantryItems.forEach((item) => {
+      pairingTargets.forEach((item) => {
+        const stockedItem = findExactActiveItemByName(item.name);
         const option = document.createElement("option");
         option.value = item.name;
-        option.textContent = `${item.name} (${formatAmount(item.amount)} ${item.unit})`;
+        option.textContent = stockedItem
+          ? `${item.name} (${formatAmount(stockedItem.amount)} ${stockedItem.unit} v lednici)`
+          : `${item.name} (${item.unit || "ks"}, není v lednici)`;
         targetSelect.append(option);
       });
       targetSelect.value = row.targetName;
@@ -3616,8 +3692,8 @@ function renderCalorieImportRowsInto(container) {
 
       meta.className = "muted-text";
       meta.textContent = row.targetName
-        ? `${row.meal ? `${row.meal} · ` : ""}Párování: ${Math.round(row.matchScore)} %`
-        : `${row.meal ? `${row.meal} · ` : ""}Vyber položku v lednici.`;
+        ? `${row.meal ? `${row.meal} · ` : ""}Párování: ${Math.round(row.matchScore)} %, jednotka z číselníku`
+        : `${row.meal ? `${row.meal} · ` : ""}Vyber položku z číselníku.`;
 
       article.append(skipLabel, nameInput, amountInputElement, unitSelectElement, targetSelect, meta);
       container.append(article);
@@ -3638,11 +3714,20 @@ function handleCalorieImportRowChange(event) {
     return;
   }
 
+  const previousTargetName = row.targetName;
   row.skipped = Boolean(rowElement.querySelector('[data-calorie-field="skipped"]')?.checked);
   row.name = tidyName(rowElement.querySelector('[data-calorie-field="name"]')?.value || row.name);
   row.amount = parseImportAmount(rowElement.querySelector('[data-calorie-field="amount"]')?.value) || row.amount;
   row.unit = rowElement.querySelector('[data-calorie-field="unit"]')?.value || row.unit;
   row.targetName = rowElement.querySelector('[data-calorie-field="targetName"]')?.value || "";
+
+  if (row.targetName && row.targetName !== previousTargetName) {
+    applyCalorieTargetToRow(row, row.targetName, { remember: true, score: 100, fromCurrent: true });
+    rowElement.querySelector('[data-calorie-field="amount"]').value = formatFormNumber(row.amount);
+    rowElement.querySelector('[data-calorie-field="unit"]').value = row.unit;
+    rowElement.querySelector('[data-calorie-field="targetName"]').value = row.targetName;
+  }
+
   rowElement.classList.toggle("is-skipped", row.skipped);
 }
 
@@ -3662,7 +3747,9 @@ async function applyCalorieImportDeduction() {
       return;
     }
 
-    const target = getActiveItems().find((item) => normalize(item.name) === normalize(row.targetName));
+    rememberCaloriePairing(row, row.targetName);
+    const pairedTarget = findCalorieTargetByName(row.targetName);
+    const target = findExactActiveItemByName(pairedTarget?.name || row.targetName);
 
     if (!target) {
       missing += 1;
@@ -3684,7 +3771,7 @@ async function applyCalorieImportDeduction() {
       category: target.category || "Ostatní"
     });
 
-    if (result === "missing") {
+    if (result === "missing" || result === "too-much") {
       missing += 1;
       return;
     }
@@ -3737,6 +3824,106 @@ function convertCalorieAmountToTargetUnit(amount, unit, targetUnit) {
   }
 
   return null;
+}
+
+function getCaloriePairingKey(name) {
+  return normalize(name);
+}
+
+function findRememberedCaloriePairing(name) {
+  const targetName = appSettings.caloriePairings?.[getCaloriePairingKey(name)];
+  return targetName ? findCalorieTargetByName(targetName) : null;
+}
+
+function rememberCaloriePairing(row, targetName) {
+  const target = findCalorieTargetByName(targetName);
+  const key = getCaloriePairingKey(row?.name || row?.sourceName);
+
+  if (!target || !key) {
+    return;
+  }
+
+  appSettings.caloriePairings = sanitizeCaloriePairings(appSettings.caloriePairings);
+  appSettings.caloriePairings[key] = target.name;
+  queueSaveState();
+}
+
+function applyCalorieTargetToRow(row, targetName, options = {}) {
+  const target = findCalorieTargetByName(targetName);
+
+  if (!row || !target) {
+    return;
+  }
+
+  const sourceAmount = Number(options.fromCurrent ? row.amount : (row.sourceAmount ?? row.amount));
+  const sourceUnit = options.fromCurrent ? row.unit : (row.sourceUnit || row.unit);
+  const convertedAmount = convertCalorieAmountToTargetUnit(sourceAmount, sourceUnit, target.unit);
+
+  row.targetName = target.name;
+  row.unit = target.unit || row.unit;
+
+  if (convertedAmount) {
+    row.amount = convertedAmount;
+  }
+
+  row.matchScore = options.score ?? row.matchScore ?? 100;
+
+  if (options.remember) {
+    rememberCaloriePairing(row, target.name);
+  }
+}
+
+function getCaloriePairingTargets() {
+  const targets = new Map();
+
+  getCatalogItems().forEach((item) => {
+    if (item?.name) {
+      targets.set(normalize(item.name), item);
+    }
+  });
+
+  getActiveItems().forEach((item) => {
+    const key = normalize(item.name);
+
+    if (key && !targets.has(key)) {
+      targets.set(key, item);
+    }
+  });
+
+  return [...targets.values()].sort((a, b) => a.name.localeCompare(b.name, "cs"));
+}
+
+function findCalorieTargetByName(name) {
+  const catalogItem = findCatalogItemByName(name);
+
+  if (catalogItem) {
+    return catalogItem;
+  }
+
+  return findExactActiveItemByName(name);
+}
+
+function findExactActiveItemByName(name) {
+  const normalizedName = normalize(name);
+  return getActiveItems().find((item) => normalize(item.name) === normalizedName) || null;
+}
+
+function findBestCalorieCatalogMatch(name, unit) {
+  const normalizedName = normalize(name);
+
+  if (!normalizedName) {
+    return null;
+  }
+
+  const matches = getCaloriePairingTargets()
+    .map((item) => ({
+      item,
+      score: getCaloriePantryMatchScore(name, unit, item)
+    }))
+    .filter((match) => match.score >= 42)
+    .sort((first, second) => second.score - first.score || first.item.name.localeCompare(second.item.name, "cs"));
+
+  return matches[0] || null;
 }
 
 function findBestCaloriePantryMatch(name, unit) {
@@ -4335,7 +4522,7 @@ function startComboEdit(combo) {
   comboSubmitButton.textContent = "Uložit úpravu";
   cancelComboEditButton.hidden = false;
   comboName.focus();
-  showMessage(`Upravuješ kombinaci ${combo.name}.`);
+  showMessage("");
 }
 
 function renderCombos() {
@@ -7843,38 +8030,36 @@ function unlockEntryProductMeta() {
 }
 
 function syncEntryProductInfo() {
-  if (!entryStockInfo) {
-    return;
-  }
-
   const name = productInput.value;
   const combo = findComboByName(name);
-
-  if (combo) {
-    entryStockInfo.textContent = `Kombinace obsahuje ${combo.items.length} položek. Použij tlačítko Kombinace níže.`;
-    return;
-  }
-
   const stockedItem = findItemByName(name);
   const catalogItem = findCatalogItemByName(name);
+  let info = "";
 
-  if (stockedItem) {
-    entryStockInfo.textContent = `V lednici: ${formatAmountWithUnit(stockedItem.amount, stockedItem.unit)}.`;
-    return;
+  if (combo) {
+    info = `kombinace ${combo.items.length} položek`;
+  } else if (stockedItem) {
+    info = `v lednici ${formatAmountWithUnit(stockedItem.amount, stockedItem.unit)}`;
+  } else if (catalogItem) {
+    info = `v číselníku ${catalogItem.unit || "ks"}`;
+  } else if (name) {
+    info = "nová položka";
   }
 
-  if (catalogItem) {
-    entryStockInfo.textContent = `V lednici zatím není. V číselníku: ${catalogItem.category || "Ostatní"} · ${catalogItem.unit || "ks"}.`;
-    return;
+  if (productFieldLabel) {
+    productFieldLabel.textContent = info ? `Potravina · ${info}` : "Potravina";
   }
 
-  entryStockInfo.textContent = name
-    ? "Nová položka se při přidání uloží i do číselníku."
-    : "Vyber položku a ukážu, kolik jí je v lednici.";
+  if (entryStockInfo) {
+    entryStockInfo.textContent = info;
+    entryStockInfo.hidden = true;
+  }
+
+  updateActionAvailability();
 }
 
 function updateEntryTabOrder() {
-  const hasCatalogItem = Boolean(findCatalogItemByName(productInput.value));
+  const hasCatalogItem = Boolean(findCatalogItemByName(productInput.value) || findItemByName(productInput.value) || findComboByName(productInput.value));
   const priceVisible = !priceInput.disabled;
   const order = hasCatalogItem
     ? [productInput, actionComboInput, amountInput, priceVisible ? priceInput : null, eventDateInput, submitButton]
@@ -7893,7 +8078,23 @@ function updateEntryTabOrder() {
 }
 
 function isNegativeEntryAction(action = actionSelect.value) {
-  return ["eaten", "discarded", "adjustMinus", "subtract"].includes(action);
+  return NEGATIVE_ENTRY_ACTIONS.has(action);
+}
+
+function isEntryActionAvailable(action) {
+  return !isNegativeEntryAction(action) || Boolean(findItemByName(productInput.value));
+}
+
+function updateActionAvailability() {
+  const currentAvailable = isEntryActionAvailable(actionSelect.value);
+
+  [...actionSelect.options].forEach((option) => {
+    option.disabled = !isEntryActionAvailable(option.value);
+  });
+
+  if (!currentAvailable) {
+    setActionState("purchase");
+  }
 }
 
 function getMaxAmountForNegativeAction(name, unit, action = actionSelect.value) {
@@ -7934,6 +8135,10 @@ function showMessage(text, isError = false) {
 }
 
 function setActionState(action) {
+  if (isNegativeEntryAction(action) && !findItemByName(productInput.value)) {
+    action = "purchase";
+  }
+
   actionSelect.value = action;
   const selectedOption = [...actionSelect.options].find((option) => option.value === action);
 
@@ -7948,9 +8153,14 @@ function setActionState(action) {
   });
 
   updatePriceInputLock();
+  updateAmountInputBounds();
   updateSubmitButtonText();
   syncEntryProductInfo();
   updateEntryTabOrder();
+}
+
+function updateAmountInputBounds() {
+  amountInput.min = actionSelect.value === "set" ? "0" : "0.01";
 }
 
 function updatePriceInputLock() {
@@ -7998,11 +8208,11 @@ function updateSubmitButtonText() {
 
 function stepAmount(direction) {
   const currentValue = Number(amountInput.value);
-  const min = 1;
+  const min = actionSelect.value === "set" ? 0 : 1;
   const base = direction > 0 ? Math.floor(currentValue) : Math.ceil(currentValue);
   const next = Number.isFinite(currentValue) && currentValue >= min
     ? Math.max(min, base + direction)
-    : 1;
+    : min || 1;
 
   amountInput.value = formatFormNumber(next);
   amountInput.dispatchEvent(new Event("input", { bubbles: true }));
