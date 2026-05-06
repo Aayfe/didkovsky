@@ -2701,23 +2701,132 @@ function closeDeleteAllModal() {
 async function confirmDeleteActiveList() {
   const removedList = getActiveList();
   const removedIndex = lists.findIndex((list) => list.id === removedList.id);
+  const wasOnlyList = lists.length <= 1;
 
   lists = lists.filter((list) => list.id !== removedList.id);
 
   if (!lists.length) {
     setState(createDefaultState());
   } else {
+    removeDataForList(removedList, wasOnlyList);
     activeListId = lists[Math.max(0, removedIndex - 1)].id;
   }
 
   closeDeleteListModal();
   resetForm();
+  selectedPantryCategories.clear();
+  pantryCategoryFiltersInitialized = false;
   renderLists();
   renderItems();
-  recordHistory(`Odebrán seznam ${getDisplayListName(removedList)}.`, "list", removedList);
+  renderShoppingList();
+  renderCatalog();
+  renderCombos();
   renderHistory();
+  syncSettingsControls();
   showMessage(`Seznam ${getDisplayListName(removedList)} odebrán.`);
   await saveState();
+}
+
+function removeDataForList(removedList, wasOnlyList = false) {
+  const removedNames = collectListDataNames(removedList);
+  const belongsToRemovedList = (record) => isRecordScopedToList(record, removedList);
+
+  shoppingItems = shoppingItems.filter((item) => !belongsToRemovedList(item));
+  combos = combos.filter((combo) => !belongsToRemovedList(combo));
+  catalogItems = catalogItems.filter((item) => !belongsToRemovedList(item));
+  history = history.filter((entry) => !isHistoryEntryForRemovedList(entry, removedList, wasOnlyList));
+  appSettings.caloriePairings = pruneCaloriePairingsForRemovedList(removedNames);
+
+  calorieImportRowsState = [];
+  pendingEanProduct = null;
+  pendingEanCatalogChoice = null;
+  pendingCatalogEanProduct = null;
+  editingId = null;
+  editingComboId = null;
+  editingCatalogId = null;
+  editingCatalogAliases = [];
+  editingCatalogAliasIndex = -1;
+}
+
+function collectListDataNames(removedList) {
+  const names = new Set();
+  const addName = (name) => {
+    const normalized = normalize(name || "");
+
+    if (normalized) {
+      names.add(normalized);
+    }
+  };
+
+  removedList.items?.forEach((item) => addName(item.name));
+  shoppingItems.filter((item) => isRecordScopedToList(item, removedList)).forEach((item) => addName(item.name));
+  catalogItems.filter((item) => isRecordScopedToList(item, removedList)).forEach((item) => addName(item.name));
+  combos.filter((combo) => isRecordScopedToList(combo, removedList)).forEach((combo) => {
+    addName(combo.name);
+    combo.items?.forEach((item) => addName(item.name));
+  });
+
+  return names;
+}
+
+function isRecordScopedToList(record, list) {
+  if (!record || !list) {
+    return false;
+  }
+
+  if (record.listId) {
+    return record.listId === list.id;
+  }
+
+  return true;
+}
+
+function isHistoryEntryForRemovedList(entry, removedList, wasOnlyList = false) {
+  if (!entry || !removedList) {
+    return false;
+  }
+
+  if (entry.listId) {
+    return entry.listId === removedList.id;
+  }
+
+  if (entry.listName) {
+    return normalize(entry.listName) === normalize(getDisplayListName(removedList));
+  }
+
+  return wasOnlyList;
+}
+
+function pruneCaloriePairingsForRemovedList(removedNames) {
+  const pairings = sanitizeCaloriePairings(appSettings.caloriePairings);
+
+  if (!removedNames.size) {
+    return pairings;
+  }
+
+  return Object.entries(pairings).reduce((nextPairings, [sourceName, targetName]) => {
+    const normalizedTarget = normalize(targetName);
+
+    if (!removedNames.has(normalizedTarget) || hasRemainingListDataName(normalizedTarget)) {
+      nextPairings[sourceName] = targetName;
+    }
+
+    return nextPairings;
+  }, {});
+}
+
+function hasRemainingListDataName(normalizedName) {
+  if (!normalizedName) {
+    return false;
+  }
+
+  return lists.some((list) => list.items?.some((item) => normalize(item.name) === normalizedName))
+    || shoppingItems.some((item) => normalize(item.name) === normalizedName)
+    || catalogItems.some((item) => normalize(item.name) === normalizedName)
+    || combos.some((combo) => {
+      return normalize(combo.name) === normalizedName
+        || combo.items?.some((item) => normalize(item.name) === normalizedName);
+    });
 }
 
 async function confirmDeleteAllLists() {
@@ -2728,7 +2837,11 @@ async function confirmDeleteAllLists() {
   resetForm();
   renderLists();
   renderItems();
+  renderShoppingList();
+  renderCatalog();
+  renderCombos();
   renderHistory();
+  syncSettingsControls();
   showMessage("Všechna data včetně historie a statistik byla smazána.");
   await saveState();
 }

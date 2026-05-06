@@ -712,14 +712,20 @@ textarea {
   justify-content: flex-start;
   gap: 8px;
   margin-bottom: 24px;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
+  padding-bottom: 4px;
 }
 
 .list-tabs {
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
 }
 
 .list-tab,
@@ -735,6 +741,8 @@ textarea {
 }
 
 .list-tab {
+  flex: 0 0 auto;
+  min-width: 92px;
   max-width: 180px;
   overflow: hidden;
   padding: 0 14px;
@@ -1278,27 +1286,23 @@ body.dark-mode .modal {
   margin-left: 6px;
 }
 
-.scan-shortcut-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-width: 76px;
-  border-color: transparent;
-  background: var(--accent);
-  color: #ffffff;
-  box-shadow: var(--button-shadow);
-}
-
+.scan-shortcut-button,
 .pantry-export-shortcut {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 76px;
-  border-color: transparent;
+  flex: 0 0 80px;
+  width: 80px;
+  min-width: 80px;
+  height: 64px;
+  min-height: 64px;
+  border-radius: 12px;
+  border: 0;
   background: var(--accent);
   color: #ffffff;
   box-shadow: var(--button-shadow);
+  appearance: none;
+  padding: 0;
 }
 
 .scan-shortcut-button:hover,
@@ -1308,9 +1312,10 @@ body.dark-mode .modal {
 
 .pantry-export-shortcut .button-icon,
 .scan-shortcut-button .button-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 0;
+  background: transparent;
 }
 
 .pantry-search-field {
@@ -1333,8 +1338,24 @@ body.dark-mode .modal {
   box-shadow: var(--shadow);
   font-size: 0.92rem;
   font-weight: 900;
-  padding: 10px 14px;
+  overflow: hidden;
+  padding: 10px 16px 13px;
   transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.temp-toast::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--accent);
+  content: "";
+  transform-origin: left center;
+}
+
+.temp-toast.is-visible::after {
+  animation: toastReverseLoad 2s linear forwards;
 }
 
 .temp-toast.is-visible {
@@ -1344,6 +1365,16 @@ body.dark-mode .modal {
 
 .temp-toast[hidden] {
   display: none;
+}
+
+@keyframes toastReverseLoad {
+  from {
+    transform: scaleX(1);
+  }
+
+  to {
+    transform: scaleX(0);
+  }
 }
 
 .category-filter-panel {
@@ -2050,15 +2081,24 @@ body.dark-mode .modal {
   background: var(--panel-strong);
 }
 
-.scan-shortcut-button.ghost-button {
-  min-height: 48px;
-  border-color: transparent;
+.scan-shortcut-button.ghost-button,
+.pantry-export-shortcut.ghost-button {
+  flex: 0 0 80px;
+  width: 80px;
+  min-width: 80px;
+  height: 64px;
+  min-height: 64px;
+  border-radius: 12px;
+  border: 0;
   background: var(--accent);
   color: #ffffff;
   box-shadow: var(--button-shadow);
+  appearance: none;
+  padding: 0;
 }
 
-.scan-shortcut-button.ghost-button:hover {
+.scan-shortcut-button.ghost-button:hover,
+.pantry-export-shortcut.ghost-button:hover {
   background: var(--accent-hover);
 }
 
@@ -2547,6 +2587,18 @@ tbody tr:last-child td {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.section-actions .pantry-export-shortcut,
+.section-actions .scan-shortcut-button {
+  inline-size: 80px;
+  block-size: 64px;
+  flex: 0 0 80px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #ffffff;
+  padding: 0;
 }
 
 .section-heading h2 {

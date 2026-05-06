@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux32">
+    <link rel="stylesheet" href="styles.css?v=ux35">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -62,10 +62,8 @@
               <button class="ghost-button pantry-export-shortcut" id="pantry-export-text-button" type="button" aria-label="Zkopírovat textový export lednice">
                 <span class="button-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
-                    <path d="M8 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-2"></path>
-                    <path d="M4 7h10v14H4z"></path>
-                    <path d="M7 11h4"></path>
-                    <path d="M7 15h4"></path>
+                    <rect x="8" y="8" width="11" height="11" rx="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
                   </svg>
                 </span>
               </button>
@@ -457,6 +455,10 @@
             </div>
             <ol class="settings-news-list">
               <li>
+                <time datetime="2026-05-06">06.05.2026</time>
+                <span>Prostory jsou oddělené: smazání prostoru smaže i jeho zásoby, logy, číselník, kombinace a nákupní list.</span>
+              </li>
+              <li>
                 <time datetime="2026-05-05">05.05.2026</time>
                 <span>Vylepšené Změny, exporty, lednice a práce s kombinacemi.</span>
               </li>
@@ -471,10 +473,6 @@
               <li>
                 <time datetime="2026-04-30">30.04.2026</time>
                 <span>Přidané propojení Kalorických tabulek přes účet nebo relaci.</span>
-              </li>
-              <li>
-                <time datetime="2026-04-30">30.04.2026</time>
-                <span>Rozpoznávání účtenek lépe pracuje s AI a slevami.</span>
               </li>
             </ol>
           </section>
@@ -695,6 +693,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux37"></script>
+    <script src="app.js?v=ux39"></script>
   </body>
 </html>
