@@ -2455,6 +2455,7 @@ function sanitizeState(state) {
   const activeId = sanitizedLists.some((list) => list.id === state.activeListId)
     ? state.activeListId
     : sanitizedLists[0].id;
+  const validListIds = new Set(sanitizedLists.map((list) => list.id));
   const sanitizedHistory = Array.isArray(state.history)
     ? state.history
       .filter((entry) => {
@@ -2478,14 +2479,18 @@ function sanitizeState(state) {
           action: typeof entry.action === "string" ? entry.action : ""
         };
       })
+      .filter((entry) => !entry.listId || validListIds.has(entry.listId))
       .slice(0, HISTORY_LIMIT)
     : [];
   const sanitizedShopping = sanitizeShoppingItems(state.shoppingItems)
-    .map((item) => ({ ...item, listId: item.listId || activeId }));
+    .map((item) => ({ ...item, listId: item.listId || activeId }))
+    .filter((item) => validListIds.has(item.listId));
   const sanitizedCombos = sanitizeCombos(state.combos)
-    .map((combo) => ({ ...combo, listId: combo.listId || activeId }));
+    .map((combo) => ({ ...combo, listId: combo.listId || activeId }))
+    .filter((combo) => validListIds.has(combo.listId));
   const sanitizedCatalog = sanitizeCatalogItems(state.catalogItems)
-    .map((item) => ({ ...item, listId: item.listId || activeId }));
+    .map((item) => ({ ...item, listId: item.listId || activeId }))
+    .filter((item) => validListIds.has(item.listId));
 
   return {
     lists: sanitizedLists,
@@ -2608,6 +2613,8 @@ async function addList() {
   resetForm();
   renderLists();
   renderItems();
+  renderShoppingList();
+  renderCombos();
   recordHistory(`Přidán seznam ${getDisplayListName(list)}.`, "list", list);
   renderHistory();
   showMessage("Nový seznam přidán.");
@@ -2639,6 +2646,7 @@ function switchList(id) {
   renderItems();
   renderShoppingList();
   renderCatalog();
+  renderCombos();
   renderHistory();
   showMessage("");
 }
@@ -4589,7 +4597,7 @@ function mergeShoppingItems() {
 }
 
 function isShoppingItemForActiveList(item) {
-  return !item.listId || item.listId === activeListId;
+  return Boolean(item?.listId) && item.listId === activeListId;
 }
 
 function getShoppingDisplayTitle(item, parsed, summary) {
@@ -5217,7 +5225,7 @@ function renderProductOptions() {
         text: alias.unit || item.unit
       }))
     ]),
-    ...combos.map((combo) => ({
+    ...combos.filter(isComboForActiveList).map((combo) => ({
       value: combo.name,
       label: "Kombinace",
       text: combo.items.map((item) => item.name).join(", ")
@@ -7682,7 +7690,7 @@ function getCatalogItems() {
   const map = new Map();
 
   catalogItems
-    .filter((item) => !item.listId || item.listId === activeListId)
+    .filter((item) => item.listId === activeListId)
     .forEach((item) => {
     const key = normalize(item.name);
 
@@ -7704,18 +7712,16 @@ function getCatalogItems() {
     }
   });
 
-  lists.forEach((list) => {
-    list.items.forEach((item) => {
-      const key = normalize(item.name);
+  getActiveItems().forEach((item) => {
+    const key = normalize(item.name);
 
-      if (!map.has(key)) {
-        map.set(key, {
-          name: item.name,
-          category: item.category || "Ostatní",
-          unit: item.unit
-        });
-      }
-    });
+    if (!map.has(key)) {
+      map.set(key, {
+        name: item.name,
+        category: item.category || "Ostatní",
+        unit: item.unit
+      });
+    }
   });
 
   combos.filter(isComboForActiveList).forEach((combo) => {
@@ -8830,7 +8836,7 @@ function findComboByName(name) {
 }
 
 function isComboForActiveList(combo) {
-  return !combo.listId || combo.listId === activeListId;
+  return Boolean(combo?.listId) && combo.listId === activeListId;
 }
 
 function findCatalogItemByName(name) {
