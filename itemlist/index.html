@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux36">
+    <link rel="stylesheet" href="styles.css?v=ux37">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -456,6 +456,10 @@
             <ol class="settings-news-list">
               <li>
                 <time datetime="2026-05-06">06.05.2026</time>
+                <span>Číselník je hlavní zdroj pro názvy, kategorie a jednotky produktů.</span>
+              </li>
+              <li>
+                <time datetime="2026-05-06">06.05.2026</time>
                 <span>Prostory jsou oddělené: smazání prostoru smaže i jeho zásoby, logy, číselník, kombinace a nákupní list.</span>
               </li>
               <li>
@@ -469,10 +473,6 @@
               <li>
                 <time datetime="2026-04-30">30.04.2026</time>
                 <span>Odečet z Kalorických tabulek načítá položky po dnech a umí je odečíst z lednice.</span>
-              </li>
-              <li>
-                <time datetime="2026-04-30">30.04.2026</time>
-                <span>Přidané propojení Kalorických tabulek přes účet nebo relaci.</span>
               </li>
             </ol>
           </section>
@@ -651,6 +651,17 @@
       </div>
     </div>
 
+    <div class="modal-backdrop" id="missing-catalog-modal" hidden>
+      <div class="modal missing-catalog-modal" role="dialog" aria-modal="true" aria-labelledby="missing-catalog-title">
+        <h2 id="missing-catalog-title">Položka není v číselníku</h2>
+        <p class="missing-catalog-warning" id="missing-catalog-description">Tato položka není v číselníku, chcete ji tam přidat?</p>
+        <div class="modal-actions">
+          <button class="ghost-button" id="cancel-missing-catalog" type="button">Zrušit akci</button>
+          <button class="primary-button" id="confirm-missing-catalog" type="button">Přidat do číselníku i do lednice</button>
+        </div>
+      </div>
+    </div>
+
     <div class="modal-backdrop" id="import-modal" hidden>
       <div class="modal import-modal" role="dialog" aria-modal="true" aria-labelledby="import-title">
         <h2 id="import-title">Import</h2>
@@ -693,6 +704,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux44"></script>
+    <script src="app.js?v=ux48"></script>
   </body>
 </html>

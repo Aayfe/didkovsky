@@ -2168,6 +2168,11 @@ body.dark-mode .modal {
   color: var(--danger);
 }
 
+#view-history > #message {
+  min-height: 18px;
+  margin: 8px 0 10px;
+}
+
 .setting-line {
   width: fit-content;
   max-width: 100%;
@@ -2717,6 +2722,19 @@ tbody tr:last-child td {
 
 .import-modal {
   width: min(560px, 100%);
+}
+
+.missing-catalog-modal {
+  width: min(560px, 100%);
+}
+
+.missing-catalog-warning {
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-weight: 800;
+  padding: 12px 14px;
 }
 
 .combo-change-modal {
@@ -3658,7 +3676,7 @@ body.dark-mode .list-name-input {
    generic form breakpoints above cannot collapse it unpredictably. */
 .changes-entry-form {
   align-items: end;
-  gap: clamp(10px, 1.1vw, 18px);
+  gap: 10px 14px;
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -3920,17 +3938,22 @@ body.dark-mode .list-name-input {
 
 @media (min-width: 1280px) {
   .changes-entry-form {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-columns:
+      minmax(240px, 1.35fr)
+      minmax(160px, 0.9fr)
+      minmax(160px, 0.9fr)
+      minmax(210px, 0.95fr)
+      minmax(100px, 0.55fr);
     grid-template-areas:
-      "product product product category category action action amount amount unit unit unit"
-      "price price event event event event . . . submit submit submit";
+      "product category action amount unit"
+      "price event event event submit";
     align-items: end;
   }
 
   .changes-entry-form.is-price-hidden {
     grid-template-areas:
-      "product product product category category action action amount amount unit unit unit"
-      "event event event event event . . . . submit submit submit";
+      "product category action amount unit"
+      "event event event event submit";
   }
 
   .changes-entry-form .product-field,

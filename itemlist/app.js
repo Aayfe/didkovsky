@@ -3221,11 +3221,11 @@ function startEdit(id) {
   form.reset();
   setDefaultEventDate();
   productInput.value = item.name;
-  amountInput.value = "1";
+  amountInput.value = formatFormNumber(item.amount);
   unitSelect.value = catalogItem.unit || item.unit || "ks";
   categoryInput.value = catalogItem.category || item.category || "Ostatní";
   syncEntryProductLock();
-  setActionState("eaten");
+  setActionState("set");
   setActionButtonsDisabled(false);
   updateSubmitButtonText();
   cancelEditButton.hidden = false;
