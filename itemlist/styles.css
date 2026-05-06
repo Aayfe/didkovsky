@@ -1291,12 +1291,12 @@ body.dark-mode .modal {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 80px;
-  width: 80px;
-  min-width: 80px;
-  height: 64px;
-  min-height: 64px;
-  border-radius: 12px;
+  flex: 0 0 64px;
+  width: 64px;
+  min-width: 64px;
+  height: 52px;
+  min-height: 52px;
+  border-radius: 10px;
   border: 0;
   background: var(--accent);
   color: #ffffff;
@@ -1312,8 +1312,8 @@ body.dark-mode .modal {
 
 .pantry-export-shortcut .button-icon,
 .scan-shortcut-button .button-icon {
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   border-radius: 0;
   background: transparent;
 }
@@ -2083,12 +2083,12 @@ body.dark-mode .modal {
 
 .scan-shortcut-button.ghost-button,
 .pantry-export-shortcut.ghost-button {
-  flex: 0 0 80px;
-  width: 80px;
-  min-width: 80px;
-  height: 64px;
-  min-height: 64px;
-  border-radius: 12px;
+  flex: 0 0 64px;
+  width: 64px;
+  min-width: 64px;
+  height: 52px;
+  min-height: 52px;
+  border-radius: 10px;
   border: 0;
   background: var(--accent);
   color: #ffffff;
@@ -2591,11 +2591,11 @@ tbody tr:last-child td {
 
 .section-actions .pantry-export-shortcut,
 .section-actions .scan-shortcut-button {
-  inline-size: 80px;
-  block-size: 64px;
-  flex: 0 0 80px;
+  inline-size: 64px;
+  block-size: 52px;
+  flex: 0 0 64px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--accent);
   color: #ffffff;
   padding: 0;
