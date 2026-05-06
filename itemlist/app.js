@@ -86,6 +86,10 @@ const deleteAllButton = document.querySelector("#delete-all-button");
 const deleteAllModal = document.querySelector("#delete-all-modal");
 const cancelDeleteAll = document.querySelector("#cancel-delete-all");
 const confirmDeleteAll = document.querySelector("#confirm-delete-all");
+const missingCatalogModal = document.querySelector("#missing-catalog-modal");
+const missingCatalogDescription = document.querySelector("#missing-catalog-description");
+const cancelMissingCatalog = document.querySelector("#cancel-missing-catalog");
+const confirmMissingCatalog = document.querySelector("#confirm-missing-catalog");
 const importModal = document.querySelector("#import-modal");
 const importText = document.querySelector("#import-text");
 const importError = document.querySelector("#import-error");
@@ -320,6 +324,7 @@ let currentTextExport = {
 };
 let currentImportMode = "items";
 let tempToastTimer = null;
+let pendingMissingCatalogEntry = null;
 
 const COMBOBOX_INPUT_SELECTOR = "[data-combobox-source]";
 
@@ -452,10 +457,12 @@ function setupEvents() {
     const amount = Number(amountInput.value);
     const price = parseOptionalPrice(priceInput.value);
     const eventDate = normalizeEventDate(eventDateInput.value);
-    const category = tidyName(categoryInput.value) || "Ostatní";
-    const existingProduct = findItemByName(name);
+    const catalogProduct = findStoredCatalogItemByName(name);
+    const itemName = catalogProduct?.name || name;
+    const existingProduct = findItemByName(itemName);
     const action = actionSelect.value;
-    const unit = existingProduct && action !== "set" ? existingProduct.unit : unitSelect.value;
+    const category = catalogProduct?.category || tidyName(categoryInput.value) || existingProduct?.category || "Ostatní";
+    const unit = catalogProduct?.unit || (existingProduct && action !== "set" ? existingProduct.unit : unitSelect.value);
 
     if (!name) {
       showMessage("Vyplň položku.", true);
@@ -492,7 +499,12 @@ function setupEvents() {
 
     unitSelect.value = unit;
 
-    const maxAmount = getMaxAmountForNegativeAction(name, unit, action);
+    if (!editingId && shouldConfirmMissingCatalogEntry(name, combo)) {
+      openMissingCatalogEntryModal({ name: itemName, amount, unit, action, category, price, eventDate });
+      return;
+    }
+
+    const maxAmount = getMaxAmountForNegativeAction(itemName, unit, action);
 
     if (Number.isFinite(maxAmount) && amount > maxAmount) {
       amountInput.value = formatFormNumber(maxAmount);
@@ -507,7 +519,7 @@ function setupEvents() {
       return;
     }
 
-    await applyItemChange({ name, amount, unit, action, category, price, eventDate });
+    await applyItemChange({ name: itemName, amount, unit, action, category, price, eventDate });
   });
 
   amountInput.addEventListener("input", () => {
@@ -517,6 +529,9 @@ function setupEvents() {
 
     clampAmountToAvailableStock();
   });
+  amountInput.addEventListener("keydown", handleEntryStepKeydown);
+  unitSelect.addEventListener("keydown", handleEntryStepKeydown);
+  priceInput.addEventListener("keydown", handleEntryStepKeydown);
 
   productInput.addEventListener("input", syncUnitFromProduct);
   productInput.addEventListener("change", syncUnitFromProduct);
@@ -526,6 +541,8 @@ function setupEvents() {
   productInput.addEventListener("change", syncEntryProductLock);
   productInput.addEventListener("input", syncEntryProductInfo);
   productInput.addEventListener("change", syncEntryProductInfo);
+  productInput.addEventListener("input", syncDefaultEntryActionFromProduct);
+  productInput.addEventListener("change", syncDefaultEntryActionFromProduct);
   productInput.addEventListener("input", clampAmountToAvailableStock);
   productInput.addEventListener("change", clampAmountToAvailableStock);
   addListButton.addEventListener("click", addList);
@@ -594,6 +611,8 @@ function setupEvents() {
   deleteAllButton.addEventListener("click", openDeleteAllModal);
   cancelDeleteAll.addEventListener("click", closeDeleteAllModal);
   confirmDeleteAll.addEventListener("click", confirmDeleteAllLists);
+  cancelMissingCatalog?.addEventListener("click", cancelMissingCatalogEntry);
+  confirmMissingCatalog?.addEventListener("click", confirmMissingCatalogEntry);
   cancelImport.addEventListener("click", closeImportModal);
   confirmImport.addEventListener("click", importShoppingList);
 
@@ -606,6 +625,12 @@ function setupEvents() {
   deleteAllModal.addEventListener("click", (event) => {
     if (event.target === deleteAllModal) {
       closeDeleteAllModal();
+    }
+  });
+
+  missingCatalogModal?.addEventListener("click", (event) => {
+    if (event.target === missingCatalogModal) {
+      cancelMissingCatalogEntry();
     }
   });
 
@@ -927,6 +952,9 @@ function selectComboboxValue(input, value, optionValue = value) {
 
   if (input === productInput) {
     focusNextEntryFieldAfterProductSelect();
+  } else if (input === categoryInput) {
+    actionComboInput.focus();
+    actionComboInput.select();
   } else if (input === actionComboInput) {
     amountInput.focus();
     amountInput.select();
@@ -939,7 +967,7 @@ function selectComboboxValue(input, value, optionValue = value) {
 }
 
 function focusNextEntryFieldAfterProductSelect() {
-  const hasKnownProduct = Boolean(findCatalogItemByName(productInput.value) || findItemByName(productInput.value) || findComboByName(productInput.value));
+  const hasKnownProduct = Boolean(findStoredCatalogItemByName(productInput.value) || findComboByName(productInput.value));
   const nextField = hasKnownProduct ? actionComboInput : categoryInput;
 
   nextField.focus();
@@ -2739,6 +2767,55 @@ function closeDeleteAllModal() {
   deleteAllButton.focus();
 }
 
+function shouldConfirmMissingCatalogEntry(name, combo) {
+  return Boolean(name)
+    && !combo
+    && !findStoredCatalogItemByName(name);
+}
+
+function openMissingCatalogEntryModal(entry) {
+  pendingMissingCatalogEntry = entry;
+
+  if (missingCatalogDescription) {
+    missingCatalogDescription.textContent = `Tato položka není v číselníku, chcete ji tam přidat?`;
+  }
+
+  missingCatalogModal.hidden = false;
+  confirmMissingCatalog?.focus();
+}
+
+function closeMissingCatalogEntryModal() {
+  missingCatalogModal.hidden = true;
+}
+
+function cancelMissingCatalogEntry() {
+  pendingMissingCatalogEntry = null;
+  closeMissingCatalogEntryModal();
+  showMessage("Akce zrušena.", true);
+  productInput.focus();
+}
+
+async function confirmMissingCatalogEntry() {
+  const entry = pendingMissingCatalogEntry;
+
+  if (!entry) {
+    closeMissingCatalogEntryModal();
+    return;
+  }
+
+  pendingMissingCatalogEntry = null;
+  closeMissingCatalogEntryModal();
+  upsertCatalogItem({
+    name: entry.name,
+    category: entry.category || "Ostatní",
+    unit: entry.unit || "ks",
+    listId: activeListId
+  });
+  renderCatalog();
+  renderProductOptions();
+  await applyItemChange(entry);
+}
+
 async function confirmDeleteActiveList() {
   const removedList = getActiveList();
   const removedIndex = lists.findIndex((list) => list.id === removedList.id);
@@ -2926,7 +3003,6 @@ async function applyItemChange({ name, amount, unit, action, category, price = n
     }
   }
 
-  ensureCatalogItemFromEntry({ name: itemName, category, unit });
   const historyText = getItemHistoryText(itemName, amount, unit, action, result, price);
   recordHistory(historyText, "item", getActiveList(), {
     action,
@@ -3137,18 +3213,28 @@ function startEdit(id) {
     return;
   }
 
-  editingId = id;
-  productInput.value = item.name;
-  amountInput.value = String(item.amount);
-  unitSelect.value = item.unit;
-  categoryInput.value = item.category || "Ostatní";
-  setActionState("set");
-  setActionButtonsDisabled(true);
-  submitButton.textContent = "Uložit";
-  cancelEditButton.hidden = false;
+  const repairedCatalog = ensureActiveCatalogIntegrity();
+  const catalogItem = findStoredCatalogItemByName(item.name) || item;
+
+  editingId = null;
   switchView("history");
-  productInput.focus();
-  showMessage("");
+  form.reset();
+  setDefaultEventDate();
+  productInput.value = item.name;
+  amountInput.value = "1";
+  unitSelect.value = catalogItem.unit || item.unit || "ks";
+  categoryInput.value = catalogItem.category || item.category || "Ostatní";
+  syncEntryProductLock();
+  setActionState("eaten");
+  setActionButtonsDisabled(false);
+  updateSubmitButtonText();
+  cancelEditButton.hidden = false;
+  amountInput.focus();
+  amountInput.select();
+  showMessage(`Vybráno ${item.name}. V lednici je ${formatAmountWithUnit(item.amount, item.unit)}.`);
+  if (repairedCatalog) {
+    queueSaveState();
+  }
 }
 
 async function removeItem(id) {
@@ -5109,6 +5195,11 @@ function applyTheme() {
 }
 
 function renderItems() {
+  const repairedCatalog = ensureActiveCatalogIntegrity();
+  if (repairedCatalog) {
+    queueSaveState();
+  }
+
   const items = getActiveItems();
   renderPantryCategoryFilters(items);
   const visibleItems = getVisiblePantryItems(items);
@@ -5151,6 +5242,35 @@ function renderItems() {
     });
 
   renderShoppingList();
+}
+
+function ensureActiveCatalogIntegrity() {
+  let repaired = false;
+
+  getActiveItems().forEach((item) => {
+    if (findStoredCatalogItemByName(item.name)) {
+      const catalogItem = findStoredCatalogItemByName(item.name);
+      if (catalogItem.category && item.category !== catalogItem.category) {
+        item.category = catalogItem.category;
+        repaired = true;
+      }
+      if (catalogItem.unit && item.unit !== catalogItem.unit) {
+        item.unit = catalogItem.unit;
+        repaired = true;
+      }
+      return;
+    }
+
+    upsertCatalogItem({
+      name: item.name,
+      category: item.category || "Ostatní",
+      unit: item.unit || "ks",
+      listId: activeListId
+    });
+    repaired = true;
+  });
+
+  return repaired;
 }
 
 function renderPantryCategoryFilters(items = getActiveItems()) {
@@ -8615,7 +8735,7 @@ function getLocalDateTimeValue(date) {
 }
 
 function syncEntryProductLock() {
-  const item = findCatalogItemByName(productInput.value);
+  const item = findStoredCatalogItemByName(productInput.value);
 
   if (!item) {
     unlockEntryProductMeta();
@@ -8642,8 +8762,8 @@ function unlockEntryProductMeta() {
 function syncEntryProductInfo() {
   const name = productInput.value;
   const combo = findComboByName(name);
-  const stockedItem = findItemByName(name);
-  const catalogItem = findCatalogItemByName(name);
+  const catalogItem = findStoredCatalogItemByName(name);
+  const stockedItem = findItemByName(catalogItem?.name || name);
   let info = "";
 
   if (combo) {
@@ -8669,11 +8789,7 @@ function syncEntryProductInfo() {
 }
 
 function updateEntryTabOrder() {
-  const hasCatalogItem = Boolean(findCatalogItemByName(productInput.value) || findItemByName(productInput.value) || findComboByName(productInput.value));
-  const priceVisible = !priceInput.disabled;
-  const order = hasCatalogItem
-    ? [productInput, actionComboInput, amountInput, priceVisible ? priceInput : null, eventDateInput, submitButton]
-    : [productInput, categoryInput, actionComboInput, amountInput, unitSelect, priceVisible ? priceInput : null, eventDateInput, submitButton];
+  const order = getEntryKeyboardOrder();
 
   [productInput, categoryInput, actionComboInput, amountInput, unitSelect, priceInput, eventDateInput, submitButton]
     .forEach((element) => {
@@ -8687,12 +8803,76 @@ function updateEntryTabOrder() {
   });
 }
 
+function getEntryKeyboardOrder() {
+  const hasKnownProduct = Boolean(findStoredCatalogItemByName(productInput.value) || findComboByName(productInput.value));
+  const priceVisible = !priceInput.disabled && !priceInput.closest(".field")?.hidden;
+  const order = [productInput];
+
+  if (!hasKnownProduct) {
+    order.push(categoryInput);
+  }
+
+  order.push(actionComboInput, amountInput);
+
+  if (!unitSelect.disabled) {
+    order.push(unitSelect);
+  }
+
+  if (priceVisible) {
+    order.push(priceInput);
+  }
+
+  order.push(submitButton);
+
+  return order;
+}
+
+function focusNextEntryControl(currentElement) {
+  const order = getEntryKeyboardOrder().filter((element) => {
+    return element && !element.disabled && !element.hidden && !element.closest(".field")?.hidden;
+  });
+  const currentIndex = order.indexOf(currentElement);
+  const nextElement = order[currentIndex + 1] || submitButton;
+
+  nextElement.focus();
+  nextElement.select?.();
+}
+
+function handleEntryStepKeydown(event) {
+  if (event.key !== "Enter") {
+    return;
+  }
+
+  event.preventDefault();
+  focusNextEntryControl(event.currentTarget);
+}
+
+function syncDefaultEntryActionFromProduct() {
+  if (editingId) {
+    return;
+  }
+
+  const stockedItem = findEntryStockItemByInput();
+
+  if (stockedItem && actionSelect.value !== "eaten") {
+    setActionState("eaten");
+    return;
+  }
+
+  updateActionAvailability();
+}
+
+function findEntryStockItemByInput(value = productInput.value) {
+  const catalogItem = findStoredCatalogItemByName(value);
+  return findItemByName(catalogItem?.name || value);
+}
+
 function isNegativeEntryAction(action = actionSelect.value) {
   return NEGATIVE_ENTRY_ACTIONS.has(action);
 }
 
 function isEntryActionAvailable(action) {
-  return !isNegativeEntryAction(action) || Boolean(findItemByName(productInput.value));
+  return !isNegativeEntryAction(action) || Boolean(findEntryStockItemByInput());
 }
 
 function updateActionAvailability() {
@@ -8712,7 +8892,8 @@ function getMaxAmountForNegativeAction(name, unit, action = actionSelect.value) 
     return Number.NaN;
   }
 
-  const item = findItemByName(name);
+  const catalogItem = findStoredCatalogItemByName(name);
+  const item = findItemByName(catalogItem?.name || name);
 
   if (!item || item.unit !== unit) {
     return Number.NaN;
@@ -8723,7 +8904,7 @@ function getMaxAmountForNegativeAction(name, unit, action = actionSelect.value) 
 
 function clampAmountToAvailableStock() {
   const name = formatProductName(productInput.value);
-  const unit = findItemByName(name)?.unit || unitSelect.value;
+  const unit = findEntryStockItemByInput()?.unit || unitSelect.value;
   const maxAmount = getMaxAmountForNegativeAction(name, unit);
   const amount = Number(amountInput.value);
 
@@ -8745,7 +8926,7 @@ function showMessage(text, isError = false) {
 }
 
 function setActionState(action) {
-  if (isNegativeEntryAction(action) && !findItemByName(productInput.value)) {
+  if (isNegativeEntryAction(action) && !findEntryStockItemByInput()) {
     action = "purchase";
   }
 
@@ -8837,7 +9018,7 @@ function syncUnitFromProduct() {
     return;
   }
 
-  const item = findCatalogItemByName(productInput.value) || findItemByName(productInput.value);
+  const item = findStoredCatalogItemByName(productInput.value) || findItemByName(productInput.value);
 
   if (item) {
     unitSelect.value = item.unit;
@@ -8852,7 +9033,7 @@ function syncCategoryFromProduct() {
     return;
   }
 
-  const item = findCatalogItemByName(productInput.value) || findItemByName(productInput.value);
+  const item = findStoredCatalogItemByName(productInput.value) || findItemByName(productInput.value);
 
   if (item) {
     categoryInput.value = item.category || "Ostatní";
@@ -8871,6 +9052,51 @@ function findComboByName(name) {
 
 function isComboForActiveList(combo) {
   return Boolean(combo?.listId) && combo.listId === activeListId;
+}
+
+function getStoredCatalogItems() {
+  return catalogItems
+    .filter((item) => item.listId === activeListId)
+    .map((item) => {
+      const aliases = normalizeEanAliases(item.eanAliases);
+      const eans = normalizeEanList([
+        ...(Array.isArray(item.eans) ? item.eans : [item.eans]),
+        item.ean,
+        ...aliases.map((alias) => alias.ean)
+      ]);
+
+      return {
+        ...item,
+        ean: eans[0] || "",
+        eans,
+        eanAliases: aliases
+      };
+    });
+}
+
+function findStoredCatalogItemByName(name) {
+  const normalizedName = normalize(name);
+
+  if (!normalizedName) {
+    return null;
+  }
+
+  const items = getStoredCatalogItems();
+  const exactItem = items.find((item) => normalize(item.name) === normalizedName);
+
+  if (exactItem) {
+    return exactItem;
+  }
+
+  for (const item of items) {
+    const alias = normalizeEanAliases(item.eanAliases).find((currentAlias) => normalize(currentAlias.name) === normalizedName);
+
+    if (alias) {
+      return { ...item, _nameAlias: alias };
+    }
+  }
+
+  return null;
 }
 
 function findCatalogItemByName(name) {
@@ -8901,7 +9127,7 @@ function findCatalogItemByName(name) {
 function ensureCatalogItemFromEntry({ name, category, unit }) {
   const cleanName = formatProductName(name);
 
-  if (!cleanName || findCatalogItemByName(cleanName)) {
+  if (!cleanName || findStoredCatalogItemByName(cleanName)) {
     return;
   }
 
