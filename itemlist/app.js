@@ -2655,7 +2655,7 @@ function renderLists(options = {}) {
 
   pageTitle.textContent = getDisplayListName(activeList);
 
-  [getActiveList()].forEach((list) => {
+  lists.forEach((list) => {
     const tab = document.createElement("button");
     const isActive = list.id === activeList.id;
 
