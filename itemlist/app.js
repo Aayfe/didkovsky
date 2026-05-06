@@ -206,6 +206,7 @@ const ACTION_COMBOBOX_OPTIONS = [
   { value: "Nastavit", optionValue: "set", meta: "Nastavit přesný stav" }
 ];
 const NEGATIVE_ENTRY_ACTIONS = new Set(["eaten", "discarded", "adjustMinus", "subtract"]);
+const ACTIVE_LIST_STORAGE_PREFIX = "itemlist-active-list-id";
 const CATEGORY_ICONS = {
   "Pečivo": "🥖",
   "Mléčné": "🥛",
@@ -2366,7 +2367,7 @@ async function updateAllowedUserAdmin(email, isAdmin) {
 
 function setState(state) {
   lists = state.lists;
-  activeListId = state.activeListId;
+  activeListId = getLocalActiveListId(lists) || lists[0]?.id || null;
   history = state.history || [];
   shoppingItems = state.shoppingItems || [];
   mergeShoppingItems();
@@ -2383,6 +2384,7 @@ function setState(state) {
     caloriePairings: sanitizeCaloriePairings(state.appSettings?.caloriePairings)
   };
   ensureComboBuilderRows();
+  rememberActiveListId();
 }
 
 function createDefaultState() {
@@ -2407,7 +2409,7 @@ function createDefaultState() {
 function serializeState() {
   return {
     lists,
-    activeListId,
+    activeListId: lists[0]?.id || null,
     history,
     shoppingItems,
     combos,
@@ -2452,9 +2454,8 @@ function sanitizeState(state) {
     return createDefaultState();
   }
 
-  const activeId = sanitizedLists.some((list) => list.id === state.activeListId)
-    ? state.activeListId
-    : sanitizedLists[0].id;
+  const defaultListId = sanitizedLists[0].id;
+  const activeId = getLocalActiveListId(sanitizedLists) || defaultListId;
   const validListIds = new Set(sanitizedLists.map((list) => list.id));
   const sanitizedHistory = Array.isArray(state.history)
     ? state.history
@@ -2483,13 +2484,13 @@ function sanitizeState(state) {
       .slice(0, HISTORY_LIMIT)
     : [];
   const sanitizedShopping = sanitizeShoppingItems(state.shoppingItems)
-    .map((item) => ({ ...item, listId: item.listId || activeId }))
+    .map((item) => ({ ...item, listId: item.listId || defaultListId }))
     .filter((item) => validListIds.has(item.listId));
   const sanitizedCombos = sanitizeCombos(state.combos)
-    .map((combo) => ({ ...combo, listId: combo.listId || activeId }))
+    .map((combo) => ({ ...combo, listId: combo.listId || defaultListId }))
     .filter((combo) => validListIds.has(combo.listId));
   const sanitizedCatalog = sanitizeCatalogItems(state.catalogItems)
-    .map((item) => ({ ...item, listId: item.listId || activeId }))
+    .map((item) => ({ ...item, listId: item.listId || defaultListId }))
     .filter((item) => validListIds.has(item.listId));
 
   return {
@@ -2606,10 +2607,41 @@ function getActiveItems() {
   return getActiveList().items;
 }
 
+function getActiveListStorageKey() {
+  const userKey = currentUser?.id || getCurrentUserEmail() || "anonymous";
+  return `${ACTIVE_LIST_STORAGE_PREFIX}:${userKey}`;
+}
+
+function getLocalActiveListId(listRows = lists) {
+  if (!Array.isArray(listRows) || !listRows.length) {
+    return "";
+  }
+
+  try {
+    const storedId = localStorage.getItem(getActiveListStorageKey()) || "";
+    return listRows.some((list) => list.id === storedId) ? storedId : "";
+  } catch {
+    return "";
+  }
+}
+
+function rememberActiveListId() {
+  if (!activeListId) {
+    return;
+  }
+
+  try {
+    localStorage.setItem(getActiveListStorageKey(), activeListId);
+  } catch {
+    // Local persistence is a convenience only; the app still works without it.
+  }
+}
+
 async function addList() {
   const list = createList(getNextListName());
   lists.push(list);
   activeListId = list.id;
+  rememberActiveListId();
   resetForm();
   renderLists();
   renderItems();
@@ -2641,6 +2673,7 @@ function switchList(id) {
   }
 
   activeListId = id;
+  rememberActiveListId();
   resetForm();
   renderLists();
   renderItems();
@@ -2718,6 +2751,7 @@ async function confirmDeleteActiveList() {
   } else {
     removeDataForList(removedList, wasOnlyList);
     activeListId = lists[Math.max(0, removedIndex - 1)].id;
+    rememberActiveListId();
   }
 
   closeDeleteListModal();
