@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux31">
+    <link rel="stylesheet" href="styles.css?v=ux32">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -38,8 +38,8 @@
         </div>
         <nav class="menu-nav" aria-label="Hlavní navigace">
           <button class="menu-link is-active" type="button" data-view="pantry">Lednice</button>
-          <button class="menu-link" type="button" data-view="shopping">Nákupní list</button>
           <button class="menu-link" type="button" data-view="history">Změny</button>
+          <button class="menu-link" type="button" data-view="shopping">Nákupní list</button>
           <button class="menu-link" type="button" data-view="catalog">Číselník potravin</button>
           <button class="menu-link" type="button" data-view="combos">Kombinace</button>
           <button class="menu-link" type="button" data-view="tools">Import / export</button>
@@ -107,30 +107,33 @@
               <h1>Nákupní list</h1>
             </div>
           </div>
-          <label class="admin-checkbox setting-line">
-            <input id="shopping-subtract-stock" type="checkbox">
-            <span>Odečítat od nákupního listu to, co už je v lednici</span>
-          </label>
-          <form class="shopping-form" id="shopping-form" autocomplete="off">
-            <label class="field">
-              <span>Potravina</span>
-              <input id="shopping-product" type="text" data-combobox-source="product-options" placeholder="Např. máslo">
+          <details class="shopping-limit-panel">
+            <summary>Nastavení limitů</summary>
+            <label class="admin-checkbox setting-line">
+              <input id="shopping-subtract-stock" type="checkbox">
+              <span>Hlídání limitů podle aktuální lednice</span>
             </label>
-            <label class="field">
-              <span>Limit / množství</span>
-              <input id="shopping-amount" type="number" min="0.01" step="any" inputmode="decimal" placeholder="1">
-            </label>
-            <label class="field">
-              <span>Jednotka</span>
-              <select id="shopping-unit">
-                <option value="g">g</option>
-                <option value="ml">ml</option>
-                <option value="ks">ks</option>
-                <option value="kg">kg</option>
-              </select>
-            </label>
-            <button class="primary-button" type="submit">Přidat</button>
-          </form>
+            <form class="shopping-form" id="shopping-form" autocomplete="off">
+              <label class="field">
+                <span>Potravina</span>
+                <input id="shopping-product" type="text" data-combobox-source="product-options" placeholder="Např. máslo">
+              </label>
+              <label class="field">
+                <span>Limit v lednici</span>
+                <input id="shopping-amount" type="number" min="0.01" step="any" inputmode="decimal" placeholder="1">
+              </label>
+              <label class="field">
+                <span>Jednotka</span>
+                <select id="shopping-unit">
+                  <option value="g">g</option>
+                  <option value="ml">ml</option>
+                  <option value="ks">ks</option>
+                  <option value="kg">kg</option>
+                </select>
+              </label>
+              <button class="primary-button" type="submit">Uložit limit</button>
+            </form>
+          </details>
           <div class="card-list" id="shopping-list"></div>
         </section>
 
@@ -360,6 +363,7 @@
               <button class="primary-button" id="calorie-diary-button" type="button">Odečet z Kalorických tabulek</button>
               <button class="ghost-button" id="import-button" type="button">Hromadný import textem</button>
               <button class="ghost-button" id="xml-import-button" type="button">Import XML</button>
+              <button class="ghost-button" id="catalog-import-button" type="button">Import číselníku</button>
               <input class="visually-hidden" id="xml-file-input" type="file" accept=".xml,application/xml,text/xml">
             </section>
             <section class="tool-group">
@@ -444,7 +448,6 @@
               <input id="settings-shopping-subtract-stock" type="checkbox">
               <span>Nákupní list odečítá aktuální zásoby</span>
             </label>
-            <button class="danger-button" id="delete-list-button" type="button">Odebrat aktuální prostor</button>
           </div>
 
           <section class="settings-news-panel" aria-labelledby="settings-news-title">
@@ -503,7 +506,7 @@
             </div>
           </details>
 
-          <details class="calorie-import-panel">
+          <details class="calorie-import-panel" hidden>
             <summary>Ruční odečet z Kalorických tabulek</summary>
             <div class="calorie-import-layout">
               <label class="field">
@@ -545,6 +548,7 @@
               <span>Název prostoru</span>
               <input class="list-name-input" id="list-name-input" type="text" value="Lednice">
             </label>
+            <button class="danger-button settings-danger-small" id="delete-list-button" type="button">Odebrat aktuální prostor</button>
           </details>
 
           <details class="settings-stats-panel">
@@ -594,6 +598,27 @@
 
           <details class="settings-log-panel">
             <summary>Kompletní log aplikace</summary>
+            <div class="settings-history-filters">
+              <label class="field compact-field">
+                <span>Období</span>
+                <select id="settings-log-period-filter">
+                  <option value="">Vše</option>
+                  <option value="today">Dnes</option>
+                  <option value="3d">3 dny</option>
+                  <option value="week">Týden</option>
+                  <option value="month">Měsíc</option>
+                  <option value="year">Rok</option>
+                </select>
+              </label>
+              <label class="field compact-field">
+                <span>Od</span>
+                <input id="settings-log-date-from" type="date">
+              </label>
+              <label class="field compact-field">
+                <span>Do</span>
+                <input id="settings-log-date-to" type="date">
+              </label>
+            </div>
             <div class="history-list" id="settings-log-list" aria-live="polite"></div>
           </details>
 
@@ -603,6 +628,8 @@
         </section>
       </section>
     </main>
+
+    <div class="temp-toast" id="temp-toast" role="status" aria-live="polite" hidden></div>
 
     <div class="modal-backdrop" id="delete-list-modal" hidden>
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-list-title">
@@ -668,6 +695,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux36"></script>
+    <script src="app.js?v=ux37"></script>
   </body>
 </html>

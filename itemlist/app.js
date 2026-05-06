@@ -19,6 +19,7 @@ const receiptImportButton = document.querySelector("#receipt-import-button");
 const eanImportButton = document.querySelector("#ean-import-button");
 const calorieDiaryButton = document.querySelector("#calorie-diary-button");
 const xmlImportButton = document.querySelector("#xml-import-button");
+const catalogImportButton = document.querySelector("#catalog-import-button");
 const xmlFileButton = document.querySelector("#xml-file-button");
 const xmlFileInput = document.querySelector("#xml-file-input");
 const xmlExportButton = document.querySelector("#xml-export-button");
@@ -74,6 +75,7 @@ const pantryScanButton = document.querySelector("#pantry-scan-button");
 const pantryExportTextButton = document.querySelector("#pantry-export-text-button");
 const pantrySearchInput = document.querySelector("#pantry-search-input");
 const pantryCategoryFilters = document.querySelector("#pantry-category-filters");
+const tempToast = document.querySelector("#temp-toast");
 const cancelEditButton = document.querySelector("#cancel-edit");
 const deleteListButton = document.querySelector("#delete-list-button");
 const deleteListModal = document.querySelector("#delete-list-modal");
@@ -112,6 +114,9 @@ const statsChartCanvas = document.querySelector("#stats-chart-canvas");
 const settingsPeriodFilter = document.querySelector("#settings-period-filter");
 const settingsDateFrom = document.querySelector("#settings-date-from");
 const settingsDateTo = document.querySelector("#settings-date-to");
+const settingsLogPeriodFilter = document.querySelector("#settings-log-period-filter");
+const settingsLogDateFrom = document.querySelector("#settings-log-date-from");
+const settingsLogDateTo = document.querySelector("#settings-log-date-to");
 const calorieAccountEmail = document.querySelector("#calorie-account-email");
 const calorieAccountPassword = document.querySelector("#calorie-account-password");
 const calorieSessionCookie = document.querySelector("#calorie-session-cookie");
@@ -312,6 +317,8 @@ let currentTextExport = {
   fileName: "export",
   text: ""
 };
+let currentImportMode = "items";
+let tempToastTimer = null;
 
 const COMBOBOX_INPUT_SELECTOR = "[data-combobox-source]";
 
@@ -357,6 +364,7 @@ function setupEvents() {
   eanImportButton.addEventListener("click", openEanImport);
   calorieDiaryButton?.addEventListener("click", openCalorieDiaryImport);
   xmlImportButton.addEventListener("click", openXmlImport);
+  catalogImportButton?.addEventListener("click", openCatalogImport);
   xmlFileButton?.addEventListener("click", () => xmlFileInput.click());
   importFilePickButton?.addEventListener("click", () => xmlFileInput.click());
   xmlFileInput.addEventListener("change", importXmlFromFile);
@@ -394,6 +402,15 @@ function setupEvents() {
   });
   settingsDateTo?.addEventListener("input", () => {
     settingsPeriodFilter.value = "";
+    renderHistory();
+  });
+  settingsLogPeriodFilter?.addEventListener("change", handleSettingsLogFilterChange);
+  settingsLogDateFrom?.addEventListener("input", () => {
+    settingsLogPeriodFilter.value = "";
+    renderHistory();
+  });
+  settingsLogDateTo?.addEventListener("input", () => {
+    settingsLogPeriodFilter.value = "";
     renderHistory();
   });
   calorieSaveConnectionButton?.addEventListener("click", saveCalorieConnectionSettings);
@@ -1369,15 +1386,35 @@ async function copyFridgeExportToClipboard() {
 
 async function copyPantryTextExportShortcut() {
   const text = buildFridgeTextExport();
+  const listName = getDisplayListName(getActiveList());
+  const copiedLabel = listName ? `Lednice - ${listName}` : "Lednice";
 
   if (fridgeExportText) {
     fridgeExportText.value = text;
   }
 
   const copied = await copyTextToClipboard(text);
+  if (copied) {
+    showTempToast(`${copiedLabel} zkopírovaná.`);
+  }
   showMessage(copied
     ? "Textový export lednice zkopírovaný do schránky."
     : "Kopírování se nepovedlo. Otevři export lednice a zkopíruj text ručně.", !copied);
+}
+
+function showTempToast(text) {
+  if (!tempToast) {
+    return;
+  }
+
+  clearTimeout(tempToastTimer);
+  tempToast.textContent = text;
+  tempToast.hidden = false;
+  tempToast.classList.add("is-visible");
+  tempToastTimer = window.setTimeout(() => {
+    tempToast.classList.remove("is-visible");
+    tempToast.hidden = true;
+  }, 2000);
 }
 
 async function copyTextToClipboard(text) {
@@ -1576,8 +1613,13 @@ function openCalorieDiaryImport() {
 }
 
 function openXmlImport() {
-  openImportModal("Import XML", getXmlExample());
+  openImportModal("Import XML", getXmlExample(), "items");
   importError.textContent = "Použij stejný formát jako Export XML, nebo vyber XML soubor v nástrojích.";
+}
+
+function openCatalogImport() {
+  openImportModal("Import číselníku", getCatalogXmlExample(), "catalog");
+  importError.textContent = "Vlož XML z exportu číselníku, nebo jednoduchý seznam položek.";
 }
 
 async function importXmlFromFile(event) {
@@ -1589,7 +1631,7 @@ async function importXmlFromFile(event) {
 
   try {
     const text = await file.text();
-    openImportModal("Import XML", getXmlExample());
+    openImportModal(currentImportMode === "catalog" ? "Import číselníku" : "Import XML", currentImportMode === "catalog" ? getCatalogXmlExample() : getXmlExample(), currentImportMode);
     importText.value = text.trim();
     importError.textContent = "XML soubor je načtený. Zkontroluj položky a potvrď import.";
     confirmImport.focus();
@@ -1600,7 +1642,8 @@ async function importXmlFromFile(event) {
   }
 }
 
-function openImportModal(title = "Import", placeholder = "Rohlík 4 ks\nŠunka 100 g\nMléko 1000 ml") {
+function openImportModal(title = "Import", placeholder = "Rohlík 4 ks\nŠunka 100 g\nMléko 1000 ml", mode = "items") {
+  currentImportMode = mode;
   importModal.hidden = false;
   importModal.querySelector("#import-title").textContent = title;
   importText.value = "";
@@ -1617,6 +1660,11 @@ function closeImportModal() {
 }
 
 async function importShoppingList() {
+  if (currentImportMode === "catalog") {
+    await importCatalogFromModal();
+    return;
+  }
+
   const parsedItems = importText.value.trim().startsWith("<")
     ? parseXmlItems(importText.value)
     : parseImportedItems(importText.value);
@@ -1747,6 +1795,87 @@ function getXmlExample() {
     '  </items>',
     '</domaci-zasoby>'
   ].join("\n");
+}
+
+function getCatalogXmlExample() {
+  return [
+    '<domaci-zasoby version="1">',
+    '  <catalog>',
+    '    <catalogItem name="Mléko" category="Mléčné" unit="ml">',
+    '      <alias name="Mléko Kunín" ean="12345678" amount="1000" unit="ml" />',
+    '    </catalogItem>',
+    '  </catalog>',
+    '</domaci-zasoby>'
+  ].join("\n");
+}
+
+async function importCatalogFromModal() {
+  const source = importText.value.trim();
+  const parsed = source.startsWith("<")
+    ? parseXmlCatalogItems(source)
+    : { items: parseImportedItems(source).items.map((item) => ({ ...item, eans: [], eanAliases: [] })), skipped: [] };
+
+  if (!parsed.items.length) {
+    importError.textContent = "Nenašel jsem žádné položky číselníku.";
+    importText.focus();
+    return;
+  }
+
+  parsed.items.forEach((item) => {
+    upsertCatalogItem({
+      id: item.id || createId(),
+      name: item.name,
+      category: item.category || inferCategoryFromName(item.name) || "Ostatní",
+      unit: item.unit || "ks",
+      listId: activeListId,
+      eans: item.eans || [],
+      eanAliases: item.eanAliases || [],
+      replaceAliases: false
+    });
+  });
+
+  closeImportModal();
+  renderProductOptions();
+  renderCategoryOptions();
+  renderCatalog();
+  recordHistory(`Import číselníku: ${parsed.items.length} položek.`, "catalog");
+  renderHistory();
+  showMessage(`Číselník importován: ${parsed.items.length} položek.`);
+  await saveState();
+}
+
+function parseXmlCatalogItems(value) {
+  const items = [];
+  const skipped = [];
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(value, "application/xml");
+
+  if (doc.querySelector("parsererror")) {
+    return { items, skipped: [value] };
+  }
+
+  doc.querySelectorAll("catalogItem").forEach((node) => {
+    const name = formatProductName(readXmlValue(node, "name"));
+    const category = tidyName(readXmlValue(node, "category")) || inferCategoryFromName(name) || "Ostatní";
+    const unit = normalizeImportUnit(readXmlValue(node, "unit") || "ks");
+    const eans = normalizeEanList(readXmlValue(node, "ean"));
+    const eanAliases = [...node.querySelectorAll("alias")]
+      .map((aliasNode) => ({
+        name: formatProductName(readXmlValue(aliasNode, "name")),
+        ean: normalizeEan(readXmlValue(aliasNode, "ean")),
+        amount: parseImportAmount(readXmlValue(aliasNode, "amount")) || 1,
+        unit: normalizeImportUnit(readXmlValue(aliasNode, "unit") || unit)
+      }))
+      .filter((alias) => alias.name);
+
+    if (name) {
+      items.push({ name, category, unit, eans, eanAliases });
+    } else {
+      skipped.push(node.outerHTML || "catalogItem");
+    }
+  });
+
+  return { items, skipped };
 }
 
 function buildItemsXml(items, listName) {
@@ -2338,6 +2467,7 @@ function sanitizeState(state) {
           id: typeof entry.id === "string" ? entry.id : createId(),
           text: entry.text,
           type: typeof entry.type === "string" ? entry.type : "info",
+          listId: typeof entry.listId === "string" ? entry.listId : "",
           listName: typeof entry.listName === "string" ? entry.listName : "",
           createdAt: entry.createdAt,
           occurredAt: normalizeEventDate(typeof entry.occurredAt === "string" ? entry.occurredAt : entry.createdAt.slice(0, 10)),
@@ -2350,14 +2480,20 @@ function sanitizeState(state) {
       })
       .slice(0, HISTORY_LIMIT)
     : [];
+  const sanitizedShopping = sanitizeShoppingItems(state.shoppingItems)
+    .map((item) => ({ ...item, listId: item.listId || activeId }));
+  const sanitizedCombos = sanitizeCombos(state.combos)
+    .map((combo) => ({ ...combo, listId: combo.listId || activeId }));
+  const sanitizedCatalog = sanitizeCatalogItems(state.catalogItems)
+    .map((item) => ({ ...item, listId: item.listId || activeId }));
 
   return {
     lists: sanitizedLists,
     activeListId: activeId,
     history: sanitizedHistory,
-    shoppingItems: sanitizeShoppingItems(state.shoppingItems),
-    combos: sanitizeCombos(state.combos),
-    catalogItems: sanitizeCatalogItems(state.catalogItems),
+    shoppingItems: sanitizedShopping,
+    combos: sanitizedCombos,
+    catalogItems: sanitizedCatalog,
     appSettings: {
       subtractStockFromShopping: Boolean(state.appSettings?.subtractStockFromShopping),
       calorieAccountEmail: typeof state.appSettings?.calorieAccountEmail === "string"
@@ -2405,6 +2541,7 @@ function sanitizeCatalogItems(items) {
           name: formatProductName(item.name),
           category: tidyName(item.category || "Ostatní"),
           unit: normalizeImportUnit(item.unit || "ks"),
+          listId: typeof item.listId === "string" ? item.listId : "",
           ean: eans[0] || "",
           eans,
           eanAliases: aliases
@@ -2422,6 +2559,7 @@ function sanitizeShoppingItems(items) {
         id: typeof item.id === "string" ? item.id : createId(),
         name: formatProductName(item.name),
         done: Boolean(item.done),
+        listId: typeof item.listId === "string" ? item.listId : "",
         createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString()
       }))
     : [];
@@ -2434,6 +2572,7 @@ function sanitizeCombos(items) {
       .map((combo) => ({
         id: typeof combo.id === "string" ? combo.id : createId(),
         name: formatProductName(combo.name),
+        listId: typeof combo.listId === "string" ? combo.listId : "",
         items: combo.items
           .filter((item) => item && typeof item.name === "string")
           .map((item) => ({
@@ -2498,6 +2637,9 @@ function switchList(id) {
   resetForm();
   renderLists();
   renderItems();
+  renderShoppingList();
+  renderCatalog();
+  renderHistory();
   showMessage("");
 }
 
@@ -2513,7 +2655,7 @@ function renderLists(options = {}) {
 
   pageTitle.textContent = getDisplayListName(activeList);
 
-  lists.forEach((list) => {
+  [getActiveList()].forEach((list) => {
     const tab = document.createElement("button");
     const isActive = list.id === activeList.id;
 
@@ -2904,6 +3046,7 @@ function upsertShoppingItem({ product, amount, unit }) {
     const parsed = parseImportLine(item.name);
 
     return !item.done
+      && isShoppingItemForActiveList(item)
       && parsed
       && normalize(parsed.name) === normalize(product)
       && parsed.unit === unit;
@@ -2919,6 +3062,7 @@ function upsertShoppingItem({ product, amount, unit }) {
     id: createId(),
     name: `${product} ${formatAmount(amount)} ${unit}`,
     done: false,
+    listId: activeListId,
     createdAt: new Date().toISOString()
   });
 }
@@ -4210,8 +4354,9 @@ async function handleShoppingClick(event) {
 function renderShoppingList() {
   mergeShoppingItems();
   shoppingList.replaceChildren();
+  const activeShoppingItems = shoppingItems.filter(isShoppingItemForActiveList);
 
-  if (!shoppingItems.length) {
+  if (!activeShoppingItems.length) {
     const empty = document.createElement("p");
     empty.className = "message";
     empty.textContent = "Nákupní list je prázdný.";
@@ -4219,21 +4364,31 @@ function renderShoppingList() {
     return;
   }
 
-  shoppingItems.forEach((item) => {
+  let visibleCount = 0;
+  activeShoppingItems.forEach((item) => {
     const parsed = parseImportLine(item.name);
     const summary = parsed ? getShoppingNeedSummary(parsed) : null;
+
+    if (appSettings.subtractStockFromShopping && summary && summary.missing === 0 && !item.done) {
+      return;
+    }
+
     const row = document.createElement("article");
     const content = document.createElement("div");
     const text = document.createElement("strong");
     const meta = document.createElement("span");
+    const metrics = document.createElement("div");
     const actions = document.createElement("div");
     const toggle = document.createElement("button");
     const remove = document.createElement("button");
 
-    row.className = `card-row${item.done ? " is-done" : ""}`;
+    visibleCount += 1;
+    row.className = `card-row shopping-row${item.done ? " is-done" : ""}`;
     row.classList.toggle("is-covered", Boolean(appSettings.subtractStockFromShopping && summary && summary.missing === 0));
     content.className = "row-content";
-    text.textContent = getShoppingDisplayTitle(item, parsed, summary);
+    text.textContent = parsed ? parsed.name : getShoppingDisplayTitle(item, parsed, summary);
+    metrics.className = "shopping-metrics";
+    metrics.append(...createShoppingMetricNodes(parsed, summary));
     meta.className = "muted-text";
     meta.textContent = getShoppingItemMeta(item, parsed, summary);
     actions.className = "row-actions";
@@ -4249,6 +4404,9 @@ function renderShoppingList() {
     remove.textContent = "Smazat";
 
     content.append(text);
+    if (metrics.children.length) {
+      content.append(metrics);
+    }
 
     if (meta.textContent) {
       content.append(meta);
@@ -4257,6 +4415,34 @@ function renderShoppingList() {
     actions.append(toggle, remove);
     row.append(content, actions);
     shoppingList.append(row);
+  });
+
+  if (!visibleCount) {
+    const empty = document.createElement("p");
+    empty.className = "message";
+    empty.textContent = "Všechno je nad nastaveným limitem.";
+    shoppingList.append(empty);
+  }
+}
+
+function createShoppingMetricNodes(parsed, summary) {
+  if (!parsed || !summary) {
+    return [];
+  }
+
+  return [
+    ["Limit", formatAmountWithUnit(summary.totalWanted, parsed.unit), ""],
+    ["V lednici", formatAmountWithUnit(summary.currentAmount, parsed.unit), ""],
+    ["Koupit", summary.missing > 0 ? formatAmountWithUnit(summary.missing, parsed.unit) : "0", summary.missing > 0 ? "is-needed" : "is-ok"]
+  ].map(([label, value, className]) => {
+    const item = document.createElement("span");
+    const labelElement = document.createElement("small");
+    const valueElement = document.createElement("strong");
+    item.className = className;
+    labelElement.textContent = label;
+    valueElement.textContent = value;
+    item.append(labelElement, valueElement);
+    return item;
   });
 }
 
@@ -4272,7 +4458,7 @@ function mergeShoppingItems() {
       return;
     }
 
-    const key = `${normalize(parsed.name)}|${parsed.unit}`;
+    const key = `${item.listId || ""}|${normalize(parsed.name)}|${parsed.unit}`;
     const existing = openMap.get(key);
 
     if (existing) {
@@ -4287,6 +4473,10 @@ function mergeShoppingItems() {
   });
 
   shoppingItems = merged;
+}
+
+function isShoppingItemForActiveList(item) {
+  return !item.listId || item.listId === activeListId;
 }
 
 function getShoppingDisplayTitle(item, parsed, summary) {
@@ -4311,13 +4501,8 @@ function getShoppingItemMeta(item, parsed = parseImportLine(item.name), summary 
     return "Zadej třeba: Mléko 1000 ml, potom odečtu zásoby.";
   }
 
-  if (summary.missing === 0) {
-    return `Cíl ${formatAmountWithUnit(summary.totalWanted, parsed.unit)}, v zásobách ${formatAmountWithUnit(summary.currentAmount, parsed.unit)}.`;
-  }
-
   const suggestion = getShoppingPackageSuggestion(parsed, summary);
-  const recommendation = suggestion ? ` Doporučení: ${suggestion}.` : "";
-  return `Limit ${formatAmountWithUnit(summary.totalWanted, parsed.unit)}, v lednici ${formatAmountWithUnit(summary.currentAmount, parsed.unit)}.${recommendation}`;
+  return suggestion ? `Doporučení: ${suggestion}.` : "";
 }
 
 function getShoppingPackageSuggestion(parsed, summary) {
@@ -4345,7 +4530,7 @@ function getShoppingNeedSummary(parsed) {
   });
   const currentAmount = stocked ? stocked.amount : 0;
   const totalWanted = shoppingItems
-    .filter((item) => !item.done)
+    .filter((item) => !item.done && isShoppingItemForActiveList(item))
     .map((item) => parseImportLine(item.name))
     .filter((item) => {
       return item
@@ -4371,7 +4556,7 @@ async function saveCombo(event) {
     return;
   }
 
-  const existing = combos.find((combo) => normalize(combo.name) === normalize(name));
+  const existing = combos.find((combo) => isComboForActiveList(combo) && normalize(combo.name) === normalize(name));
   const editedCombo = editingComboId
     ? combos.find((combo) => combo.id === editingComboId)
     : null;
@@ -4385,6 +4570,7 @@ async function saveCombo(event) {
     combos.unshift({
       id: createId(),
       name,
+      listId: activeListId,
       items
     });
   }
@@ -4514,7 +4700,7 @@ function getComboBuilderItems() {
 }
 
 async function useSelectedCombo() {
-  const combo = combos.find((currentCombo) => currentCombo.id === comboSelect.value);
+  const combo = combos.find((currentCombo) => isComboForActiveList(currentCombo) && currentCombo.id === comboSelect.value);
 
   if (!combo) {
     showMessage("Vyber kombinaci.", true);
@@ -4530,14 +4716,15 @@ function openComboChangeModal(selectedComboId = "") {
   }
 
   comboChangeSelect.replaceChildren();
+  const activeCombos = combos.filter(isComboForActiveList);
 
-  if (!combos.length) {
+  if (!activeCombos.length) {
     const option = document.createElement("option");
     option.value = "";
     option.textContent = "Zatím žádná kombinace";
     comboChangeSelect.append(option);
   } else {
-    combos.forEach((combo) => {
+    activeCombos.forEach((combo) => {
       const option = document.createElement("option");
       option.value = combo.id;
       option.textContent = combo.name;
@@ -4565,7 +4752,7 @@ function renderComboChangeItems() {
     return;
   }
 
-  const combo = combos.find((currentCombo) => currentCombo.id === comboChangeSelect.value);
+  const combo = combos.find((currentCombo) => isComboForActiveList(currentCombo) && currentCombo.id === comboChangeSelect.value);
   comboChangeItems.replaceChildren();
 
   if (!combo) {
@@ -4598,7 +4785,7 @@ function renderComboChangeItems() {
 }
 
 async function applyComboChangeFromModal() {
-  const combo = combos.find((currentCombo) => currentCombo.id === comboChangeSelect?.value);
+  const combo = combos.find((currentCombo) => isComboForActiveList(currentCombo) && currentCombo.id === comboChangeSelect?.value);
   const action = comboChangeAction?.value || "purchase";
 
   if (!combo) {
@@ -4658,7 +4845,7 @@ async function handleComboClick(event) {
     return;
   }
 
-  const combo = combos.find((currentCombo) => currentCombo.id === button.dataset.id);
+  const combo = combos.find((currentCombo) => isComboForActiveList(currentCombo) && currentCombo.id === button.dataset.id);
 
   if (!combo) {
     return;
@@ -4703,8 +4890,9 @@ function renderCombos() {
   comboList.replaceChildren();
   comboSelect.replaceChildren();
   renderProductOptions();
+  const activeCombos = combos.filter(isComboForActiveList);
 
-  if (!combos.length) {
+  if (!activeCombos.length) {
     const option = document.createElement("option");
     option.textContent = "Zatím žádná kombinace";
     option.value = "";
@@ -4716,7 +4904,7 @@ function renderCombos() {
     return;
   }
 
-  combos.forEach((combo) => {
+  activeCombos.forEach((combo) => {
     const option = document.createElement("option");
     const row = document.createElement("article");
     const content = document.createElement("div");
@@ -4806,6 +4994,8 @@ function renderItems() {
       row.querySelector(".product-card-category").textContent = formatCategoryLabel(item.category);
       itemsBody.append(row);
     });
+
+  renderShoppingList();
 }
 
 function renderPantryCategoryFilters(items = getActiveItems()) {
@@ -5193,7 +5383,10 @@ async function handleCatalogClick(event) {
   }
 
   if (button.dataset.catalogAction === "edit") {
-    const existing = catalogItems.find((currentItem) => normalize(currentItem.name) === normalize(item.name));
+    const existing = catalogItems.find((currentItem) => {
+      return normalize(currentItem.name) === normalize(item.name)
+        && (!currentItem.listId || currentItem.listId === activeListId);
+    });
     editingCatalogId = existing?.id || null;
     pendingCatalogEanProduct = null;
     editingCatalogAliases = getCatalogAliasesForEditor(existing || item);
@@ -5211,7 +5404,10 @@ async function handleCatalogClick(event) {
   }
 
   if (button.dataset.catalogAction === "delete") {
-    catalogItems = catalogItems.filter((currentItem) => normalize(currentItem.name) !== normalize(item.name));
+    catalogItems = catalogItems.filter((currentItem) => {
+      return normalize(currentItem.name) !== normalize(item.name)
+        || (currentItem.listId && currentItem.listId !== activeListId);
+    });
     renderProductOptions();
     renderCategoryOptions();
     renderCatalog();
@@ -7250,6 +7446,7 @@ function inferCategoryFromName(name) {
 }
 
 function upsertCatalogItem(item) {
+  const targetListId = item.listId || activeListId || "";
   const nextEans = normalizeEanList(item.eans || item.ean);
   const nextAliases = normalizeEanAliases(item.eanAliases);
   const nextName = normalize(item.name);
@@ -7257,9 +7454,11 @@ function upsertCatalogItem(item) {
 
   if (nextEans.length || nextAliasNames.length) {
     catalogItems.forEach((currentItem) => {
-      const sameItem = (item.id && currentItem.id === item.id) || normalize(currentItem.name) === nextName;
+      const currentListId = currentItem.listId || "";
+      const sameItem = (item.id && currentItem.id === item.id)
+        || (normalize(currentItem.name) === nextName && currentListId === targetListId);
 
-      if (sameItem) {
+      if (sameItem || currentListId !== targetListId) {
         return;
       }
 
@@ -7274,8 +7473,9 @@ function upsertCatalogItem(item) {
   }
 
   const existing = catalogItems.find((currentItem) => {
+    const currentListId = currentItem.listId || "";
     return (item.id && currentItem.id === item.id)
-      || normalize(currentItem.name) === nextName;
+      || (normalize(currentItem.name) === nextName && currentListId === targetListId);
   });
 
   if (existing) {
@@ -7288,6 +7488,7 @@ function upsertCatalogItem(item) {
     existing.name = item.name || existing.name;
     existing.category = item.category || existing.category || "Ostatní";
     existing.unit = item.unit || existing.unit || "ks";
+    existing.listId = targetListId;
     existing.ean = mergedEans[0] || "";
     existing.eans = mergedEans;
     existing.eanAliases = mergedAliases;
@@ -7299,6 +7500,7 @@ function upsertCatalogItem(item) {
     name: item.name,
     category: item.category || "Ostatní",
     unit: item.unit || "ks",
+    listId: targetListId,
     ean: nextEans[0] || "",
     eans: nextEans,
     eanAliases: nextAliases
@@ -7366,7 +7568,9 @@ function createCatalogAliasSummary(item) {
 function getCatalogItems() {
   const map = new Map();
 
-  catalogItems.forEach((item) => {
+  catalogItems
+    .filter((item) => !item.listId || item.listId === activeListId)
+    .forEach((item) => {
     const key = normalize(item.name);
 
     if (!map.has(key)) {
@@ -7401,7 +7605,7 @@ function getCatalogItems() {
     });
   });
 
-  combos.forEach((combo) => {
+  combos.filter(isComboForActiveList).forEach((combo) => {
     combo.items.forEach((item) => {
       const key = normalize(item.name);
 
@@ -7423,6 +7627,7 @@ function recordHistory(text, type = "info", list = getActiveList(), details = {}
     id: createId(),
     text,
     type,
+    listId: list?.id || activeListId || "",
     listName: list ? getDisplayListName(list) : "",
     createdAt: new Date().toISOString(),
     occurredAt: details.occurredAt || getLocalDateTimeValue(new Date()),
@@ -7439,10 +7644,11 @@ function renderHistory() {
   historyList.replaceChildren();
   const filteredHistory = getFilteredHistory();
   const filteredSettingsHistory = getFilteredSettingsHistory();
+  const filteredSettingsLog = getFilteredSettingsLogHistory();
   const visibleHistory = filteredHistory.filter(isInventoryHistoryEntry);
   renderPriceStats(filteredSettingsHistory);
   renderStatsDashboard(filteredSettingsHistory);
-  renderSettingsLog(filteredSettingsHistory);
+  renderSettingsLog(filteredSettingsLog);
 
   if (!visibleHistory.length) {
     const empty = document.createElement("p");
@@ -7600,10 +7806,16 @@ function renderStatsDashboard(entries) {
   }
 
   if (metrics.includes("categories")) {
+    const categoryContent = document.createElement("div");
+    categoryContent.className = "stats-compact-visual";
+    categoryContent.append(
+      createPieChart(stats.categoryActivity, { formatter: (value) => `${formatAmount(value)} změn` }),
+      createBarList(stats.categoryActivity, { formatter: (value) => `${formatAmount(value)} změn`, tone: "cyan" })
+    );
     cards.push(createInsightCard(
       "Kategorie podle aktivity",
-      "Souhrn změn podle kategorií číselníku nebo odhadu z názvu.",
-      createBarList(stats.categoryActivity, { formatter: (value) => `${formatAmount(value)} změn`, tone: "cyan" }),
+      "Souhrn změn podle kategorií.",
+      categoryContent,
       "cyan"
     ));
   }
@@ -7799,8 +8011,49 @@ function createActionMix(stats) {
     pills.append(pill);
   });
 
+  summary.append(createPieChart(stats.actionMix, { formatter: (value) => `${formatAmount(value)}x` }));
   summary.append(createBarList(stats.actionMix, { formatter: (value) => `${formatAmount(value)}x`, tone: "teal" }));
   wrapper.append(pills, summary);
+  return wrapper;
+}
+
+function createPieChart(rows, options = {}) {
+  const formatter = options.formatter || formatAmount;
+  const wrapper = document.createElement("div");
+  const pie = document.createElement("div");
+  const legend = document.createElement("div");
+  const colors = ["#14a36f", "#2f80ed", "#f59e0b", "#ef4444", "#7c3aed", "#0891b2"];
+  const total = rows.reduce((sum, [, value]) => sum + Number(value || 0), 0);
+  let cursor = 0;
+
+  wrapper.className = "stat-pie-wrap";
+  pie.className = "stat-pie";
+  legend.className = "stat-pie-legend";
+
+  if (!rows.length || total <= 0) {
+    pie.style.background = "var(--soft-line)";
+    legend.textContent = "Bez dat";
+    wrapper.append(pie, legend);
+    return wrapper;
+  }
+
+  const gradient = rows.map(([label, value], index) => {
+    const start = cursor;
+    const end = cursor + (Number(value) / total) * 100;
+    cursor = end;
+    return `${colors[index % colors.length]} ${start}% ${end}%`;
+  }).join(", ");
+
+  pie.style.background = `conic-gradient(${gradient})`;
+  rows.slice(0, 5).forEach(([label, value], index) => {
+    const item = document.createElement("span");
+    const dot = document.createElement("i");
+    dot.style.background = colors[index % colors.length];
+    item.append(dot, document.createTextNode(`${label}: ${formatter(value)}`));
+    legend.append(item);
+  });
+
+  wrapper.append(pie, legend);
   return wrapper;
 }
 
@@ -8041,6 +8294,12 @@ function handleSettingsHistoryFilterChange() {
   renderHistory();
 }
 
+function handleSettingsLogFilterChange() {
+  settingsLogDateFrom.value = "";
+  settingsLogDateTo.value = "";
+  renderHistory();
+}
+
 function getFilteredHistory() {
   return getHistoryEntriesForRange(getHistoryFilterRange());
 }
@@ -8049,9 +8308,17 @@ function getFilteredSettingsHistory() {
   return getHistoryEntriesForRange(getSettingsHistoryFilterRange());
 }
 
+function getFilteredSettingsLogHistory() {
+  return getHistoryEntriesForRange(getSettingsLogHistoryFilterRange());
+}
+
 function getHistoryEntriesForRange(range) {
   return history.filter((entry) => {
     const eventDate = getHistoryEventDate(entry);
+
+    if (!isHistoryEntryForActiveList(entry)) {
+      return false;
+    }
 
     if (!range.from && !range.to) {
       return true;
@@ -8061,12 +8328,28 @@ function getHistoryEntriesForRange(range) {
   });
 }
 
+function isHistoryEntryForActiveList(entry) {
+  if (entry.listId) {
+    return entry.listId === activeListId;
+  }
+
+  if (entry.listName) {
+    return normalize(entry.listName) === normalize(getDisplayListName(getActiveList()));
+  }
+
+  return true;
+}
+
 function getHistoryFilterRange() {
   return getHistoryFilterRangeFromControls(historyPeriodFilter, historyDateFrom, historyDateTo);
 }
 
 function getSettingsHistoryFilterRange() {
   return getHistoryFilterRangeFromControls(settingsPeriodFilter, settingsDateFrom, settingsDateTo);
+}
+
+function getSettingsLogHistoryFilterRange() {
+  return getHistoryFilterRangeFromControls(settingsLogPeriodFilter, settingsLogDateFrom, settingsLogDateTo);
 }
 
 function getHistoryFilterRangeFromControls(periodInput, fromInput, toInput) {
@@ -8430,7 +8713,11 @@ function findComboByName(name) {
     return null;
   }
 
-  return combos.find((combo) => normalize(combo.name) === normalizedName) || null;
+  return combos.find((combo) => isComboForActiveList(combo) && normalize(combo.name) === normalizedName) || null;
+}
+
+function isComboForActiveList(combo) {
+  return !combo.listId || combo.listId === activeListId;
 }
 
 function findCatalogItemByName(name) {
@@ -8470,6 +8757,7 @@ function ensureCatalogItemFromEntry({ name, category, unit }) {
     name: cleanName,
     category: tidyName(category) || inferCategoryFromName(cleanName) || "Ostatní",
     unit: normalizeImportUnit(unit || "ks"),
+    listId: activeListId,
     ean: "",
     eans: [],
     eanAliases: []
