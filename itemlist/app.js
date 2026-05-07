@@ -4058,10 +4058,10 @@ function renderCalorieImportRowsInto(container) {
       nameInput.disabled = Boolean(row.lockedNoStock);
       nameInput.setAttribute("aria-label", "Položka z Kalorických tabulek");
 
-      amountInputElement.type = "number";
+      amountInputElement.type = "text";
       amountInputElement.min = row.lockedNoStock ? "0" : "0.01";
-      amountInputElement.step = "0.01";
       amountInputElement.inputMode = "decimal";
+      amountInputElement.pattern = "[0-9]+([,.][0-9]+)?";
       amountInputElement.value = formatCalorieAmountInput(row.amount);
       amountInputElement.dataset.calorieField = "amount";
       amountInputElement.disabled = Boolean(row.lockedNoStock);
@@ -4127,6 +4127,8 @@ function handleCalorieImportRowChange(event) {
   }
 
   const previousTargetName = row.targetName;
+  const changedField = event.target?.dataset?.calorieField || "";
+  const isAmountTyping = event.type === "input" && changedField === "amount";
   row.skipped = Boolean(rowElement.querySelector('[data-calorie-field="skipped"]')?.checked);
   row.name = tidyName(rowElement.querySelector('[data-calorie-field="name"]')?.value || row.name);
   row.amount = parseCalorieAmountInput(rowElement.querySelector('[data-calorie-field="amount"]')?.value, row.amount);
@@ -4156,7 +4158,9 @@ function handleCalorieImportRowChange(event) {
   const meta = rowElement.querySelector("small");
 
   if (amountInputElement) {
-    amountInputElement.value = formatCalorieAmountInput(row.amount);
+    if (!isAmountTyping || row.cappedToStock || row.lockedNoStock) {
+      amountInputElement.value = formatCalorieAmountInput(row.amount);
+    }
     if (Number.isFinite(row.maxAmount)) {
       amountInputElement.max = formatCalorieAmountInput(row.maxAmount);
     } else {
@@ -4857,7 +4861,7 @@ function addComboItemRow(item = {}) {
     </label>
     <label class="field">
       <span>Množství</span>
-      <input class="combo-amount" type="number" min="0.01" step="any" inputmode="decimal" placeholder="1">
+      <input class="combo-amount" type="number" min="0.01" step="1" inputmode="decimal" placeholder="1">
     </label>
     <label class="field">
       <span>Jednotka</span>
@@ -5014,7 +5018,7 @@ function renderComboChangeItems() {
       </div>
       <label class="field">
         <span>Množství</span>
-        <input type="number" min="0.01" step="any" inputmode="decimal" data-combo-change-amount="${index}">
+        <input type="number" min="0.01" step="1" inputmode="decimal" data-combo-change-amount="${index}">
       </label>
     `;
 

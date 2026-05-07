@@ -111,14 +111,14 @@
               <input id="shopping-subtract-stock" type="checkbox">
               <span>Hlídání limitů podle aktuální lednice</span>
             </label>
-            <form class="shopping-form" id="shopping-form" autocomplete="off">
+            <form class="shopping-form" id="shopping-form" autocomplete="off" novalidate>
               <label class="field">
                 <span>Potravina</span>
                 <input id="shopping-product" type="text" data-combobox-source="product-options" placeholder="Např. máslo">
               </label>
               <label class="field">
                 <span>Limit v lednici</span>
-                <input id="shopping-amount" type="number" min="0.01" step="any" inputmode="decimal" placeholder="1">
+                <input id="shopping-amount" type="number" min="0.01" step="1" inputmode="decimal" placeholder="1">
               </label>
               <label class="field">
                 <span>Jednotka</span>
@@ -136,7 +136,7 @@
         </section>
 
         <section class="app-view" id="view-history" data-view-panel="history" hidden>
-          <form class="entry-form changes-entry-form" id="entry-form" autocomplete="off">
+          <form class="entry-form changes-entry-form" id="entry-form" autocomplete="off" novalidate>
             <label class="field combo-field product-field">
               <span id="product-field-label">Potravina</span>
               <input id="product-input" name="product" type="text" data-combobox-source="product-options" placeholder="Např. rohlík" required>
@@ -177,7 +177,7 @@
               <span id="amount-label">Množství</span>
               <div class="number-control">
                 <button class="number-step" type="button" data-amount-step="down" aria-label="Snížit množství">-</button>
-                <input id="amount-input" name="amount" type="number" min="0" step="any" inputmode="decimal" placeholder="1" aria-labelledby="amount-label" required>
+                <input id="amount-input" name="amount" type="number" min="0" step="1" inputmode="decimal" placeholder="1" aria-labelledby="amount-label" required>
                 <button class="number-step" type="button" data-amount-step="up" aria-label="Zvýšit množství">+</button>
               </div>
             </div>
@@ -194,7 +194,7 @@
 
             <label class="field price-field">
               <span>Cena</span>
-              <input id="price-input" name="price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Kč">
+              <input id="price-input" name="price" type="number" min="0" step="1" inputmode="decimal" placeholder="Kč">
             </label>
 
             <label class="field event-date-field">
@@ -247,7 +247,7 @@
             </div>
             <button class="ghost-button" id="export-catalog-button" type="button">Export číselníku</button>
           </div>
-          <form class="catalog-form" id="catalog-form" autocomplete="off">
+          <form class="catalog-form" id="catalog-form" autocomplete="off" novalidate>
             <label class="field">
               <span>Potravina</span>
               <input id="catalog-name" type="text" placeholder="Např. máslo">
@@ -282,7 +282,7 @@
                 </label>
                 <label class="field">
                   <span>Množství</span>
-                  <input id="catalog-alias-amount" type="number" min="0.01" step="0.01" inputmode="decimal" value="1">
+                  <input id="catalog-alias-amount" type="number" min="0.01" step="1" inputmode="decimal" value="1">
                 </label>
                 <label class="field">
                   <span>Jednotka</span>
@@ -321,7 +321,7 @@
               <h1>Kombinace</h1>
             </div>
           </div>
-          <form class="combo-form" id="combo-form" autocomplete="off">
+          <form class="combo-form" id="combo-form" autocomplete="off" novalidate>
             <label class="field">
               <span>Název kombinace</span>
               <input id="combo-name" type="text" placeholder="Rohlík se šunkou">
@@ -704,6 +704,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux48"></script>
+    <script src="app.js?v=ux49"></script>
   </body>
 </html>
