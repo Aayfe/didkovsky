@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux37">
+    <link rel="stylesheet" href="styles.css?v=ux38">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -404,6 +404,11 @@
               <input id="receipt-file-input" type="file" accept="image/*" capture="environment">
             </label>
             <p class="message" id="receipt-message" role="status" aria-live="polite"></p>
+            <div class="receipt-import-rows" id="receipt-import-rows"></div>
+            <div class="receipt-import-actions" id="receipt-import-actions" hidden>
+              <button class="ghost-button" id="receipt-clear-button" type="button">Vyčistit</button>
+              <button class="primary-button" id="receipt-apply-button" type="button">Přidat do lednice</button>
+            </div>
           </div>
           <div class="tool-card" id="calorie-diary-tool" hidden>
             <h2>Odečet z Kalorických tabulek</h2>
@@ -662,6 +667,18 @@
       </div>
     </div>
 
+    <div class="modal-backdrop" id="receipt-unpaired-modal" hidden>
+      <div class="modal receipt-unpaired-modal" role="dialog" aria-modal="true" aria-labelledby="receipt-unpaired-title">
+        <h2 id="receipt-unpaired-title">Nenapárované položky z účtenky</h2>
+        <p class="missing-catalog-warning" id="receipt-unpaired-description">Chcete nenapárované položky přidat do Lednice a číselníku?</p>
+        <div class="modal-actions modal-actions-three">
+          <button class="ghost-button" id="cancel-receipt-unpaired" type="button">Zrušit</button>
+          <button class="ghost-button" id="confirm-receipt-unpaired-paired" type="button">Přidat zalistované a napárované položky</button>
+          <button class="primary-button" id="confirm-receipt-unpaired-all" type="button">Ano</button>
+        </div>
+      </div>
+    </div>
+
     <div class="modal-backdrop" id="import-modal" hidden>
       <div class="modal import-modal" role="dialog" aria-modal="true" aria-labelledby="import-title">
         <h2 id="import-title">Import</h2>
@@ -704,6 +721,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux49"></script>
+    <script src="app.js?v=ux50"></script>
   </body>
 </html>

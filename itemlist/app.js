@@ -33,6 +33,10 @@ const eanMessage = document.querySelector("#ean-message");
 const receiptTool = document.querySelector("#receipt-tool");
 const receiptFileInput = document.querySelector("#receipt-file-input");
 const receiptMessage = document.querySelector("#receipt-message");
+const receiptImportRows = document.querySelector("#receipt-import-rows");
+const receiptImportActions = document.querySelector("#receipt-import-actions");
+const receiptApplyButton = document.querySelector("#receipt-apply-button");
+const receiptClearButton = document.querySelector("#receipt-clear-button");
 const calorieDiaryTool = document.querySelector("#calorie-diary-tool");
 const calorieDiaryDate = document.querySelector("#calorie-diary-date");
 const calorieDiaryLoadButton = document.querySelector("#calorie-diary-load-button");
@@ -90,6 +94,11 @@ const missingCatalogModal = document.querySelector("#missing-catalog-modal");
 const missingCatalogDescription = document.querySelector("#missing-catalog-description");
 const cancelMissingCatalog = document.querySelector("#cancel-missing-catalog");
 const confirmMissingCatalog = document.querySelector("#confirm-missing-catalog");
+const receiptUnpairedModal = document.querySelector("#receipt-unpaired-modal");
+const receiptUnpairedDescription = document.querySelector("#receipt-unpaired-description");
+const cancelReceiptUnpaired = document.querySelector("#cancel-receipt-unpaired");
+const confirmReceiptUnpairedAll = document.querySelector("#confirm-receipt-unpaired-all");
+const confirmReceiptUnpairedPaired = document.querySelector("#confirm-receipt-unpaired-paired");
 const importModal = document.querySelector("#import-modal");
 const importText = document.querySelector("#import-text");
 const importError = document.querySelector("#import-error");
@@ -316,6 +325,7 @@ let pendingEanProduct = null;
 let pendingEanCatalogChoice = null;
 let pendingCatalogEanProduct = null;
 let calorieImportRowsState = [];
+let receiptImportRowsState = [];
 let activeComboboxInput = null;
 let activeComboboxIndex = -1;
 let currentTextExport = {
@@ -379,6 +389,10 @@ function setupEvents() {
   eanFileInput.addEventListener("change", scanEanFromFile);
   eanResult.addEventListener("click", handleEanResultClick);
   receiptFileInput.addEventListener("change", importReceiptFromImage);
+  receiptApplyButton?.addEventListener("click", () => applyReceiptImportRows());
+  receiptClearButton?.addEventListener("click", clearReceiptImportRows);
+  receiptImportRows?.addEventListener("input", handleReceiptImportRowChange);
+  receiptImportRows?.addEventListener("change", handleReceiptImportRowChange);
   calorieDiaryLoadButton?.addEventListener("click", loadCalorieDiaryEntries);
   calorieDiaryApplyButton?.addEventListener("click", applyCalorieImportDeduction);
   calorieDiaryRows?.addEventListener("input", handleCalorieImportRowChange);
@@ -613,6 +627,9 @@ function setupEvents() {
   confirmDeleteAll.addEventListener("click", confirmDeleteAllLists);
   cancelMissingCatalog?.addEventListener("click", cancelMissingCatalogEntry);
   confirmMissingCatalog?.addEventListener("click", confirmMissingCatalogEntry);
+  cancelReceiptUnpaired?.addEventListener("click", closeReceiptUnpairedModal);
+  confirmReceiptUnpairedAll?.addEventListener("click", () => applyReceiptImportRows({ includeUnpaired: true }));
+  confirmReceiptUnpairedPaired?.addEventListener("click", () => applyReceiptImportRows({ skipUnpaired: true }));
   cancelImport.addEventListener("click", closeImportModal);
   confirmImport.addEventListener("click", importShoppingList);
 
@@ -631,6 +648,12 @@ function setupEvents() {
   missingCatalogModal?.addEventListener("click", (event) => {
     if (event.target === missingCatalogModal) {
       cancelMissingCatalogEntry();
+    }
+  });
+
+  receiptUnpairedModal?.addEventListener("click", (event) => {
+    if (event.target === receiptUnpairedModal) {
+      closeReceiptUnpairedModal();
     }
   });
 
@@ -1596,7 +1619,10 @@ function openReceiptImport() {
   if (fridgeExportTool) {
     fridgeExportTool.hidden = true;
   }
-  receiptMessage.textContent = "Vyber fotku účtenky. Rozpoznání zkusí několik verzí fotky a výsledek ještě můžeš upravit před importem.";
+  renderReceiptImportRows();
+  receiptMessage.textContent = receiptImportRowsState.length
+    ? "Zkontroluj rozpoznané položky, napáruj je na číselník a potvrď přidání."
+    : "Vyber fotku účtenky. Rozpoznání zkusí několik verzí fotky a výsledek ještě můžeš upravit před importem.";
   receiptFileInput.focus();
 }
 
@@ -2703,12 +2729,15 @@ function switchList(id) {
   activeListId = id;
   rememberActiveListId();
   resetForm();
+  receiptImportRowsState = [];
+  closeReceiptUnpairedModal();
   renderLists();
   renderItems();
   renderShoppingList();
   renderCatalog();
   renderCombos();
   renderHistory();
+  renderReceiptImportRows();
   showMessage("");
 }
 
@@ -2857,6 +2886,7 @@ function removeDataForList(removedList, wasOnlyList = false) {
   appSettings.caloriePairings = pruneCaloriePairingsForRemovedList(removedNames);
 
   calorieImportRowsState = [];
+  receiptImportRowsState = [];
   pendingEanProduct = null;
   pendingEanCatalogChoice = null;
   pendingCatalogEanProduct = null;
@@ -6527,24 +6557,494 @@ async function importReceiptFromImage(event) {
       sourceInfo = `Lokální OCR pokusů: ${result.attempts.length}.`;
     }
 
-    const text = formatReceiptItemsForImport(parsed.items);
+    const items = Array.isArray(parsed?.items) ? parsed.items : [];
 
-    if (!text) {
+    if (!items.length) {
       receiptMessage.textContent = "Z účtenky jsem nevyčetl žádné použitelné položky.";
       return;
     }
 
-    openImportModal("Import z účtenky", "Rozpoznané položky uprav a potvrď.");
-    importText.value = text;
-    importError.textContent = parsed.skipped.length
-      ? `Zkontroluj množství, jednotky a cenu. ${sourceInfo} Řádků k ruční kontrole: ${parsed.skipped.length}.`
-      : `Zkontroluj množství, jednotky a cenu. ${sourceInfo}`;
-    receiptMessage.textContent = `Hotovo. Našel jsem ${parsed.items.length} položek k importu. Cena za řádkem se uloží do statistik.`;
+    receiptImportRowsState = items.map((item) => createReceiptImportRowState(item));
+    renderReceiptImportRows();
+
+    const pairedCount = receiptImportRowsState.filter((row) => row.targetName).length;
+    const skippedInfo = parsed.skipped?.length ? ` K ruční kontrole zůstalo ${parsed.skipped.length} řádků.` : "";
+    receiptMessage.textContent = `Hotovo. Našel jsem ${receiptImportRowsState.length} položek. Napárováno ${pairedCount}, nenapárováno ${receiptImportRowsState.length - pairedCount}. ${sourceInfo}${skippedInfo}`;
   } catch (error) {
     receiptMessage.textContent = "OCR se nepovedlo. Zkus ostřejší fotku nebo ruční hromadný import.";
   } finally {
     receiptFileInput.value = "";
   }
+}
+
+function clearReceiptImportRows() {
+  receiptImportRowsState = [];
+  closeReceiptUnpairedModal();
+  renderReceiptImportRows();
+
+  if (receiptMessage) {
+    receiptMessage.textContent = "Rozpoznané položky z účtenky jsou vyčištěné.";
+    receiptMessage.classList.remove("is-error");
+  }
+}
+
+function createReceiptImportRowState(item) {
+  const sourceName = formatProductName(item?.receiptName || item?.sourceProductName || item?.rawName || item?.originalName || item?.name);
+  const visibleName = sourceName || formatProductName(item?.name || "");
+  const normalized = normalizeImportAmountAndUnit(Number(item?.amount) || 1, item?.unit || "ks");
+  const row = {
+    id: createId(),
+    sourceName: visibleName,
+    name: visibleName,
+    amount: Math.max(0.01, roundAmount(normalized.amount || 1)),
+    sourceAmount: Math.max(0.01, roundAmount(normalized.amount || 1)),
+    unit: normalized.unit,
+    sourceUnit: normalized.unit,
+    price: Number.isFinite(Number(item?.price)) && Number(item.price) > 0 ? roundAmount(Number(item.price)) : null,
+    category: tidyName(item?.category) || inferCategoryFromName(visibleName),
+    targetName: "",
+    matchScore: 0,
+    skipped: false
+  };
+  const match = findBestReceiptCatalogMatch(row.name, row.unit, row.category)
+    || (normalize(item?.name) !== normalize(row.name) ? findBestReceiptCatalogMatch(item?.name, row.unit, row.category) : null);
+
+  if (match?.item) {
+    applyReceiptTargetToRow(row, match.item.name, { score: match.score });
+  }
+
+  return row;
+}
+
+function renderReceiptImportRows() {
+  if (!receiptImportRows) {
+    return;
+  }
+
+  receiptImportRows.replaceChildren();
+  if (receiptImportActions) {
+    receiptImportActions.hidden = !receiptImportRowsState.length;
+  }
+
+  if (!receiptImportRowsState.length) {
+    return;
+  }
+
+  const targets = getReceiptPairingTargets();
+
+  receiptImportRowsState.forEach((row) => {
+    const article = document.createElement("article");
+    const skipLabel = document.createElement("label");
+    const skipInput = document.createElement("input");
+    const skipText = document.createElement("span");
+    const nameInput = document.createElement("input");
+    const amountInputElement = document.createElement("input");
+    const unitSelectElement = document.createElement("select");
+    const priceInputElement = document.createElement("input");
+    const targetSelect = document.createElement("select");
+    const meta = document.createElement("small");
+
+    article.className = `calorie-import-row receipt-import-row${row.skipped ? " is-skipped" : ""}${row.targetName ? " is-paired" : ""}`;
+    article.dataset.receiptRow = row.id;
+
+    skipLabel.className = "calorie-skip-check receipt-skip-check";
+    skipInput.type = "checkbox";
+    skipInput.checked = Boolean(row.skipped);
+    skipInput.dataset.receiptField = "skipped";
+    skipText.textContent = "Nepřidávat";
+    skipLabel.append(skipInput, skipText);
+
+    nameInput.type = "text";
+    nameInput.value = row.name;
+    nameInput.dataset.receiptField = "name";
+    nameInput.setAttribute("aria-label", "Položka z účtenky");
+
+    amountInputElement.type = "text";
+    amountInputElement.inputMode = "decimal";
+    amountInputElement.pattern = "[0-9]+([,.][0-9]+)?";
+    amountInputElement.value = formatCalorieAmountInput(row.amount);
+    amountInputElement.dataset.receiptField = "amount";
+    amountInputElement.setAttribute("aria-label", "Množství");
+
+    ["g", "ml", "ks", "kg"].forEach((unit) => {
+      const option = document.createElement("option");
+      option.value = unit;
+      option.textContent = unit;
+      unitSelectElement.append(option);
+    });
+    unitSelectElement.value = row.unit;
+    unitSelectElement.dataset.receiptField = "unit";
+    unitSelectElement.disabled = Boolean(row.targetName);
+    unitSelectElement.setAttribute("aria-label", "Jednotka");
+
+    priceInputElement.type = "text";
+    priceInputElement.inputMode = "decimal";
+    priceInputElement.value = Number.isFinite(Number(row.price)) ? String(row.price).replace(".", ",") : "";
+    priceInputElement.dataset.receiptField = "price";
+    priceInputElement.placeholder = "Cena";
+    priceInputElement.setAttribute("aria-label", "Cena z účtenky");
+
+    const emptyOption = document.createElement("option");
+    emptyOption.value = "";
+    emptyOption.textContent = "Nenapárováno";
+    targetSelect.append(emptyOption);
+
+    targets.forEach((item) => {
+      const option = document.createElement("option");
+      option.value = item.name;
+      option.textContent = `${item.name} (${item.unit || "ks"}, ${formatCategoryLabel(item.category || "Ostatní")})`;
+      targetSelect.append(option);
+    });
+    targetSelect.value = row.targetName;
+    targetSelect.dataset.receiptField = "targetName";
+    targetSelect.setAttribute("aria-label", "Položka v číselníku");
+
+    meta.className = "muted-text";
+    meta.textContent = getReceiptRowMetaText(row);
+
+    article.append(skipLabel, nameInput, amountInputElement, unitSelectElement, priceInputElement, targetSelect, meta);
+    receiptImportRows.append(article);
+  });
+}
+
+function handleReceiptImportRowChange(event) {
+  const rowElement = event.target.closest("[data-receipt-row]");
+
+  if (!rowElement) {
+    return;
+  }
+
+  const row = receiptImportRowsState.find((item) => item.id === rowElement.dataset.receiptRow);
+
+  if (!row) {
+    return;
+  }
+
+  const previousTargetName = row.targetName;
+  const changedField = event.target?.dataset?.receiptField || "";
+  const isAmountTyping = event.type === "input" && changedField === "amount";
+  const isPriceTyping = event.type === "input" && changedField === "price";
+
+  row.skipped = Boolean(rowElement.querySelector('[data-receipt-field="skipped"]')?.checked);
+  row.name = tidyName(rowElement.querySelector('[data-receipt-field="name"]')?.value || row.name);
+  row.amount = parseCalorieAmountInput(rowElement.querySelector('[data-receipt-field="amount"]')?.value, row.amount);
+  row.unit = rowElement.querySelector('[data-receipt-field="unit"]')?.value || row.unit;
+  row.price = parseOptionalPrice(rowElement.querySelector('[data-receipt-field="price"]')?.value);
+  row.targetName = rowElement.querySelector('[data-receipt-field="targetName"]')?.value || "";
+
+  if (row.targetName !== previousTargetName) {
+    if (row.targetName) {
+      applyReceiptTargetToRow(row, row.targetName, { fromCurrent: true, score: 100 });
+      receiptMessage.textContent = `${row.name} je napárované na ${row.targetName}. Alias se uloží až po potvrzení přidání do lednice.`;
+      receiptMessage.classList.remove("is-error");
+    } else {
+      row.matchScore = 0;
+      receiptMessage.textContent = "Párování řádku je zrušené.";
+    }
+    renderReceiptImportRows();
+    return;
+  }
+
+  const amountInputElement = rowElement.querySelector('[data-receipt-field="amount"]');
+  const priceInputElement = rowElement.querySelector('[data-receipt-field="price"]');
+  const unitSelectElement = rowElement.querySelector('[data-receipt-field="unit"]');
+  const meta = rowElement.querySelector("small");
+
+  if (amountInputElement && !isAmountTyping) {
+    amountInputElement.value = formatCalorieAmountInput(row.amount);
+  }
+
+  if (priceInputElement && !isPriceTyping) {
+    priceInputElement.value = Number.isFinite(Number(row.price)) ? String(row.price).replace(".", ",") : "";
+  }
+
+  if (unitSelectElement) {
+    unitSelectElement.value = row.unit;
+    unitSelectElement.disabled = Boolean(row.targetName);
+  }
+
+  if (meta) {
+    meta.textContent = getReceiptRowMetaText(row);
+  }
+
+  rowElement.classList.toggle("is-skipped", row.skipped);
+  rowElement.classList.toggle("is-paired", Boolean(row.targetName));
+}
+
+function getReceiptPairingTargets() {
+  return getStoredCatalogItems()
+    .filter((item) => item?.name)
+    .sort((a, b) => a.name.localeCompare(b.name, "cs"));
+}
+
+function findBestReceiptCatalogMatch(name, unit, category) {
+  const exact = findStoredCatalogItemByName(name);
+
+  if (exact) {
+    return { item: exact, score: 120 };
+  }
+
+  const product = {
+    name: formatProductName(name || ""),
+    unit: normalizeImportUnit(unit || "ks"),
+    category: tidyName(category || "")
+  };
+
+  if (!product.name) {
+    return null;
+  }
+
+  const matches = getStoredCatalogItems()
+    .map((item) => ({
+      item,
+      score: getCatalogMatchScore(product, item)
+    }))
+    .filter((match) => match.score >= 42)
+    .sort((first, second) => second.score - first.score || first.item.name.localeCompare(second.item.name, "cs"));
+
+  return matches[0] || null;
+}
+
+function findReceiptTargetByName(name) {
+  return findStoredCatalogItemByName(name);
+}
+
+function applyReceiptTargetToRow(row, targetName, options = {}) {
+  const target = typeof targetName === "string" ? findReceiptTargetByName(targetName) : targetName;
+
+  if (!row || !target) {
+    return;
+  }
+
+  const sourceAmount = Number(options.fromCurrent ? row.amount : (row.sourceAmount ?? row.amount));
+  const sourceUnit = options.fromCurrent ? row.unit : (row.sourceUnit || row.unit);
+  const convertedAmount = convertCalorieAmountToTargetUnit(sourceAmount, sourceUnit, target.unit);
+
+  row.targetName = target.name;
+  row.category = target.category || row.category || "Ostatní";
+  row.unit = target.unit || row.unit;
+
+  if (convertedAmount) {
+    row.amount = convertedAmount;
+  }
+
+  row.matchScore = options.score ?? row.matchScore ?? 100;
+}
+
+function getReceiptRowMetaText(row) {
+  if (row.skipped) {
+    return "Řádek se nepřidá.";
+  }
+
+  if (row.targetName) {
+    const target = findReceiptTargetByName(row.targetName);
+    const aliasText = normalize(row.name) && target && normalize(row.name) !== normalize(target.name)
+      ? "Po potvrzení se název z účtenky uloží jako alias."
+      : "Položka už odpovídá číselníku.";
+
+    return `Přidá se jako ${target?.name || row.targetName} (${target?.unit || row.unit}). ${aliasText}`;
+  }
+
+  return "Nenapárováno. Vyber položku z číselníku, nebo při potvrzení rozhodni, jestli se založí nová.";
+}
+
+function openReceiptUnpairedModal(unpairedRows) {
+  if (!receiptUnpairedModal) {
+    return;
+  }
+
+  const count = unpairedRows.length;
+  receiptUnpairedDescription.textContent = `Chcete ${count} nenapárovaných položek přidat do Lednice a číselníku?`;
+  receiptUnpairedModal.hidden = false;
+  confirmReceiptUnpairedPaired?.focus();
+}
+
+function closeReceiptUnpairedModal() {
+  if (receiptUnpairedModal) {
+    receiptUnpairedModal.hidden = true;
+  }
+}
+
+async function applyReceiptImportRows(options = {}) {
+  if (!receiptImportRowsState.length) {
+    receiptMessage.textContent = "Nejdřív načti účtenku.";
+    receiptMessage.classList.add("is-error");
+    return;
+  }
+
+  const rows = receiptImportRowsState
+    .map((row) => ({
+      ...row,
+      name: formatProductName(row.name || row.sourceName)
+    }))
+    .filter((row) => !row.skipped && row.name && Number(row.amount) > 0);
+
+  if (!rows.length) {
+    receiptMessage.textContent = "Není vybraná žádná položka k přidání.";
+    receiptMessage.classList.add("is-error");
+    return;
+  }
+
+  const unpairedRows = rows.filter((row) => !row.targetName);
+
+  if (unpairedRows.length && !options.includeUnpaired && !options.skipUnpaired) {
+    openReceiptUnpairedModal(unpairedRows);
+    return;
+  }
+
+  closeReceiptUnpairedModal();
+
+  const list = getActiveList();
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+  let failed = 0;
+  let catalogCreated = 0;
+  let aliasesSaved = 0;
+
+  rows.forEach((row) => {
+    let target = row.targetName ? findReceiptTargetByName(row.targetName) : null;
+
+    if (!target && options.skipUnpaired) {
+      skipped += 1;
+      return;
+    }
+
+    if (!target && options.includeUnpaired) {
+      target = createReceiptCatalogItemFromRow(row);
+      catalogCreated += target ? 1 : 0;
+    }
+
+    if (!target) {
+      failed += 1;
+      return;
+    }
+
+    const amount = getReceiptAmountForTarget(row, target);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      failed += 1;
+      return;
+    }
+
+    if (row.targetName && ensureReceiptAliasForTarget(row, target)) {
+      aliasesSaved += 1;
+      target = findReceiptTargetByName(target.name) || target;
+    }
+
+    const result = upsertItemAmount({
+      name: target.name,
+      amount,
+      unit: target.unit || row.unit || "ks",
+      action: "purchase",
+      category: target.category || row.category || "Ostatní"
+    });
+    const price = Number.isFinite(Number(row.price)) && Number(row.price) > 0 ? roundAmount(Number(row.price)) : null;
+
+    if (result === "missing" || result === "too-much") {
+      failed += 1;
+      return;
+    }
+
+    if (result === "created") {
+      created += 1;
+    } else {
+      updated += 1;
+    }
+
+    recordHistory(getItemHistoryText(target.name, amount, target.unit || row.unit || "ks", "purchase", result, price), "item", list, {
+      action: "purchase",
+      product: target.name,
+      amount,
+      unit: target.unit || row.unit || "ks",
+      price,
+      occurredAt: getLocalDateTimeValue(new Date())
+    });
+  });
+
+  renderProductOptions();
+  renderCategoryOptions();
+  renderCatalog();
+  renderItems();
+  renderHistory();
+  await saveState();
+
+  const summary = [
+    `přidáno ${created}`,
+    `upraveno ${updated}`,
+    catalogCreated ? `nově v číselníku ${catalogCreated}` : "",
+    aliasesSaved ? `aliasů ${aliasesSaved}` : "",
+    skipped ? `vynecháno ${skipped}` : "",
+    failed ? `nešlo přidat ${failed}` : ""
+  ].filter(Boolean).join(", ");
+
+  receiptImportRowsState = [];
+  renderReceiptImportRows();
+  receiptMessage.textContent = `Účtenka zapsaná: ${summary}.`;
+  receiptMessage.classList.toggle("is-error", created + updated === 0);
+}
+
+function createReceiptCatalogItemFromRow(row) {
+  const name = formatProductName(row.name || row.sourceName);
+
+  if (!name) {
+    return null;
+  }
+
+  upsertCatalogItem({
+    name,
+    category: tidyName(row.category) || inferCategoryFromName(name) || "Ostatní",
+    unit: normalizeImportUnit(row.unit || "ks"),
+    listId: activeListId
+  });
+
+  return findStoredCatalogItemByName(name);
+}
+
+function ensureReceiptAliasForTarget(row, target) {
+  const aliasName = formatProductName(row.name || row.sourceName);
+
+  if (!aliasName || !target?.name || normalize(aliasName) === normalize(target.name)) {
+    return false;
+  }
+
+  const storedTarget = getStoredCatalogItems().find((item) => normalize(item.name) === normalize(target.name)) || target;
+  const aliases = normalizeEanAliases(storedTarget.eanAliases);
+
+  if (aliases.some((alias) => normalize(alias.name) === normalize(aliasName))) {
+    return false;
+  }
+
+  upsertCatalogItem({
+    ...storedTarget,
+    listId: activeListId,
+    eanAliases: [
+      ...aliases,
+      {
+        name: aliasName,
+        ean: "",
+        amount: row.sourceAmount || row.amount || 1,
+        unit: row.sourceUnit || row.unit || storedTarget.unit || "ks",
+        category: storedTarget.category || row.category || "Ostatní"
+      }
+    ]
+  });
+
+  return true;
+}
+
+function getReceiptAmountForTarget(row, target) {
+  const converted = convertCalorieAmountToTargetUnit(row.amount, row.unit, target.unit || row.unit);
+
+  if (converted) {
+    return roundAmount(converted);
+  }
+
+  if (normalizeImportUnit(row.unit) === normalizeImportUnit(target.unit || row.unit)) {
+    return roundAmount(Number(row.amount) || 0);
+  }
+
+  return null;
 }
 
 function hasReceiptAiIntegration() {
@@ -6697,7 +7197,7 @@ function fileToDataUrl(file) {
 }
 
 function getReceiptAiCatalogContext() {
-  return getCatalogItems()
+  return getStoredCatalogItems()
     .slice(0, 160)
     .map((item) => ({
       name: item.name,
@@ -6742,6 +7242,7 @@ function mergeReceiptAiItem(items, item) {
   });
 
   if (duplicate) {
+    duplicate.receiptName = duplicate.receiptName || item.receiptName;
     duplicate.score = Math.max(duplicate.score || 0, item.score || 0);
     return;
   }
@@ -6757,7 +7258,7 @@ function normalizeReceiptAiItem(item) {
   const rawUnit = item?.unit || item?.measure || "ks";
   const normalized = normalizeImportAmountAndUnit(parseImportAmount(rawAmount) || 1, rawUnit);
   const price = parseOptionalPrice(item?.price ?? item?.totalPrice ?? item?.total ?? item?.amountPaid);
-  const catalogItem = findCatalogItemByName(name);
+  const catalogItem = findStoredCatalogItemByName(name);
   const finalName = catalogItem?.name || name;
 
   if (!finalName || normalize(finalName).length < 3) {
@@ -6774,6 +7275,7 @@ function normalizeReceiptAiItem(item) {
 
   return {
     name: finalName,
+    receiptName: name,
     amount: normalized.amount,
     unit: normalized.unit,
     category: catalogItem?.category || normalizeReceiptAiCategory(item?.category, finalName),
@@ -7304,7 +7806,7 @@ function normalizeReceiptCandidate(candidate, line, sourceName) {
   const name = cleanReceiptProductName(candidate.name);
   const price = Number.isFinite(Number(candidate.price)) ? roundAmount(Number(candidate.price)) : null;
   const hasPrice = Number.isFinite(price) && price > 0;
-  const catalogItem = findCatalogItemByName(name);
+  const catalogItem = findStoredCatalogItemByName(name);
 
   if (!name || normalize(name).length < 3) {
     return null;
@@ -7330,6 +7832,7 @@ function normalizeReceiptCandidate(candidate, line, sourceName) {
 
   return {
     name: finalName,
+    receiptName: name,
     amount: normalized.amount,
     unit: normalized.unit,
     category: catalogItem?.category || inferCategoryFromName(finalName),
@@ -7457,6 +7960,7 @@ function mergeReceiptItem(items, item) {
   });
 
   if (existing) {
+    existing.receiptName = existing.receiptName || item.receiptName;
     existing.amount = roundAmount(existing.amount + item.amount);
     existing.price = mergeReceiptPrices(existing.price, item.price);
     existing.score = Math.max(existing.score || 0, item.score || 0) + 4;
@@ -7495,6 +7999,7 @@ function mergeReceiptAttemptItem(items, item, nextOrder) {
 
   if (shouldReplace) {
     existing.name = item.name;
+    existing.receiptName = item.receiptName;
     existing.amount = item.amount;
     existing.unit = item.unit;
     existing.category = item.category;
