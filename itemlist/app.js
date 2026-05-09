@@ -163,6 +163,7 @@ const shoppingList = document.querySelector("#shopping-list");
 const shoppingSubtractStock = document.querySelector("#shopping-subtract-stock");
 const comboForm = document.querySelector("#combo-form");
 const comboName = document.querySelector("#combo-name");
+const comboNotes = document.querySelector("#combo-notes");
 const comboItemsList = document.querySelector("#combo-items-list");
 const addComboItemButton = document.querySelector("#add-combo-item");
 const comboSubmitButton = document.querySelector("#combo-submit-button");
@@ -507,7 +508,7 @@ function setupEvents() {
         const item = combo.items[index];
         input.value = formatFormNumber(roundAmount((item?.amount || 1) * amount));
       });
-      showMessage("Zkontroluj položky kombinace a potvrď změnu.");
+      showMessage("Zkontroluj položky receptu a potvrď změnu.");
       return;
     }
 
@@ -1301,7 +1302,7 @@ function switchView(view, options = {}) {
     shopping: "Nákupní list",
     history: "Změny",
     catalog: "Číselník",
-    combos: "Kombinace",
+    combos: "Recepty",
     tools: "Import / export",
     settings: "Nastavení"
   };
@@ -2000,11 +2001,13 @@ function buildStateXml(state = serializeState()) {
     .join("\n");
   const comboRows = (state.combos || [])
     .map((combo) => {
+      const notes = tidyName(combo.notes || "");
       return [
         `    <combo id="${escapeXml(combo.id || "")}" name="${escapeXml(combo.name)}">`,
+        notes ? `      <notes>${escapeXml(notes)}</notes>` : "",
         ...((combo.items || []).map((item) => `      <item name="${escapeXml(item.name)}" amount="${escapeXml(formatXmlAmount(item.amount))}" unit="${escapeXml(item.unit || "ks")}" />`)),
         "    </combo>"
-      ].join("\n");
+      ].filter(Boolean).join("\n");
     })
     .join("\n");
   const historyRows = (state.history || [])
@@ -2028,7 +2031,7 @@ function buildStateXml(state = serializeState()) {
     shoppingRows || "    <!-- žádný nákupní list -->",
     "  </shoppingList>",
     "  <combos>",
-    comboRows || "    <!-- žádné kombinace -->",
+    comboRows || "    <!-- žádné recepty -->",
     "  </combos>",
     "  <history>",
     historyRows || "    <!-- žádná historie -->",
@@ -2632,6 +2635,7 @@ function sanitizeCombos(items) {
       .map((combo) => ({
         id: typeof combo.id === "string" ? combo.id : createId(),
         name: formatProductName(combo.name),
+        notes: typeof combo.notes === "string" ? combo.notes : "",
         listId: typeof combo.listId === "string" ? combo.listId : "",
         items: combo.items
           .filter((item) => item && typeof item.name === "string")
@@ -3050,7 +3054,7 @@ async function applyItemChange({ name, amount, unit, action, category, price = n
 
 async function applyComboChange(combo, multiplier, action) {
   if (action === "set") {
-    showMessage("Kombinaci nejde nastavit na pevný počet. Použij nákup, snězeno nebo korekci.", true);
+    showMessage("Recept nejde nastavit na pevný počet. Použij nákup, snězeno nebo korekci.", true);
     return;
   }
 
@@ -3072,16 +3076,16 @@ async function applyComboChange(combo, multiplier, action) {
   });
 
   if (!changed) {
-    showMessage("Žádná položka z kombinace v zásobách není.", true);
+    showMessage("Žádná položka z receptu v zásobách není.", true);
     return;
   }
 
   const suffix = missing ? `, ${missing} položek chybělo` : "";
-  recordHistory(`Kombinace ${combo.name}: provedena akce ${getActionLabel(action)} ${formatAmount(multiplier)}x${suffix}.`, "combo");
+  recordHistory(`Recept ${combo.name}: provedena akce ${getActionLabel(action)} ${formatAmount(multiplier)}x${suffix}.`, "combo");
   renderHistory();
   renderItems();
   resetForm();
-  showMessage(`Kombinace ${combo.name} zapsána.`);
+  showMessage(`Recept ${combo.name} zapsán.`);
   await saveState();
 }
 
@@ -4824,10 +4828,11 @@ function getShoppingNeedSummary(parsed) {
 async function saveCombo(event) {
   event.preventDefault();
   const name = tidyName(comboName.value);
+  const notes = comboNotes ? comboNotes.value.trim() : "";
   const items = getComboBuilderItems();
 
   if (!name || !items.length) {
-    showMessage("Vyplň název kombinace a aspoň jednu položku z číselníku.", true);
+    showMessage("Vyplň název receptu a aspoň jednu položku z číselníku.", true);
     return;
   }
 
@@ -4838,20 +4843,23 @@ async function saveCombo(event) {
 
   if (editedCombo) {
     editedCombo.name = name;
+    editedCombo.notes = notes;
     editedCombo.items = items;
   } else if (existing) {
+    existing.notes = notes;
     existing.items = items;
   } else {
     combos.unshift({
       id: createId(),
       name,
+      notes,
       listId: activeListId,
       items
     });
   }
 
   resetComboForm();
-  recordHistory(`Uložena kombinace ${name}.`, "combo");
+  recordHistory(`Uložen recept ${name}.`, "combo");
   renderCombos();
   renderCatalog();
   renderHistory();
@@ -4876,8 +4884,11 @@ function resetComboBuilderRows() {
 function resetComboForm() {
   editingComboId = null;
   comboForm.reset();
+  if (comboNotes) {
+    comboNotes.value = "";
+  }
   resetComboBuilderRows();
-  comboSubmitButton.textContent = "Uložit kombinaci";
+  comboSubmitButton.textContent = "Uložit recept";
   cancelComboEditButton.hidden = true;
 }
 
@@ -4978,7 +4989,7 @@ async function useSelectedCombo() {
   const combo = combos.find((currentCombo) => isComboForActiveList(currentCombo) && currentCombo.id === comboSelect.value);
 
   if (!combo) {
-    showMessage("Vyber kombinaci.", true);
+    showMessage("Vyber recept.", true);
     return;
   }
 
@@ -4996,7 +5007,7 @@ function openComboChangeModal(selectedComboId = "") {
   if (!activeCombos.length) {
     const option = document.createElement("option");
     option.value = "";
-    option.textContent = "Zatím žádná kombinace";
+    option.textContent = "Zatím žádný recept";
     comboChangeSelect.append(option);
   } else {
     activeCombos.forEach((combo) => {
@@ -5033,7 +5044,7 @@ function renderComboChangeItems() {
   if (!combo) {
     const empty = document.createElement("p");
     empty.className = "message";
-    empty.textContent = "Nejdřív si ulož kombinaci.";
+    empty.textContent = "Nejdřív si ulož recept.";
     comboChangeItems.append(empty);
     return;
   }
@@ -5064,7 +5075,7 @@ async function applyComboChangeFromModal() {
   const action = comboChangeAction?.value || "purchase";
 
   if (!combo) {
-    showMessage("Vyber kombinaci.", true);
+    showMessage("Vyber recept.", true);
     return;
   }
 
@@ -5093,7 +5104,7 @@ async function applyComboChangeFromModal() {
   });
 
   recordHistory(
-    `${getActionLabel(action)} kombinace ${combo.name}: ${changed} položek${missing ? `, ${missing} chybělo` : ""}.`,
+    `${getActionLabel(action)} receptu ${combo.name}: ${changed} položek${missing ? `, ${missing} chybělo` : ""}.`,
     "item",
     getActiveList(),
     {
@@ -5131,7 +5142,7 @@ async function handleComboClick(event) {
     if (editingComboId === combo.id) {
       resetComboForm();
     }
-    recordHistory(`Smazána kombinace ${combo.name}.`, "combo");
+    recordHistory(`Smazán recept ${combo.name}.`, "combo");
   }
 
   if (button.dataset.comboAction === "edit") {
@@ -5148,6 +5159,9 @@ async function handleComboClick(event) {
 function startComboEdit(combo) {
   editingComboId = combo.id;
   comboName.value = combo.name;
+  if (comboNotes) {
+    comboNotes.value = combo.notes || "";
+  }
   comboItemsList.replaceChildren();
   combo.items.forEach((item) => addComboItemRow(item));
 
@@ -5169,12 +5183,12 @@ function renderCombos() {
 
   if (!activeCombos.length) {
     const option = document.createElement("option");
-    option.textContent = "Zatím žádná kombinace";
+    option.textContent = "Zatím žádný recept";
     option.value = "";
     comboSelect.append(option);
     const empty = document.createElement("p");
     empty.className = "message";
-    empty.textContent = "Ulož si třeba kombinaci Rohlík se šunkou.";
+    empty.textContent = "Ulož si třeba recept Rohlík se šunkou.";
     comboList.append(empty);
     return;
   }
@@ -5185,6 +5199,7 @@ function renderCombos() {
     const content = document.createElement("div");
     const text = document.createElement("strong");
     const meta = document.createElement("span");
+    const notes = document.createElement("small");
     const actions = document.createElement("div");
     const edit = document.createElement("button");
     const remove = document.createElement("button");
@@ -5198,6 +5213,8 @@ function renderCombos() {
     text.textContent = combo.name;
     meta.className = "muted-text";
     meta.textContent = combo.items.map((item) => `${item.name} ${formatAmount(item.amount)} ${item.unit}`).join(", ");
+    notes.className = "recipe-notes-preview";
+    notes.textContent = tidyName(combo.notes || "");
     actions.className = "row-actions";
     edit.className = "ghost-button";
     edit.type = "button";
@@ -5211,6 +5228,9 @@ function renderCombos() {
     remove.textContent = "Smazat";
 
     content.append(text, meta);
+    if (notes.textContent) {
+      content.append(notes);
+    }
     actions.append(edit, remove);
     row.append(content, actions);
     comboList.append(row);
@@ -5415,7 +5435,7 @@ function renderProductOptions() {
     ]),
     ...combos.filter(isComboForActiveList).map((combo) => ({
       value: combo.name,
-      label: "Kombinace",
+      label: "Recept",
       text: combo.items.map((item) => item.name).join(", ")
     }))
   ];
@@ -5441,7 +5461,7 @@ function renderCategoryOptions() {
       ...DEFAULT_CATEGORIES,
       ...getCatalogItems().map((item) => item.category || "Ostatní")
     ])
-  ].filter((category) => normalize(category) !== "kombinace")
+  ].filter((category) => !["kombinace", "recept", "recepty"].includes(normalize(category)))
     .sort((a, b) => a.localeCompare(b, "cs"));
   categoryOptions.replaceChildren();
 
@@ -5458,7 +5478,7 @@ async function saveCatalogItem(event) {
   event.preventDefault();
   const name = formatProductName(catalogName.value);
   const categoryValue = tidyName(catalogCategory.value) || "Ostatní";
-  const category = normalize(categoryValue) === "kombinace" ? "Ostatní" : categoryValue;
+  const category = ["kombinace", "recept", "recepty"].includes(normalize(categoryValue)) ? "Ostatní" : categoryValue;
   const unit = normalizeImportUnit(catalogUnit.value || "ks");
 
   if (!name) {
@@ -5590,7 +5610,7 @@ function addOrUpdateCatalogAlias() {
   const amount = Number(catalogAliasAmount.value);
   const unit = normalizeImportUnit(catalogAliasUnit.value || catalogUnit.value || "ks");
   const categoryValue = tidyName(catalogCategory.value) || "Ostatní";
-  const category = normalize(categoryValue) === "kombinace" ? "Ostatní" : categoryValue;
+  const category = ["kombinace", "recept", "recepty"].includes(normalize(categoryValue)) ? "Ostatní" : categoryValue;
 
   if (!name) {
     showMessage("Zadej název aliasu, třeba Mléko Kunín.", true);
@@ -8707,7 +8727,7 @@ function getStatsActionLabel(entry) {
   const labels = {
     shopping: "Nákupní list",
     catalog: "Číselník",
-    combo: "Kombinace",
+    combo: "Recepty",
     list: "Seznam"
   };
 
@@ -8743,7 +8763,7 @@ function mapToChartRows(map, limit) {
 }
 
 function mapActionRows(map) {
-  const order = ["Snězeno", "Nákup", "Korekce +", "Korekce -", "Dar", "Vyhozeno", "Nastavit", "Nákupní list", "Číselník", "Kombinace", "Seznam", "Ostatní"];
+  const order = ["Snězeno", "Nákup", "Korekce +", "Korekce -", "Dar", "Vyhozeno", "Nastavit", "Nákupní list", "Číselník", "Recepty", "Seznam", "Ostatní"];
   const used = new Set(order);
   const orderedRows = order
     .map((label) => [label, map.get(label) || 0])
@@ -9276,7 +9296,7 @@ function syncEntryProductInfo() {
   let info = "";
 
   if (combo) {
-    info = `kombinace ${combo.items.length} položek`;
+    info = `recept ${combo.items.length} položek`;
   } else if (stockedItem) {
     info = `v lednici ${formatAmountWithUnit(stockedItem.amount, stockedItem.unit)}`;
   } else if (catalogItem) {
@@ -9538,7 +9558,7 @@ function syncCategoryFromProduct() {
   const combo = findComboByName(productInput.value);
 
   if (combo) {
-    categoryInput.value = "Kombinace";
+    categoryInput.value = "Recept";
     return;
   }
 

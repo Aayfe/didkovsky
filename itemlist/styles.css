@@ -1070,6 +1070,11 @@ h1 {
   margin-bottom: 14px;
 }
 
+.combo-notes-field textarea {
+  min-height: 108px;
+  resize: vertical;
+}
+
 .combo-form-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1091,6 +1096,14 @@ h1 {
   border-radius: 8px;
   background: var(--field);
   padding: 12px;
+}
+
+.recipe-notes-preview {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  line-height: 1.45;
+  white-space: pre-line;
 }
 
 .combo-add-button {

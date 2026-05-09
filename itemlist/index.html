@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux38">
+    <link rel="stylesheet" href="styles.css?v=ux39">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -41,7 +41,7 @@
           <button class="menu-link" type="button" data-view="history">Změny</button>
           <button class="menu-link" type="button" data-view="shopping">Nákupní list</button>
           <button class="menu-link" type="button" data-view="catalog">Číselník potravin</button>
-          <button class="menu-link" type="button" data-view="combos">Kombinace</button>
+          <button class="menu-link" type="button" data-view="combos">Recepty</button>
           <button class="menu-link" type="button" data-view="tools">Import / export</button>
           <button class="menu-link" type="button" data-view="settings">Nastavení</button>
         </nav>
@@ -206,7 +206,7 @@
             <button class="ghost-button" id="cancel-edit" type="button" hidden>Zrušit úpravu</button>
           </form>
           <div class="history-combo-actions" hidden>
-            <button class="ghost-button" id="open-combo-change" type="button">Kombinace</button>
+            <button class="ghost-button" id="open-combo-change" type="button">Recepty</button>
           </div>
           <p class="message" id="message" role="status" aria-live="polite"></p>
           <div class="section-heading history-title-heading">
@@ -318,27 +318,31 @@
           <div class="section-heading">
             <div>
               <p class="eyebrow">Více položek najednou</p>
-              <h1>Kombinace</h1>
+              <h1>Recepty</h1>
             </div>
           </div>
           <form class="combo-form" id="combo-form" autocomplete="off" novalidate>
             <label class="field">
-              <span>Název kombinace</span>
+              <span>Název receptu</span>
               <input id="combo-name" type="text" placeholder="Rohlík se šunkou">
             </label>
-            <div class="combo-items-builder" id="combo-items-list" aria-label="Položky v kombinaci"></div>
+            <label class="field combo-notes-field">
+              <span>Postup a poznámky</span>
+              <textarea id="combo-notes" rows="4" placeholder="Postup, časy, teplota nebo vlastní poznámky"></textarea>
+            </label>
+            <div class="combo-items-builder" id="combo-items-list" aria-label="Položky v receptu"></div>
             <button class="ghost-button combo-add-button" id="add-combo-item" type="button">Přidat další položku</button>
             <div class="combo-form-actions">
-              <button class="primary-button" id="combo-submit-button" type="submit">Uložit kombinaci</button>
+              <button class="primary-button" id="combo-submit-button" type="submit">Uložit recept</button>
               <button class="ghost-button" id="cancel-combo-edit" type="button" hidden>Zrušit úpravu</button>
             </div>
           </form>
           <div class="combo-runner" hidden>
             <label class="field combo-runner-field">
-              <span>Kombinace</span>
+              <span>Recept</span>
               <select id="combo-select"></select>
             </label>
-            <button class="primary-button" id="use-combo-button" type="button">Použít kombinaci</button>
+            <button class="primary-button" id="use-combo-button" type="button">Použít recept</button>
           </div>
           <div class="card-list" id="combo-list"></div>
         </section>
@@ -460,24 +464,24 @@
             </div>
             <ol class="settings-news-list">
               <li>
+                <time datetime="2026-05-09">09.05.2026</time>
+                <span>Kombinace se nově jmenují Recepty a mají poznámky k postupu.</span>
+              </li>
+              <li>
                 <time datetime="2026-05-06">06.05.2026</time>
                 <span>Číselník je hlavní zdroj pro názvy, kategorie a jednotky produktů.</span>
               </li>
               <li>
                 <time datetime="2026-05-06">06.05.2026</time>
-                <span>Prostory jsou oddělené: smazání prostoru smaže i jeho zásoby, logy, číselník, kombinace a nákupní list.</span>
+                <span>Prostory jsou oddělené: smazání prostoru smaže i jeho zásoby, logy, číselník, recepty a nákupní list.</span>
               </li>
               <li>
                 <time datetime="2026-05-05">05.05.2026</time>
-                <span>Vylepšené Změny, exporty, lednice a práce s kombinacemi.</span>
+                <span>Vylepšené Změny, exporty, lednice a práce s recepty.</span>
               </li>
               <li>
                 <time datetime="2026-05-01">01.05.2026</time>
                 <span>Vylepšené rozložení aplikace na mobilu i počítači.</span>
-              </li>
-              <li>
-                <time datetime="2026-04-30">30.04.2026</time>
-                <span>Odečet z Kalorických tabulek načítá položky po dnech a umí je odečíst z lednice.</span>
               </li>
             </ol>
           </section>
@@ -648,7 +652,7 @@
     <div class="modal-backdrop" id="delete-all-modal" hidden>
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-all-title">
         <h2 id="delete-all-title">Smazat všechna data</h2>
-        <p>Tohle smaže tvoje zásoby, nákupní list, kombinace i historii.</p>
+        <p>Tohle smaže tvoje zásoby, nákupní list, recepty i historii.</p>
         <div class="modal-actions">
           <button class="ghost-button" id="cancel-delete-all" type="button">Zrušit</button>
           <button class="danger-button" id="confirm-delete-all" type="button">Smazat vše</button>
@@ -697,9 +701,9 @@
 
     <div class="modal-backdrop" id="combo-change-modal" hidden>
       <div class="modal combo-change-modal" role="dialog" aria-modal="true" aria-labelledby="combo-change-title">
-        <h2 id="combo-change-title">Použít kombinaci</h2>
+        <h2 id="combo-change-title">Použít recept</h2>
         <label class="field">
-          <span>Kombinace</span>
+          <span>Recept</span>
           <select id="combo-change-select"></select>
         </label>
         <label class="field">
@@ -712,7 +716,7 @@
         <div class="combo-change-items" id="combo-change-items"></div>
         <div class="modal-actions">
           <button class="ghost-button" id="cancel-combo-change" type="button">Zrušit</button>
-          <button class="primary-button" id="apply-combo-change" type="button">Použít kombinaci</button>
+          <button class="primary-button" id="apply-combo-change" type="button">Použít recept</button>
         </div>
       </div>
     </div>
@@ -721,6 +725,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux50"></script>
+    <script src="app.js?v=ux51"></script>
   </body>
 </html>
