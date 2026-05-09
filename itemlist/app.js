@@ -145,6 +145,7 @@ const calorieImportMessage = document.querySelector("#calorie-import-message");
 const calorieApplyMessage = document.querySelector("#calorie-apply-message");
 const catalogBody = document.querySelector("#catalog-body");
 const catalogForm = document.querySelector("#catalog-form");
+const catalogSearchInput = document.querySelector("#catalog-search-input");
 const catalogName = document.querySelector("#catalog-name");
 const catalogCategory = document.querySelector("#catalog-category");
 const catalogUnit = document.querySelector("#catalog-unit");
@@ -445,6 +446,7 @@ function setupEvents() {
   shoppingSubtractStock.addEventListener("change", updateShoppingSubtractSetting);
   settingsShoppingSubtractStock.addEventListener("change", updateShoppingSubtractSetting);
   catalogForm.addEventListener("submit", saveCatalogItem);
+  catalogSearchInput?.addEventListener("input", renderCatalog);
   catalogBody.addEventListener("click", handleCatalogClick);
   catalogAliasAddButton.addEventListener("click", addOrUpdateCatalogAlias);
   catalogAliasList.addEventListener("click", handleCatalogAliasClick);
@@ -8318,7 +8320,23 @@ function renderCatalog() {
 
   catalogBody.replaceChildren();
 
-  getCatalogItems().forEach((item) => {
+  const items = getVisibleCatalogItems();
+
+  if (!items.length) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+
+    cell.colSpan = 5;
+    cell.className = "empty-state";
+    cell.textContent = catalogSearchInput?.value
+      ? "V číselníku není žádná položka pro zadané hledání."
+      : "Číselník je zatím prázdný.";
+    row.append(cell);
+    catalogBody.append(row);
+    return;
+  }
+
+  items.forEach((item) => {
     const row = document.createElement("tr");
     row.innerHTML = `
       <td></td>
@@ -8340,6 +8358,34 @@ function renderCatalog() {
       button.dataset.name = normalize(item.name);
     });
     catalogBody.append(row);
+  });
+}
+
+function getVisibleCatalogItems() {
+  const query = normalize(catalogSearchInput?.value || "");
+
+  if (!query) {
+    return getCatalogItems();
+  }
+
+  return getCatalogItems().filter((item) => {
+    const aliases = normalizeEanAliases(item.eanAliases);
+    const searchable = [
+      item.name,
+      item.category,
+      formatCategoryLabel(item.category),
+      item.unit,
+      item.ean,
+      ...(Array.isArray(item.eans) ? item.eans : []),
+      ...aliases.flatMap((alias) => [
+        alias.name,
+        alias.ean,
+        alias.unit,
+        formatAmount(alias.amount)
+      ])
+    ].join(" ");
+
+    return normalize(searchable).includes(query);
   });
 }
 

@@ -1399,7 +1399,8 @@ body.dark-mode .modal {
   background: transparent;
 }
 
-.pantry-search-field {
+.pantry-search-field,
+.catalog-search-field {
   max-width: 520px;
   margin: 0 0 12px;
 }

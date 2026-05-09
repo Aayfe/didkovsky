@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux39">
+    <link rel="stylesheet" href="styles.css?v=ux40">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -247,6 +247,10 @@
             </div>
             <button class="ghost-button" id="export-catalog-button" type="button">Export číselníku</button>
           </div>
+          <label class="field catalog-search-field">
+            <span>Hledat v číselníku</span>
+            <input id="catalog-search-input" type="search" placeholder="Např. mléko, alias, EAN, mléčné">
+          </label>
           <form class="catalog-form" id="catalog-form" autocomplete="off" novalidate>
             <label class="field">
               <span>Potravina</span>
@@ -725,6 +729,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux51"></script>
+    <script src="app.js?v=ux52"></script>
   </body>
 </html>
