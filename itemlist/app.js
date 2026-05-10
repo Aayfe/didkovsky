@@ -3640,6 +3640,10 @@ function normalizeCalorieDiaryResult(data, fallbackDate) {
     normalizeCalorieDiaryItems(data?.raw?.data?.foodstuff || data?.raw?.data?.items || data?.raw?.data?.entries || [], "", fallbackDate).forEach((item) => rows.push(item));
   }
 
+  if (!rows.length && isExplicitEmptyCalorieDiary(data)) {
+    return [];
+  }
+
   if (!rows.length) {
     extractCalorieDiaryRowsDeep(data?.raw?.data ?? data?.raw ?? data, fallbackDate).forEach((item) => rows.push(item));
   }
@@ -3661,6 +3665,33 @@ function normalizeCalorieDiaryResult(data, fallbackDate) {
     .sort((first, second) => getCalorieMealIndex(first.meal) - getCalorieMealIndex(second.meal)
       || first.name.localeCompare(second.name, "cs"))
     .slice(0, 120);
+}
+
+function isExplicitEmptyCalorieDiary(data) {
+  const root = data?.raw?.data && typeof data.raw.data === "object"
+    ? data.raw.data
+    : data?.data && typeof data.data === "object"
+      ? data.data
+      : data?.raw && typeof data.raw === "object"
+        ? data.raw
+        : data;
+  const foodstuffCount = Number(root?.foodstuffCount ?? data?.foodstuffCount);
+
+  if (Number.isFinite(foodstuffCount) && foodstuffCount === 0) {
+    return true;
+  }
+
+  if (Array.isArray(root?.times)) {
+    return root.times.every((meal) => {
+      return ![
+        meal?.foodstuff,
+        meal?.items,
+        meal?.entries
+      ].some((items) => Array.isArray(items) && items.length);
+    });
+  }
+
+  return false;
 }
 
 function normalizeCalorieDiaryItems(items, mealName, fallbackDate) {
@@ -3705,17 +3736,17 @@ function normalizeCalorieDiaryItem(item, mealName, fallbackDate) {
     || nestedFood.measure
     || (Number.isFinite(Number(item.grams ?? item.weight ?? nestedFood.grams ?? nestedFood.weight)) ? "g" : parsedLine?.unit || "g");
   const unitQuantity = parseCalorieDiaryUnitValue(rawUnit);
-  const normalized = normalizeImportAmountAndUnit(
-    parseImportAmount(rawAmount) || unitQuantity?.amount || parsedLine?.amount || 1,
-    unitQuantity?.unit || rawUnit
-  );
+  const parsedAmount = parseImportAmount(rawAmount);
+  const quantityAmount = parsedAmount || unitQuantity?.amount || parsedLine?.amount;
   const name = cleanCalorieImportName(stripCalorieHtml(item.name || item.title || item.foodName || item.food_name || item.nazev || item.label || nestedFood.name || nestedFood.title || parsedLine?.name || rawLine.replace(parsedLine?.raw || "", "")));
   const meal = normalizeCalorieMealName(item.meal || item.phase || item.section || item.group || item.mealName || item.meal_name || mealName);
   const occurredAt = normalizeCalorieDiaryOccurredAt(item.occurredAt || item.time, meal, item.date || fallbackDate);
 
-  if (!name || normalize(name).length < 3) {
+  if (!quantityAmount || !name || normalize(name).length < 3) {
     return null;
   }
+
+  const normalized = normalizeImportAmountAndUnit(quantityAmount, unitQuantity?.unit || rawUnit);
 
   return {
     name,
