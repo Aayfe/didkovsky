@@ -6653,6 +6653,7 @@ function createReceiptImportRowState(item) {
     sourceAmount: Math.max(0.01, roundAmount(normalized.amount || 1)),
     unit: normalized.unit,
     sourceUnit: normalized.unit,
+    sourceLine: item?.sourceLine || item?.raw || "",
     price: Number.isFinite(Number(item?.price)) && Number(item.price) > 0 ? roundAmount(Number(item.price)) : null,
     category: tidyName(item?.category) || inferCategoryFromName(visibleName),
     targetName: "",
@@ -6872,6 +6873,14 @@ function applyReceiptTargetToRow(row, targetName, options = {}) {
   const sourceAmount = Number(options.fromCurrent ? row.amount : (row.sourceAmount ?? row.amount));
   const sourceUnit = options.fromCurrent ? row.unit : (row.sourceUnit || row.unit);
   const convertedAmount = convertCalorieAmountToTargetUnit(sourceAmount, sourceUnit, target.unit);
+  const inferredAmount = !convertedAmount && sourceUnit === "ks" && sourceAmount === 1 && target.unit && target.unit !== "ks"
+    ? inferReceiptAmountUnitFromKnowledge({
+      name: row.name || row.sourceName,
+      sourceLine: row.sourceLine || "",
+      catalogItem: target,
+      category: target.category || row.category
+    })
+    : null;
 
   row.targetName = target.name;
   row.category = target.category || row.category || "Ostatní";
@@ -6879,6 +6888,8 @@ function applyReceiptTargetToRow(row, targetName, options = {}) {
 
   if (convertedAmount) {
     row.amount = convertedAmount;
+  } else if (inferredAmount && normalizeImportUnit(inferredAmount.unit) === normalizeImportUnit(target.unit)) {
+    row.amount = inferredAmount.amount;
   }
 
   row.matchScore = options.score ?? row.matchScore ?? 100;
@@ -7257,7 +7268,12 @@ function getReceiptAiCatalogContext() {
       category: item.category || "Ostatní",
       unit: item.unit || "ks",
       aliases: normalizeEanAliases(item.eanAliases)
-        .map((alias) => alias.name)
+        .map((alias) => ({
+          name: alias.name,
+          amount: alias.amount || 1,
+          unit: alias.unit || item.unit || "ks",
+          category: alias.category || item.category || "Ostatní"
+        }))
         .filter(Boolean)
         .slice(0, 8)
     }));
@@ -7307,12 +7323,21 @@ function normalizeReceiptAiItem(item) {
   const rawName = item?.name || item?.product || item?.title || "";
   const sourceLine = item?.sourceLine || item?.raw || rawName;
   const name = cleanReceiptProductName(rawName);
-  const rawAmount = item?.amount ?? item?.quantity ?? item?.count ?? 1;
-  const rawUnit = item?.unit || item?.measure || "ks";
-  const normalized = normalizeImportAmountAndUnit(parseImportAmount(rawAmount) || 1, rawUnit);
+  const rawAmount = item?.amount ?? item?.quantity ?? item?.count;
+  const rawUnit = item?.unit || item?.measure || "";
   const price = parseOptionalPrice(item?.price ?? item?.totalPrice ?? item?.total ?? item?.amountPaid);
   const catalogItem = findStoredCatalogItemByName(name);
   const finalName = catalogItem?.name || name;
+  const normalized = normalizeReceiptAmountAndUnit({
+    name,
+    sourceLine,
+    rawAmount,
+    rawUnit,
+    catalogItem,
+    category: catalogItem?.category || item?.category,
+    fallbackAmount: 1,
+    fallbackUnit: "ks"
+  });
 
   if (!finalName || normalize(finalName).length < 3) {
     return null;
@@ -7345,6 +7370,180 @@ function normalizeReceiptAiCategory(category, productName) {
   const matchedCategory = DEFAULT_CATEGORIES.find((item) => normalize(item) === normalize(cleanCategory));
 
   return matchedCategory || inferCategoryFromName(productName);
+}
+
+function normalizeReceiptAmountAndUnit({
+  name,
+  sourceLine = "",
+  rawName = "",
+  rawAmount = null,
+  rawUnit = "",
+  catalogItem = null,
+  category = "",
+  fallbackAmount = 1,
+  fallbackUnit = "ks"
+}) {
+  const parsedAmount = parseImportAmount(rawAmount);
+  const normalizedUnit = rawUnit ? normalizeImportUnit(rawUnit) : "";
+  const hasExplicitUnit = Boolean(normalize(rawUnit || ""));
+  const normalized = normalizeImportAmountAndUnit(parsedAmount || fallbackAmount, normalizedUnit || fallbackUnit);
+  const shouldInfer = !hasExplicitUnit
+    || !parsedAmount
+    || (normalized.unit === "ks" && normalized.amount === 1 && catalogItem?.unit && catalogItem.unit !== "ks");
+  const inferred = shouldInfer
+    ? inferReceiptAmountUnitFromKnowledge({
+      name,
+      rawName,
+      sourceLine,
+      catalogItem,
+      category,
+      parsedAmount
+    })
+    : null;
+
+  if (inferred) {
+    return inferred;
+  }
+
+  return normalized;
+}
+
+function inferReceiptAmountUnitFromKnowledge({ name, rawName = "", sourceLine = "", catalogItem = null, category = "", parsedAmount = null }) {
+  const text = [rawName, sourceLine, name].filter(Boolean).join(" ");
+  const explicitQuantity = inferReceiptExplicitQuantity(text);
+
+  if (explicitQuantity) {
+    return explicitQuantity;
+  }
+
+  const aliasQuantity = inferReceiptQuantityFromCatalogAlias(name, catalogItem);
+
+  if (aliasQuantity) {
+    return aliasQuantity;
+  }
+
+  const targetUnit = catalogItem?.unit || "";
+  const inferredTypical = inferTypicalReceiptQuantity(name, targetUnit, category || catalogItem?.category);
+
+  if (inferredTypical) {
+    const amount = parsedAmount && inferredTypical.unit === "ks"
+      ? parsedAmount
+      : inferredTypical.amount;
+    return {
+      amount: roundAmount(amount),
+      unit: inferredTypical.unit
+    };
+  }
+
+  if (targetUnit) {
+    return {
+      amount: roundAmount(parsedAmount || 1),
+      unit: targetUnit
+    };
+  }
+
+  return null;
+}
+
+function inferReceiptExplicitQuantity(text) {
+  const value = String(text || "").replace(/[×]/g, "x");
+  const packageMatch = value.match(new RegExp(`(\\d+(?:[,.]\\d+)?)\\s*x\\s*(\\d+(?:[,.]\\d+)?)\\s*(${RECEIPT_UNIT_PATTERN})\\b`, "iu"));
+
+  if (packageMatch) {
+    const count = parseImportAmount(packageMatch[1]) || 1;
+    const amount = parseImportAmount(packageMatch[2]) || 1;
+    const normalized = normalizeImportAmountAndUnit(amount, packageMatch[3]);
+    return {
+      amount: roundAmount(count * normalized.amount),
+      unit: normalized.unit
+    };
+  }
+
+  const quantityMatch = value.match(new RegExp(`(\\d+(?:[,.]\\d+)?)\\s*(${RECEIPT_UNIT_PATTERN})\\b`, "iu"));
+
+  if (!quantityMatch) {
+    return null;
+  }
+
+  const amount = parseImportAmount(quantityMatch[1]) || 1;
+  return normalizeImportAmountAndUnit(amount, quantityMatch[2]);
+}
+
+function inferReceiptQuantityFromCatalogAlias(name, catalogItem) {
+  if (!catalogItem) {
+    return null;
+  }
+
+  const normalizedName = normalize(name);
+  const aliases = normalizeEanAliases(catalogItem.eanAliases)
+    .map((alias) => ({
+      alias,
+      score: getCatalogNameMatchScore({ name: normalizedName, unit: alias.unit, category: alias.category }, {
+        ...catalogItem,
+        name: alias.name,
+        unit: alias.unit || catalogItem.unit,
+        category: alias.category || catalogItem.category
+      })
+    }))
+    .filter(({ alias, score }) => alias.amount > 0 && alias.unit && score >= 45)
+    .sort((first, second) => second.score - first.score);
+
+  if (!aliases.length) {
+    return null;
+  }
+
+  const best = aliases[0].alias;
+  return {
+    amount: roundAmount(best.amount || 1),
+    unit: normalizeImportUnit(best.unit || catalogItem.unit || "ks")
+  };
+}
+
+function inferTypicalReceiptQuantity(name, unit = "", category = "") {
+  const text = normalize([name, category].filter(Boolean).join(" "));
+  const normalizedUnit = normalizeImportUnit(unit || "");
+
+  if (/monster|energy drink|red bull|semtex|plech|plechov/.test(text)) {
+    return { amount: 500, unit: "ml" };
+  }
+
+  if (/ml[eé]k|mlek|d[zž]us|juice|voda|mineralk|napoj|limonad|cola|kofola|sirup/.test(text)) {
+    return { amount: 1000, unit: "ml" };
+  }
+
+  if (/pivo|radler|cider/.test(text)) {
+    return { amount: 500, unit: "ml" };
+  }
+
+  if (/maslo/.test(text)) {
+    return { amount: 250, unit: "g" };
+  }
+
+  if (/tvaroh|cottage/.test(text)) {
+    return { amount: 250, unit: "g" };
+  }
+
+  if (/jogurt|skyr|kefir/.test(text)) {
+    return { amount: 150, unit: "g" };
+  }
+
+  if (/syr|sunka|salam|slanina/.test(text)) {
+    return { amount: 100, unit: "g" };
+  }
+
+  if (/chleb|toast|toust/.test(text)) {
+    return { amount: normalizedUnit === "ks" ? 1 : 500, unit: normalizedUnit === "ks" ? "ks" : "g" };
+  }
+
+  if (/rohlik|housk|baget|vejce|banan|jablk|citron|pomeranc/.test(text)) {
+    return { amount: 1, unit: "ks" };
+  }
+
+  if (normalizedUnit && normalizedUnit !== "ks") {
+    return { amount: normalizedUnit === "ml" ? 1000 : 100, unit: normalizedUnit };
+  }
+
+  return null;
 }
 
 function withTimeout(promise, timeoutMs, message) {
@@ -7855,11 +8054,21 @@ function normalizeReceiptCandidate(candidate, line, sourceName) {
     return null;
   }
 
-  const normalized = normalizeImportAmountAndUnit(parseImportAmount(candidate.amount) || 1, candidate.unit || "ks");
   const name = cleanReceiptProductName(candidate.name);
   const price = Number.isFinite(Number(candidate.price)) ? roundAmount(Number(candidate.price)) : null;
   const hasPrice = Number.isFinite(price) && price > 0;
   const catalogItem = findStoredCatalogItemByName(name);
+  const normalized = normalizeReceiptAmountAndUnit({
+    name,
+    sourceLine: line,
+    rawName: candidate.name,
+    rawAmount: candidate.amount,
+    rawUnit: candidate.unit,
+    catalogItem,
+    category: catalogItem?.category,
+    fallbackAmount: 1,
+    fallbackUnit: "ks"
+  });
 
   if (!name || normalize(name).length < 3) {
     return null;
