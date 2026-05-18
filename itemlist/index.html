@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux40">
+    <link rel="stylesheet" href="styles.css?v=ux41">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -468,6 +468,10 @@
             </div>
             <ol class="settings-news-list">
               <li>
+                <time datetime="2026-05-18">18.05.2026</time>
+                <span>V Nastavení je nově Historie mazání pro rychlé obnovení posledních položek, zásob a receptů.</span>
+              </li>
+              <li>
                 <time datetime="2026-05-09">09.05.2026</time>
                 <span>Kombinace se nově jmenují Recepty a mají poznámky k postupu.</span>
               </li>
@@ -482,10 +486,6 @@
               <li>
                 <time datetime="2026-05-05">05.05.2026</time>
                 <span>Vylepšené Změny, exporty, lednice a práce s recepty.</span>
-              </li>
-              <li>
-                <time datetime="2026-05-01">01.05.2026</time>
-                <span>Vylepšené rozložení aplikace na mobilu i počítači.</span>
               </li>
             </ol>
           </section>
@@ -560,6 +560,11 @@
               <input class="list-name-input" id="list-name-input" type="text" value="Lednice">
             </label>
             <button class="danger-button settings-danger-small" id="delete-list-button" type="button">Odebrat aktuální prostor</button>
+          </details>
+
+          <details class="settings-restore-panel">
+            <summary>Historie mazání</summary>
+            <div class="restore-history-list" id="restore-history-list" aria-live="polite"></div>
           </details>
 
           <details class="settings-stats-panel">
@@ -729,6 +734,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux54"></script>
+    <script src="app.js?v=ux55"></script>
   </body>
 </html>

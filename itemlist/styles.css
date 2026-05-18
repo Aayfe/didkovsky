@@ -389,7 +389,49 @@ textarea {
   line-height: 1.45;
 }
 
+.restore-history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.restore-history-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  padding: 12px;
+}
+
+.restore-history-content {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.restore-history-label {
+  width: fit-content;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.74rem;
+  font-weight: 900;
+  padding: 4px 8px;
+}
+
+.restore-history-content strong {
+  overflow-wrap: anywhere;
+}
+
+.restore-history-content small {
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .calorie-import-panel,
+.settings-restore-panel,
 .settings-stats-panel,
 .settings-log-panel {
   min-width: 0;
@@ -401,6 +443,7 @@ textarea {
 }
 
 .calorie-import-panel summary,
+.settings-restore-panel summary,
 .settings-stats-panel summary,
 .settings-log-panel summary {
   margin: -14px;
@@ -411,12 +454,14 @@ textarea {
 }
 
 .calorie-import-panel summary::-webkit-details-marker,
+.settings-restore-panel summary::-webkit-details-marker,
 .settings-stats-panel summary::-webkit-details-marker,
 .settings-log-panel summary::-webkit-details-marker {
   display: none;
 }
 
 .calorie-import-panel[open] summary,
+.settings-restore-panel[open] summary,
 .settings-stats-panel[open] summary,
 .settings-log-panel[open] summary {
   margin-bottom: 14px;
@@ -3533,6 +3578,10 @@ body.dark-mode .list-name-input {
   }
 
   .settings-news-list li {
+    grid-template-columns: 1fr;
+  }
+
+  .restore-history-row {
     grid-template-columns: 1fr;
   }
 

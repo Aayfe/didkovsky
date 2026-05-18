@@ -175,11 +175,13 @@ const comboList = document.querySelector("#combo-list");
 const darkModeToggle = document.querySelector("#dark-mode-toggle");
 const settingsShoppingSubtractStock = document.querySelector("#settings-shopping-subtract-stock");
 const settingsLogList = document.querySelector("#settings-log-list");
+const restoreHistoryList = document.querySelector("#restore-history-list");
 const message = document.querySelector("#message");
 
 const SUPABASE_TABLE = "shopping_app_state";
 const ALLOWED_USERS_TABLE = "allowed_users";
 const HISTORY_LIMIT = 120;
+const DELETION_HISTORY_LIMIT = 5;
 const IMPORT_UNITS = ["g", "ml", "ks", "kg"];
 const CALORIE_MEAL_ORDER = [
   "Snídaně",
@@ -308,7 +310,8 @@ let appSettings = {
   subtractStockFromShopping: false,
   calorieAccountEmail: "",
   calorieSessionCookie: "",
-  caloriePairings: {}
+  caloriePairings: {},
+  deletionHistory: []
 };
 let activeView = "pantry";
 let editingId = null;
@@ -435,6 +438,7 @@ function setupEvents() {
     settingsLogPeriodFilter.value = "";
     renderHistory();
   });
+  restoreHistoryList?.addEventListener("click", handleRestoreHistoryClick);
   calorieSaveConnectionButton?.addEventListener("click", saveCalorieConnectionSettings);
   caloriePasswordLoginButton?.addEventListener("click", connectCalorieAccountWithPassword);
   calorieTestConnectionButton?.addEventListener("click", testCalorieConnection);
@@ -2440,7 +2444,8 @@ function setState(state) {
     calorieSessionCookie: typeof state.appSettings?.calorieSessionCookie === "string"
       ? state.appSettings.calorieSessionCookie
       : "",
-    caloriePairings: sanitizeCaloriePairings(state.appSettings?.caloriePairings)
+    caloriePairings: sanitizeCaloriePairings(state.appSettings?.caloriePairings),
+    deletionHistory: sanitizeDeletionHistory(state.appSettings?.deletionHistory)
   };
   ensureComboBuilderRows();
   rememberActiveListId();
@@ -2460,7 +2465,8 @@ function createDefaultState() {
       subtractStockFromShopping: false,
       calorieAccountEmail: "",
       calorieSessionCookie: "",
-      caloriePairings: {}
+      caloriePairings: {},
+      deletionHistory: []
     }
   };
 }
@@ -2567,9 +2573,63 @@ function sanitizeState(state) {
       calorieSessionCookie: typeof state.appSettings?.calorieSessionCookie === "string"
         ? state.appSettings.calorieSessionCookie
         : "",
-      caloriePairings: sanitizeCaloriePairings(state.appSettings?.caloriePairings)
+      caloriePairings: sanitizeCaloriePairings(state.appSettings?.caloriePairings),
+      deletionHistory: sanitizeDeletionHistory(state.appSettings?.deletionHistory)
     }
   };
+}
+
+function sanitizeDeletionHistory(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((entry) => entry && typeof entry.type === "string" && entry.payload)
+    .map((entry) => {
+      const payload = sanitizeDeletedPayload(entry.type, entry.payload);
+
+      if (!payload) {
+        return null;
+      }
+
+      return {
+        id: typeof entry.id === "string" ? entry.id : createId(),
+        type: entry.type,
+        createdAt: typeof entry.createdAt === "string" ? entry.createdAt : new Date().toISOString(),
+        listId: typeof entry.listId === "string" ? entry.listId : "",
+        listName: typeof entry.listName === "string" ? entry.listName : "",
+        payload
+      };
+    })
+    .filter(Boolean)
+    .slice(0, DELETION_HISTORY_LIMIT);
+}
+
+function sanitizeDeletedPayload(type, payload) {
+  if (type === "pantry") {
+    if (!payload || typeof payload.name !== "string" || !Number.isFinite(Number(payload.amount))) {
+      return null;
+    }
+
+    return {
+      id: typeof payload.id === "string" ? payload.id : createId(),
+      name: formatProductName(payload.name),
+      amount: Math.max(0.01, roundAmount(Number(payload.amount))),
+      unit: normalizeImportUnit(payload.unit || "ks"),
+      category: typeof payload.category === "string" ? payload.category : "Ostatní"
+    };
+  }
+
+  if (type === "catalog") {
+    return sanitizeCatalogItems([{ ...payload }])[0] || null;
+  }
+
+  if (type === "combo") {
+    return sanitizeCombos([{ ...payload }])[0] || null;
+  }
+
+  return null;
 }
 
 function sanitizeCaloriePairings(value) {
@@ -2890,6 +2950,8 @@ function removeDataForList(removedList, wasOnlyList = false) {
   catalogItems = catalogItems.filter((item) => !belongsToRemovedList(item));
   history = history.filter((entry) => !isHistoryEntryForRemovedList(entry, removedList, wasOnlyList));
   appSettings.caloriePairings = pruneCaloriePairingsForRemovedList(removedNames);
+  appSettings.deletionHistory = sanitizeDeletionHistory(appSettings.deletionHistory)
+    .filter((entry) => entry.listId !== removedList.id);
 
   calorieImportRowsState = [];
   receiptImportRowsState = [];
@@ -3120,6 +3182,7 @@ function upsertItemAmount({ name, amount, unit, action, category = "Ostatní" })
 
   if (action === "set") {
     if (amount <= 0) {
+      rememberDeletedRecord("pantry", existingItem, { list, action });
       list.items = items.filter((item) => item.id !== existingItem.id);
       return "removed";
     }
@@ -3139,6 +3202,7 @@ function upsertItemAmount({ name, amount, unit, action, category = "Ostatní" })
     : existingItem.amount - amount;
 
   if (nextAmount <= 0) {
+    rememberDeletedRecord("pantry", existingItem, { list, action });
     list.items = items.filter((item) => item.id !== existingItem.id);
     return "removed";
   }
@@ -3276,6 +3340,9 @@ function startEdit(id) {
 async function removeItem(id) {
   const list = getActiveList();
   const removedItem = list.items.find((item) => item.id === id);
+  if (removedItem) {
+    rememberDeletedRecord("pantry", removedItem, { list, action: "delete" });
+  }
   list.items = list.items.filter((item) => item.id !== id);
   renderItems();
 
@@ -5171,6 +5238,7 @@ async function handleComboClick(event) {
   }
 
   if (button.dataset.comboAction === "remove") {
+    rememberDeletedRecord("combo", combo, { list: getActiveList(), action: "delete" });
     combos = combos.filter((currentCombo) => currentCombo.id !== combo.id);
     if (editingComboId === combo.id) {
       resetComboForm();
@@ -5766,6 +5834,11 @@ async function handleCatalogClick(event) {
   }
 
   if (button.dataset.catalogAction === "delete") {
+    const removedCatalogItem = catalogItems.find((currentItem) => {
+      return normalize(currentItem.name) === normalize(item.name)
+        && (!currentItem.listId || currentItem.listId === activeListId);
+    }) || { ...item, listId: activeListId };
+    rememberDeletedRecord("catalog", removedCatalogItem, { list: getActiveList(), action: "delete" });
     catalogItems = catalogItems.filter((currentItem) => {
       return normalize(currentItem.name) !== normalize(item.name)
         || (currentItem.listId && currentItem.listId !== activeListId);
@@ -8737,6 +8810,7 @@ function renderHistory() {
   renderPriceStats(filteredSettingsHistory);
   renderStatsDashboard(filteredSettingsHistory);
   renderSettingsLog(filteredSettingsLog);
+  renderRestoreHistory();
 
   if (!visibleHistory.length) {
     const empty = document.createElement("p");
@@ -8765,6 +8839,210 @@ function renderSettingsLog(entries = history) {
   }
 
   renderHistoryRows(settingsLogList, entries.slice(0, 120));
+}
+
+function rememberDeletedRecord(type, payload, options = {}) {
+  const cleanPayload = sanitizeDeletedPayload(type, payload);
+
+  if (!cleanPayload) {
+    return;
+  }
+
+  const list = options.list || lists.find((currentList) => currentList.id === payload?.listId) || getActiveList();
+  const entry = {
+    id: createId(),
+    type,
+    createdAt: new Date().toISOString(),
+    listId: payload?.listId || list?.id || activeListId || "",
+    listName: list ? getDisplayListName(list) : "",
+    payload: cleanPayload
+  };
+
+  appSettings.deletionHistory = sanitizeDeletionHistory([
+    entry,
+    ...(appSettings.deletionHistory || [])
+  ]).slice(0, DELETION_HISTORY_LIMIT);
+  renderRestoreHistory();
+}
+
+function renderRestoreHistory() {
+  if (!restoreHistoryList) {
+    return;
+  }
+
+  const entries = sanitizeDeletionHistory(appSettings.deletionHistory);
+  appSettings.deletionHistory = entries;
+  restoreHistoryList.replaceChildren();
+
+  if (!entries.length) {
+    const empty = document.createElement("p");
+    empty.className = "message";
+    empty.textContent = "Zatím tu není nic k obnovení.";
+    restoreHistoryList.append(empty);
+    return;
+  }
+
+  entries.forEach((entry) => {
+    const row = document.createElement("article");
+    const content = document.createElement("div");
+    const label = document.createElement("span");
+    const title = document.createElement("strong");
+    const meta = document.createElement("small");
+    const restore = document.createElement("button");
+    const typeLabel = getDeletionTypeLabel(entry.type);
+    const date = new Date(entry.createdAt);
+
+    row.className = "restore-history-row";
+    content.className = "restore-history-content";
+    label.className = "restore-history-label";
+    label.textContent = typeLabel;
+    title.textContent = getDeletedRecordTitle(entry);
+    meta.textContent = [
+      entry.listName ? `Prostor: ${entry.listName}` : "",
+      Number.isNaN(date.getTime()) ? "" : date.toLocaleString("cs-CZ", { dateStyle: "short", timeStyle: "short" })
+    ].filter(Boolean).join(" · ");
+    restore.className = "ghost-button";
+    restore.type = "button";
+    restore.dataset.restoreId = entry.id;
+    restore.textContent = "Obnovit";
+
+    content.append(label, title, meta);
+    row.append(content, restore);
+    restoreHistoryList.append(row);
+  });
+}
+
+function getDeletionTypeLabel(type) {
+  if (type === "catalog") {
+    return "Číselník";
+  }
+
+  if (type === "combo") {
+    return "Recept";
+  }
+
+  return "Lednice";
+}
+
+function getDeletedRecordTitle(entry) {
+  if (entry.type === "pantry") {
+    return `${entry.payload.name} ${formatAmountWithUnit(entry.payload.amount, entry.payload.unit)}`;
+  }
+
+  if (entry.type === "combo") {
+    return `${entry.payload.name} · ${entry.payload.items.length} položek`;
+  }
+
+  return entry.payload.name;
+}
+
+async function handleRestoreHistoryClick(event) {
+  const button = event.target.closest?.("[data-restore-id]");
+
+  if (!button) {
+    return;
+  }
+
+  await restoreDeletedRecord(button.dataset.restoreId);
+}
+
+async function restoreDeletedRecord(id) {
+  const entries = sanitizeDeletionHistory(appSettings.deletionHistory);
+  const entry = entries.find((currentEntry) => currentEntry.id === id);
+
+  if (!entry) {
+    showMessage("Tuhle položku už nejde obnovit.", true);
+    return;
+  }
+
+  const targetList = getRestoreTargetList(entry);
+  const restored = restoreEntryPayload(entry, targetList);
+
+  if (!restored) {
+    showMessage("Obnovení se nepovedlo.", true);
+    return;
+  }
+
+  appSettings.deletionHistory = entries.filter((currentEntry) => currentEntry.id !== id);
+  recordHistory(`Obnoveno z historie mazání: ${getDeletedRecordTitle(entry)}.`, entry.type === "pantry" ? "item" : entry.type, targetList);
+  renderLists();
+  renderItems();
+  renderShoppingList();
+  renderCatalog();
+  renderCombos();
+  renderHistory();
+  showMessage(`${getDeletionTypeLabel(entry.type)} obnoveno.`);
+  await saveState();
+}
+
+function getRestoreTargetList(entry) {
+  return lists.find((list) => list.id === entry.listId) || getActiveList();
+}
+
+function restoreEntryPayload(entry, targetList) {
+  if (!targetList) {
+    return false;
+  }
+
+  if (entry.type === "pantry") {
+    restorePantryPayload(entry.payload, targetList);
+    return true;
+  }
+
+  if (entry.type === "catalog") {
+    upsertCatalogItem({ ...entry.payload, listId: targetList.id });
+    return true;
+  }
+
+  if (entry.type === "combo") {
+    restoreComboPayload(entry.payload, targetList);
+    return true;
+  }
+
+  return false;
+}
+
+function restorePantryPayload(payload, targetList) {
+  const existing = targetList.items.find((item) => item.id === payload.id || normalize(item.name) === normalize(payload.name));
+
+  if (existing) {
+    existing.name = payload.name;
+    existing.amount = payload.amount;
+    existing.unit = payload.unit;
+    existing.category = payload.category || existing.category || "Ostatní";
+    return;
+  }
+
+  const usedIds = new Set(lists.flatMap((list) => list.items.map((item) => item.id)));
+  targetList.items.push({
+    ...payload,
+    id: usedIds.has(payload.id) ? createId() : payload.id
+  });
+}
+
+function restoreComboPayload(payload, targetList) {
+  const combo = {
+    ...payload,
+    listId: targetList.id
+  };
+  const existing = combos.find((currentCombo) => {
+    return currentCombo.id === combo.id
+      || (currentCombo.listId === targetList.id && normalize(currentCombo.name) === normalize(combo.name));
+  });
+
+  if (existing) {
+    existing.name = combo.name;
+    existing.notes = combo.notes || "";
+    existing.listId = targetList.id;
+    existing.items = combo.items;
+    return;
+  }
+
+  const usedIds = new Set(combos.map((currentCombo) => currentCombo.id));
+  combos.unshift({
+    ...combo,
+    id: usedIds.has(combo.id) ? createId() : combo.id
+  });
 }
 
 function renderHistoryRows(container, entries) {
