@@ -1115,6 +1115,13 @@ h1 {
   margin-bottom: 14px;
 }
 
+.combo-form.is-editing {
+  border-radius: 8px;
+  outline: 2px solid rgba(211, 66, 69, 0.42);
+  outline-offset: 6px;
+  box-shadow: 0 0 0 6px rgba(211, 66, 69, 0.08);
+}
+
 .combo-notes-field textarea {
   min-height: 108px;
   resize: vertical;

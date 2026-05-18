@@ -62,6 +62,7 @@ const listNameInput = document.querySelector("#list-name-input");
 const pageTitle = document.querySelector("#page-title");
 const productInput = document.querySelector("#product-input");
 const productOptions = document.querySelector("#product-options");
+const catalogProductOptions = document.querySelector("#catalog-product-options");
 const categoryInput = document.querySelector("#category-input");
 const categoryOptions = document.querySelector("#category-options");
 const actionSelect = document.querySelector("#action-select");
@@ -4983,6 +4984,7 @@ function resetComboBuilderRows() {
 
 function resetComboForm() {
   editingComboId = null;
+  comboForm.classList.remove("is-editing");
   comboForm.reset();
   if (comboNotes) {
     comboNotes.value = "";
@@ -5016,6 +5018,7 @@ function addComboItemRow(item = {}) {
     <button class="ghost-button combo-remove-button" type="button" data-combo-builder-action="remove">Odebrat</button>
   `;
 
+  row.querySelector(".combo-product").dataset.comboboxSource = "catalog-product-options";
   row.querySelector(".combo-product").value = item.name || "";
   row.querySelector(".combo-amount").value = item.amount ? String(item.amount) : "";
   row.querySelector(".combo-unit").value = item.unit || "ks";
@@ -5043,7 +5046,7 @@ function handleComboBuilderInput(event) {
   }
 
   const row = input.closest(".combo-item-row");
-  const item = findCatalogItemByName(input.value) || findItemByName(input.value);
+  const item = findStoredCatalogItemByName(input.value);
 
   if (!row || !item) {
     return;
@@ -5066,7 +5069,7 @@ function getComboBuilderItems() {
     .map((row) => {
       const typedName = formatProductName(row.querySelector(".combo-product").value);
       const amount = Number(row.querySelector(".combo-amount").value);
-      const sourceItem = findCatalogItemByName(typedName);
+      const sourceItem = findStoredCatalogItemByName(typedName);
       const name = sourceItem?.name || "";
       const unit = sourceItem?.unit || "ks";
       const category = sourceItem?.category || inferCategoryFromName(name) || "Ostatní";
@@ -5259,6 +5262,7 @@ async function handleComboClick(event) {
 
 function startComboEdit(combo) {
   editingComboId = combo.id;
+  comboForm.classList.add("is-editing");
   comboName.value = combo.name;
   if (comboNotes) {
     comboNotes.value = combo.notes || "";
@@ -5549,6 +5553,36 @@ function renderProductOptions() {
       option.label = item.label;
       option.textContent = item.text;
       productOptions.append(option);
+    });
+  renderCatalogProductOptions();
+}
+
+function renderCatalogProductOptions() {
+  if (!catalogProductOptions) {
+    return;
+  }
+
+  catalogProductOptions.innerHTML = "";
+  getStoredCatalogItems()
+    .flatMap((item) => [
+      {
+        value: item.name,
+        label: `${formatCategoryLabel(item.category)} | ${item.unit}`,
+        text: item.unit
+      },
+      ...normalizeEanAliases(item.eanAliases).map((alias) => ({
+        value: alias.name,
+        label: `Alias pro ${item.name}${alias.ean ? ` | EAN ${alias.ean}` : ""}`,
+        text: alias.unit || item.unit
+      }))
+    ])
+    .sort((a, b) => a.value.localeCompare(b.value, "cs"))
+    .forEach((item) => {
+      const option = document.createElement("option");
+      option.value = item.value;
+      option.label = item.label;
+      option.textContent = item.text;
+      catalogProductOptions.append(option);
     });
 }
 
