@@ -421,12 +421,30 @@
           </div>
           <div class="tool-card" id="calorie-diary-tool" hidden>
             <h2>Odečet z Kalorických tabulek</h2>
+            <div class="calorie-diary-mode" role="radiogroup" aria-label="Rozsah odečtu z Kalorických tabulek">
+              <label>
+                <input type="radio" name="calorie-diary-mode" value="single">
+                <span>Jeden den</span>
+              </label>
+              <label>
+                <input type="radio" name="calorie-diary-mode" value="range" checked>
+                <span>Od - do</span>
+              </label>
+            </div>
             <div class="calorie-diary-toolbar">
-              <label class="field">
+              <label class="field" data-calorie-diary-mode-field="single">
                 <span>Den v Kalorických tabulkách</span>
                 <input id="calorie-diary-date" type="date">
               </label>
-              <button class="primary-button" id="calorie-diary-load-button" type="button">Načíst den</button>
+              <label class="field" data-calorie-diary-mode-field="range">
+                <span>Od</span>
+                <input id="calorie-diary-date-from" type="date">
+              </label>
+              <label class="field" data-calorie-diary-mode-field="range">
+                <span>Do</span>
+                <input id="calorie-diary-date-to" type="date">
+              </label>
+              <button class="primary-button" id="calorie-diary-load-button" type="button">Načíst období</button>
             </div>
             <p class="message" id="calorie-diary-message" role="status" aria-live="polite"></p>
             <div class="calorie-import-rows" id="calorie-diary-rows"></div>
@@ -469,6 +487,10 @@
             </div>
             <ol class="settings-news-list">
               <li>
+                <time datetime="2026-05-24">24.05.2026</time>
+                <span>Kalorické tabulky umí načíst jeden den nebo období Od-Do.</span>
+              </li>
+              <li>
                 <time datetime="2026-05-18">18.05.2026</time>
                 <span>V Nastavení je nově Historie mazání pro rychlé obnovení posledních položek, zásob a receptů.</span>
               </li>
@@ -483,10 +505,6 @@
               <li>
                 <time datetime="2026-05-06">06.05.2026</time>
                 <span>Prostory jsou oddělené: smazání prostoru smaže i jeho zásoby, logy, číselník, recepty a nákupní list.</span>
-              </li>
-              <li>
-                <time datetime="2026-05-05">05.05.2026</time>
-                <span>Vylepšené Změny, exporty, lednice a práce s recepty.</span>
               </li>
             </ol>
           </section>

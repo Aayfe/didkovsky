@@ -475,13 +475,49 @@ textarea {
   max-width: 100%;
 }
 
+.calorie-diary-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.calorie-diary-mode label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--soft-line);
+  border-radius: 999px;
+  background: var(--field);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 900;
+  padding: 9px 12px;
+}
+
+.calorie-diary-mode input {
+  accent-color: var(--accent);
+}
+
+.calorie-diary-mode label:has(input:checked) {
+  border-color: rgba(15, 118, 110, 0.34);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .calorie-diary-toolbar {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto;
+  grid-template-columns: repeat(3, minmax(150px, 1fr)) auto;
   align-items: end;
   gap: 12px;
   min-width: 0;
   max-width: 100%;
+}
+
+.calorie-diary-toolbar .primary-button {
+  grid-column: -2 / -1;
+  justify-self: end;
 }
 
 .calorie-import-actions,

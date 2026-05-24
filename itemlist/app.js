@@ -38,7 +38,10 @@ const receiptImportActions = document.querySelector("#receipt-import-actions");
 const receiptApplyButton = document.querySelector("#receipt-apply-button");
 const receiptClearButton = document.querySelector("#receipt-clear-button");
 const calorieDiaryTool = document.querySelector("#calorie-diary-tool");
+const calorieDiaryModeRadios = document.querySelectorAll('input[name="calorie-diary-mode"]');
 const calorieDiaryDate = document.querySelector("#calorie-diary-date");
+const calorieDiaryDateFrom = document.querySelector("#calorie-diary-date-from");
+const calorieDiaryDateTo = document.querySelector("#calorie-diary-date-to");
 const calorieDiaryLoadButton = document.querySelector("#calorie-diary-load-button");
 const calorieDiaryApplyButton = document.querySelector("#calorie-diary-apply-button");
 const calorieDiaryRows = document.querySelector("#calorie-diary-rows");
@@ -312,6 +315,7 @@ let appSettings = {
   calorieAccountEmail: "",
   calorieSessionCookie: "",
   caloriePairings: {},
+  lastCalorieImportDate: "",
   deletionHistory: []
 };
 let activeView = "pantry";
@@ -331,6 +335,7 @@ let pendingEanProduct = null;
 let pendingEanCatalogChoice = null;
 let pendingCatalogEanProduct = null;
 let calorieImportRowsState = [];
+let calorieDiaryLoadedRange = { source: "", mode: "range", from: "", to: "", dates: [] };
 let receiptImportRowsState = [];
 let activeComboboxInput = null;
 let activeComboboxIndex = -1;
@@ -399,6 +404,9 @@ function setupEvents() {
   receiptClearButton?.addEventListener("click", clearReceiptImportRows);
   receiptImportRows?.addEventListener("input", handleReceiptImportRowChange);
   receiptImportRows?.addEventListener("change", handleReceiptImportRowChange);
+  calorieDiaryModeRadios.forEach((radio) => {
+    radio.addEventListener("change", syncCalorieDiaryModeControls);
+  });
   calorieDiaryLoadButton?.addEventListener("click", loadCalorieDiaryEntries);
   calorieDiaryApplyButton?.addEventListener("click", applyCalorieImportDeduction);
   calorieDiaryRows?.addEventListener("input", handleCalorieImportRowChange);
@@ -1663,16 +1671,18 @@ function openCalorieDiaryImport() {
     fridgeExportTool.hidden = true;
   }
 
-  if (calorieDiaryDate && !calorieDiaryDate.value) {
-    calorieDiaryDate.value = getLocalDateValue(new Date());
-  }
+  syncCalorieDiaryModeControls({ forceDefaults: true });
 
   setCalorieImportMessage(hasCalorieDiaryIntegration()
-    ? "Vyber den a načti položky z Kalorických tabulek. Před odečtem je můžeš upravit nebo vynechat."
+    ? "Vyber den nebo období a načti položky z Kalorických tabulek. Před odečtem je můžeš upravit nebo vynechat."
     : "Backend pro Kalorické tabulky zatím není nastavený. Ruční odečet najdeš v Nastavení.");
   renderCalorieImportRows();
   setCalorieApplyMessage("");
-  calorieDiaryDate?.focus();
+  if (getCalorieDiaryMode() === "range") {
+    calorieDiaryDateFrom?.focus();
+  } else {
+    calorieDiaryDate?.focus();
+  }
 }
 
 function openXmlImport() {
@@ -2446,6 +2456,7 @@ function setState(state) {
       ? state.appSettings.calorieSessionCookie
       : "",
     caloriePairings: sanitizeCaloriePairings(state.appSettings?.caloriePairings),
+    lastCalorieImportDate: sanitizeDateValue(state.appSettings?.lastCalorieImportDate),
     deletionHistory: sanitizeDeletionHistory(state.appSettings?.deletionHistory)
   };
   ensureComboBuilderRows();
@@ -2467,6 +2478,7 @@ function createDefaultState() {
       calorieAccountEmail: "",
       calorieSessionCookie: "",
       caloriePairings: {},
+      lastCalorieImportDate: "",
       deletionHistory: []
     }
   };
@@ -2575,9 +2587,15 @@ function sanitizeState(state) {
         ? state.appSettings.calorieSessionCookie
         : "",
       caloriePairings: sanitizeCaloriePairings(state.appSettings?.caloriePairings),
+      lastCalorieImportDate: sanitizeDateValue(state.appSettings?.lastCalorieImportDate),
       deletionHistory: sanitizeDeletionHistory(state.appSettings?.deletionHistory)
     }
   };
+}
+
+function sanitizeDateValue(value) {
+  const text = String(value || "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
 }
 
 function sanitizeDeletionHistory(value) {
@@ -3451,9 +3469,7 @@ function syncSettingsControls() {
     calorieSessionCookie.value = appSettings.calorieSessionCookie || "";
   }
 
-  if (calorieDiaryDate && !calorieDiaryDate.value) {
-    calorieDiaryDate.value = getLocalDateValue(new Date());
-  }
+  syncCalorieDiaryModeControls();
 }
 
 async function saveCalorieConnectionSettings() {
@@ -3576,10 +3592,133 @@ function sanitizeCalorieSessionCookie(value) {
     .trim();
 }
 
+function getCalorieDiaryMode() {
+  const checked = [...calorieDiaryModeRadios].find((radio) => radio.checked);
+  return checked?.value === "single" ? "single" : "range";
+}
+
+function syncCalorieDiaryModeControls(options = {}) {
+  const mode = getCalorieDiaryMode();
+  const today = getLocalDateValue(new Date());
+  const defaultFrom = getDefaultCalorieDiaryFromDate(today);
+
+  if (calorieDiaryDate && (options.forceDefaults || !calorieDiaryDate.value)) {
+    calorieDiaryDate.value = defaultFrom;
+  }
+
+  if (calorieDiaryDateFrom && (options.forceDefaults || !calorieDiaryDateFrom.value)) {
+    calorieDiaryDateFrom.value = defaultFrom;
+  }
+
+  if (calorieDiaryDateTo && (options.forceDefaults || !calorieDiaryDateTo.value)) {
+    calorieDiaryDateTo.value = today;
+  }
+
+  document.querySelectorAll("[data-calorie-diary-mode-field]").forEach((field) => {
+    field.hidden = field.dataset.calorieDiaryModeField !== mode;
+  });
+
+  if (calorieDiaryLoadButton) {
+    calorieDiaryLoadButton.textContent = mode === "range" ? "Načíst období" : "Načíst den";
+  }
+}
+
+function getDefaultCalorieDiaryFromDate(today = getLocalDateValue(new Date())) {
+  const lastDate = sanitizeDateValue(appSettings.lastCalorieImportDate);
+
+  if (!lastDate) {
+    return today;
+  }
+
+  const nextDate = shiftLocalDate(lastDate, 1);
+  return nextDate > today ? today : nextDate;
+}
+
+function getCalorieDiarySelectedDates() {
+  const mode = getCalorieDiaryMode();
+
+  if (mode === "single") {
+    const date = sanitizeDateValue(calorieDiaryDate?.value);
+    return date ? [date] : [];
+  }
+
+  const from = sanitizeDateValue(calorieDiaryDateFrom?.value);
+  const to = sanitizeDateValue(calorieDiaryDateTo?.value);
+
+  if (!from || !to || from > to) {
+    return [];
+  }
+
+  const dates = [];
+  let current = from;
+
+  while (current <= to) {
+    dates.push(current);
+    current = shiftLocalDate(current, 1);
+  }
+
+  return dates;
+}
+
+function getCalorieDiaryDateSelectionError() {
+  if (getCalorieDiaryMode() === "single") {
+    return sanitizeDateValue(calorieDiaryDate?.value) ? "" : "Vyber den, ze kterého chceš načíst položky.";
+  }
+
+  const from = sanitizeDateValue(calorieDiaryDateFrom?.value);
+  const to = sanitizeDateValue(calorieDiaryDateTo?.value);
+
+  if (!from || !to) {
+    return "Vyber datum Od i Do.";
+  }
+
+  if (from > to) {
+    return "Datum Od musí být stejné nebo dřívější než datum Do.";
+  }
+
+  return "";
+}
+
+function getCalorieLoadedRangeLabel() {
+  const dates = getCalorieDiarySelectedDates();
+
+  if (!dates.length) {
+    return "";
+  }
+
+  if (dates.length === 1) {
+    return formatDateOnly(dates[0]);
+  }
+
+  return `${formatDateOnly(dates[0])} - ${formatDateOnly(dates[dates.length - 1])}`;
+}
+
+function rememberCalorieImportDateRange() {
+  if (calorieDiaryLoadedRange?.source !== "diary") {
+    return;
+  }
+
+  const dates = calorieDiaryLoadedRange?.dates || [];
+  const lastDate = dates[dates.length - 1] || "";
+
+  if (lastDate) {
+    appSettings.lastCalorieImportDate = lastDate;
+    syncCalorieDiaryModeControls({ forceDefaults: true });
+  }
+}
+
 async function loadCalorieDiaryEntries() {
-  if (!calorieDiaryDate?.value) {
-    setCalorieImportMessage("Vyber den, ze kterého chceš načíst položky.", true);
-    calorieDiaryDate?.focus();
+  syncCalorieDiaryModeControls();
+  const selectionError = getCalorieDiaryDateSelectionError();
+  const selectedDates = getCalorieDiarySelectedDates();
+
+  if (selectionError || !selectedDates.length) {
+    setCalorieImportMessage(selectionError || "Vyber datum pro načtení položek.", true);
+    if (getCalorieDiaryMode() === "range") {
+      calorieDiaryDateFrom?.focus();
+    } else {
+      calorieDiaryDate?.focus();
+    }
     return;
   }
 
@@ -3589,15 +3728,35 @@ async function loadCalorieDiaryEntries() {
   }
 
   try {
-    setCalorieImportMessage("Načítám den z Kalorických tabulek...");
-    const data = await fetchCalorieDiaryFromIntegration(calorieDiaryDate.value);
-    const rows = normalizeCalorieDiaryResult(data, calorieDiaryDate.value);
+    const rows = [];
+    const summaries = [];
+    const total = selectedDates.length;
+
+    for (const [index, date] of selectedDates.entries()) {
+      setCalorieImportMessage(total === 1
+        ? "Načítám den z Kalorických tabulek..."
+        : `Načítám ${index + 1}/${total}: ${formatDateOnly(date)}...`);
+      const data = await fetchCalorieDiaryFromIntegration(date);
+      const normalizedRows = normalizeCalorieDiaryResult(data, date);
+      rows.push(...normalizedRows);
+      summaries.push({ date, count: normalizedRows.length, data });
+    }
+
     calorieImportRowsState = rows.map((row) => createCalorieImportRowState(row));
+    calorieDiaryLoadedRange = {
+      source: "diary",
+      mode: getCalorieDiaryMode(),
+      from: selectedDates[0],
+      to: selectedDates[selectedDates.length - 1],
+      dates: selectedDates
+    };
     renderCalorieImportRows();
     setCalorieApplyMessage("");
+    const loadedLabel = getCalorieLoadedRangeLabel();
+    const emptySummaries = summaries.filter((item) => item.count === 0);
     setCalorieImportMessage(calorieImportRowsState.length
-      ? `Načteno ${calorieImportRowsState.length} položek. Jsou seřazené podle fází dne, zkontroluj párování a odečti vybrané.`
-      : `Kalorické tabulky odpověděly, ale parser ux29 nenašel položky k odečtu. ${summarizeCalorieDiaryPayload(data)}`, !calorieImportRowsState.length);
+      ? `Načteno ${calorieImportRowsState.length} položek za ${loadedLabel}. Zkontroluj párování a odečti vybrané.`
+      : `Kalorické tabulky odpověděly, ale nenašel jsem položky k odečtu. ${emptySummaries[0] ? summarizeCalorieDiaryPayload(emptySummaries[0].data) : ""}`, !calorieImportRowsState.length);
   } catch (error) {
     setCalorieImportMessage(getCalorieDiaryUserError(error), true);
   }
@@ -4036,6 +4195,7 @@ function parseCalorieImportFromText() {
 
   const rows = parseCalorieImportRows(calorieImportText.value);
   calorieImportRowsState = rows.map((row) => createCalorieImportRowState(row));
+  calorieDiaryLoadedRange = { source: "manual", mode: "", from: "", to: "", dates: [] };
 
   renderCalorieImportRows();
   setCalorieApplyMessage("");
@@ -4393,6 +4553,10 @@ async function applyCalorieImportDeduction() {
     });
   });
 
+  if (changed || rememberedOnly) {
+    rememberCalorieImportDateRange();
+  }
+
   renderItems();
   renderHistory();
   renderCalorieImportRows();
@@ -4406,9 +4570,12 @@ async function applyCalorieImportDeduction() {
     missing ? `nenapárováno/nešlo odečíst ${missing}` : ""
   ].filter(Boolean).join(", ");
   const isError = changed === 0 && rememberedOnly === 0 && missing > 0;
+  const nextImportHint = appSettings.lastCalorieImportDate
+    ? ` Další výchozí Od: ${formatDateOnly(getDefaultCalorieDiaryFromDate())}.`
+    : "";
 
-  setCalorieImportMessage(`Odečet hotový: ${summary}.`, isError);
-  setCalorieApplyMessage(`Hotovo: ${summary}.`, isError);
+  setCalorieImportMessage(`Odečet hotový: ${summary}.${nextImportHint}`, isError);
+  setCalorieApplyMessage(`Hotovo: ${summary}.${nextImportHint}`, isError);
 }
 
 function convertCalorieAmountToTargetUnit(amount, unit, targetUnit) {
@@ -4502,7 +4669,12 @@ function syncCalorieRowWithStock(row) {
 }
 
 function getCalorieRowMetaText(row) {
-  const prefix = row.meal ? `${row.meal} · ` : "";
+  const rowDate = sanitizeDateValue(String(row.occurredAt || "").slice(0, 10));
+  const prefixParts = [
+    rowDate ? formatDateOnly(rowDate) : "",
+    row.meal || ""
+  ].filter(Boolean);
+  const prefix = prefixParts.length ? `${prefixParts.join(" · ")} · ` : "";
 
   if (!row.targetName) {
     return `${prefix}Vyber položku z číselníku.`;
@@ -9800,6 +9972,13 @@ function formatDisplayDate(dateValue) {
       dateStyle: "short",
       timeStyle: "medium"
     });
+}
+
+function formatDateOnly(dateValue) {
+  const date = new Date(`${dateValue}T12:00:00`);
+  return Number.isNaN(date.getTime())
+    ? dateValue
+    : date.toLocaleDateString("cs-CZ");
 }
 
 function renderPriceStats(entries) {
