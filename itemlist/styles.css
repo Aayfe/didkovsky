@@ -1318,19 +1318,20 @@ h1 {
 
 .catalog-product-stats {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   margin: 14px 0 18px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--field);
-  padding: 14px;
+  padding: 16px;
+  overflow: hidden;
 }
 
 .catalog-product-stats-head {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: minmax(150px, 0.55fr) minmax(360px, 1.45fr) auto;
+  align-items: end;
+  gap: 14px;
 }
 
 .catalog-product-stats-head h2 {
@@ -1340,12 +1341,27 @@ h1 {
 
 .catalog-product-stats-filters {
   margin: 0;
+  grid-template-columns: minmax(150px, 0.8fr) repeat(2, minmax(150px, 1fr));
+}
+
+.catalog-product-stats-head .ghost-button {
+  min-height: 48px;
+  align-self: end;
+}
+
+.catalog-product-stats-main {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.72fr) minmax(0, 1.7fr);
+  align-items: stretch;
+  gap: 12px;
 }
 
 .catalog-product-kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
   gap: 10px;
+  min-width: 0;
 }
 
 .catalog-product-kpis > div {
@@ -1366,6 +1382,18 @@ h1 {
 
 .catalog-product-kpis strong {
   font-size: 1rem;
+}
+
+.catalog-product-stats .stat-line-chart {
+  overflow: hidden;
+}
+
+.catalog-product-stats .stat-line-chart svg {
+  min-width: 0;
+}
+
+.catalog-product-action-card {
+  grid-column: auto;
 }
 
 .stat-line-chart {
@@ -3663,6 +3691,15 @@ body.dark-mode .list-name-input {
   .tool-groups {
     grid-template-columns: 1fr;
   }
+
+  .catalog-product-stats-head,
+  .catalog-product-stats-main {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-product-stats-head .ghost-button {
+    justify-self: start;
+  }
 }
 
 @media (max-width: 720px) {
@@ -3812,6 +3849,10 @@ body.dark-mode .list-name-input {
 
   .stats-action-pills {
     grid-template-columns: 1fr;
+  }
+
+  .catalog-product-kpis {
+    grid-template-columns: 1fr 1fr;
   }
 
   .history-filters,
@@ -4227,6 +4268,10 @@ body.dark-mode .list-name-input {
 }
 
 @media (max-width: 520px) {
+  .catalog-product-kpis {
+    grid-template-columns: 1fr;
+  }
+
   .combo-form-actions {
     display: grid;
   }

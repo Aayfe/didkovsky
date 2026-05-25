@@ -9006,6 +9006,7 @@ function renderCatalogProductStats() {
   const close = document.createElement("button");
   const filters = document.createElement("div");
   const kpis = document.createElement("div");
+  const main = document.createElement("div");
   const chart = createLineChart(model.stockTimeline, {
     unit: model.unit,
     emptyText: "Pro vybrané období nejsou evidované změny stavu."
@@ -9021,7 +9022,6 @@ function renderCatalogProductStats() {
   close.dataset.productStatsAction = "close";
   close.textContent = "Zavřít";
   titleWrap.append(eyebrow, title);
-  header.append(titleWrap, close);
 
   filters.className = "settings-history-filters catalog-product-stats-filters";
   filters.innerHTML = `
@@ -9063,13 +9063,19 @@ function renderCatalogProductStats() {
     kpis.append(card);
   });
 
-  catalogProductStats.append(header, filters, kpis, chart);
-  catalogProductStats.append(createInsightCard(
+  header.append(titleWrap, filters, close);
+  main.className = "catalog-product-stats-main";
+  main.append(kpis, chart);
+
+  const actionCard = createInsightCard(
     "Akce produktu",
     "Kolikrát se s produktem v období pracovalo.",
     actionBreakdown,
     "cyan"
-  ));
+  );
+  actionCard.classList.add("catalog-product-action-card");
+
+  catalogProductStats.append(header, main, actionCard);
 }
 
 function buildProductStatsModel(productName, range) {
