@@ -551,6 +551,19 @@ textarea {
   text-transform: uppercase;
 }
 
+.calorie-day-heading {
+  margin: 22px 0 2px;
+  border-top: 1px solid var(--soft-line);
+  color: var(--ink);
+  font-size: 1.02rem;
+  font-weight: 900;
+  padding-top: 14px;
+}
+
+.calorie-day-heading + .calorie-meal-heading {
+  margin-top: 8px;
+}
+
 .calorie-import-row {
   display: grid;
   grid-template-columns: minmax(108px, max-content) minmax(0, 1.45fr) minmax(84px, 0.34fr) minmax(74px, 0.28fr) minmax(0, 1.1fr);
@@ -656,12 +669,6 @@ textarea {
 .calorie-import-row.is-skipped select,
 .calorie-import-row.is-skipped small {
   text-decoration: line-through;
-}
-
-.calorie-import-row.is-memory-only input:disabled,
-.calorie-import-row.is-memory-only select:disabled {
-  opacity: 0.68;
-  cursor: not-allowed;
 }
 
 .receipt-import-row {
@@ -1309,6 +1316,80 @@ h1 {
   padding: 4px 8px;
 }
 
+.catalog-product-stats {
+  display: grid;
+  gap: 14px;
+  margin: 14px 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  padding: 14px;
+}
+
+.catalog-product-stats-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.catalog-product-stats-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.catalog-product-stats-filters {
+  margin: 0;
+}
+
+.catalog-product-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.catalog-product-kpis > div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  padding: 11px;
+}
+
+.catalog-product-kpis span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.catalog-product-kpis strong {
+  font-size: 1rem;
+}
+
+.stat-line-chart {
+  min-width: 0;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  padding: 12px;
+  overflow-x: auto;
+}
+
+.stat-line-chart svg {
+  display: block;
+  min-width: 640px;
+  width: 100%;
+  height: auto;
+}
+
+.stat-line-chart text {
+  fill: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .card-list {
   display: grid;
   gap: 8px;
@@ -1665,6 +1746,13 @@ body.dark-mode .modal {
   gap: 8px;
 }
 
+.stats-action-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 12px;
+}
+
 .stats-metrics label {
   display: inline-flex;
   align-items: center;
@@ -1676,6 +1764,24 @@ body.dark-mode .modal {
   font-size: 0.86rem;
   font-weight: 800;
   padding: 7px 10px;
+}
+
+.stats-action-filter label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--soft-line);
+  border-radius: 999px;
+  background: var(--field);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 7px 10px;
+}
+
+.stats-action-filter input,
+.stats-metrics input {
+  accent-color: var(--accent);
 }
 
 .stats-grid {
@@ -3718,7 +3824,8 @@ body.dark-mode .list-name-input {
     flex-direction: column;
   }
 
-  .stats-metrics {
+  .stats-metrics,
+  .stats-action-filter {
     display: grid;
   }
 

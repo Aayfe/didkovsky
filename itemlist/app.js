@@ -125,6 +125,7 @@ const applyComboChangeButton = document.querySelector("#apply-combo-change");
 const priceStats = document.querySelector("#price-stats");
 const statsPanel = document.querySelector("#stats-panel");
 const statsMetrics = document.querySelector("#stats-metrics");
+const statsActionFilter = document.querySelector("#stats-action-filter");
 const statsGrid = document.querySelector("#stats-grid");
 const statsExportPdfButton = document.querySelector("#stats-export-pdf");
 const statsChartCanvas = document.querySelector("#stats-chart-canvas");
@@ -150,6 +151,7 @@ const calorieApplyMessage = document.querySelector("#calorie-apply-message");
 const catalogBody = document.querySelector("#catalog-body");
 const catalogForm = document.querySelector("#catalog-form");
 const catalogSearchInput = document.querySelector("#catalog-search-input");
+const catalogProductStats = document.querySelector("#catalog-product-stats");
 const catalogName = document.querySelector("#catalog-name");
 const catalogCategory = document.querySelector("#catalog-category");
 const catalogUnit = document.querySelector("#catalog-unit");
@@ -329,6 +331,7 @@ let listNameBeforeEdit = "";
 let editingCatalogId = null;
 let editingCatalogAliases = [];
 let editingCatalogAliasIndex = -1;
+let catalogProductStatsState = { name: "", period: "month", from: "", to: "" };
 let selectedPantryCategories = new Set();
 let pantryCategoryFiltersInitialized = false;
 let pendingEanProduct = null;
@@ -428,6 +431,7 @@ function setupEvents() {
     renderHistory();
   });
   statsMetrics.addEventListener("change", renderHistory);
+  statsActionFilter?.addEventListener("change", renderHistory);
   statsExportPdfButton.addEventListener("click", exportStatsPdf);
   settingsPeriodFilter?.addEventListener("change", handleSettingsHistoryFilterChange);
   settingsDateFrom?.addEventListener("input", () => {
@@ -461,6 +465,9 @@ function setupEvents() {
   catalogForm.addEventListener("submit", saveCatalogItem);
   catalogSearchInput?.addEventListener("input", renderCatalog);
   catalogBody.addEventListener("click", handleCatalogClick);
+  catalogProductStats?.addEventListener("input", handleCatalogProductStatsChange);
+  catalogProductStats?.addEventListener("change", handleCatalogProductStatsChange);
+  catalogProductStats?.addEventListener("click", handleCatalogProductStatsClick);
   catalogAliasAddButton.addEventListener("click", addOrUpdateCatalogAlias);
   catalogAliasList.addEventListener("click", handleCatalogAliasClick);
   shoppingForm.addEventListener("submit", addShoppingItem);
@@ -4295,6 +4302,45 @@ function renderCalorieImportRows() {
   });
 }
 
+function getCalorieDisplayGroups() {
+  const dates = [...new Set(calorieImportRowsState
+    .map((row) => getCalorieRowDate(row))
+    .filter(Boolean))]
+    .sort();
+  const splitByDate = dates.length > 1 || calorieDiaryLoadedRange?.mode === "range";
+
+  if (!splitByDate) {
+    return [{
+      date: "",
+      meals: getCalorieMealGroups(calorieImportRowsState)
+    }];
+  }
+
+  return dates.map((date) => ({
+    date,
+    meals: getCalorieMealGroups(calorieImportRowsState.filter((row) => getCalorieRowDate(row) === date))
+  }));
+}
+
+function getCalorieMealGroups(rows) {
+  const hasMealGroups = rows.some((row) => row.meal);
+
+  if (!hasMealGroups) {
+    return [{ meal: "", rows }];
+  }
+
+  return CALORIE_MEAL_ORDER
+    .map((meal) => ({
+      meal,
+      rows: rows.filter((row) => normalizeCalorieMealName(row.meal) === meal)
+    }))
+    .filter((group) => group.rows.length);
+}
+
+function getCalorieRowDate(row) {
+  return sanitizeDateValue(String(row?.occurredAt || "").slice(0, 10));
+}
+
 function renderCalorieImportRowsInto(container) {
   container.replaceChildren();
   if (!calorieImportRowsState.length) {
@@ -4306,23 +4352,23 @@ function renderCalorieImportRowsInto(container) {
   }
 
   const pairingTargets = getCaloriePairingTargets();
-  const hasMealGroups = calorieImportRowsState.some((row) => row.meal);
-  const groupedRows = hasMealGroups
-    ? CALORIE_MEAL_ORDER
-      .map((meal) => ({
-        meal,
-        rows: calorieImportRowsState.filter((row) => normalizeCalorieMealName(row.meal) === meal)
-      }))
-      .filter((group) => group.rows.length)
-    : [{ meal: "", rows: calorieImportRowsState }];
+  const dayGroups = getCalorieDisplayGroups();
 
-  groupedRows.forEach((group) => {
-    if (group.meal) {
-      const heading = document.createElement("h3");
-      heading.className = "calorie-meal-heading";
-      heading.textContent = group.meal;
-      container.append(heading);
+  dayGroups.forEach((dayGroup) => {
+    if (dayGroup.date) {
+      const dayHeading = document.createElement("h3");
+      dayHeading.className = "calorie-day-heading";
+      dayHeading.textContent = formatDateOnly(dayGroup.date);
+      container.append(dayHeading);
     }
+
+    dayGroup.meals.forEach((group) => {
+      if (group.meal) {
+        const heading = document.createElement(dayGroup.date ? "h4" : "h3");
+        heading.className = "calorie-meal-heading";
+        heading.textContent = group.meal;
+        container.append(heading);
+      }
 
     group.rows.forEach((row) => {
       syncCalorieRowWithStock(row);
@@ -4336,21 +4382,19 @@ function renderCalorieImportRowsInto(container) {
       const targetSelect = document.createElement("select");
       const meta = document.createElement("small");
 
-      article.className = `calorie-import-row${row.skipped ? " is-skipped" : ""}${row.lockedNoStock ? " is-memory-only" : ""}`;
+      article.className = `calorie-import-row${row.skipped ? " is-skipped" : ""}`;
       article.dataset.calorieRow = row.id;
 
       skipLabel.className = "calorie-skip-check";
       skipInput.type = "checkbox";
       skipInput.checked = Boolean(row.skipped);
       skipInput.dataset.calorieField = "skipped";
-      skipInput.disabled = Boolean(row.lockedNoStock);
       skipText.textContent = "Neodečítat";
       skipLabel.append(skipInput, skipText);
 
       nameInput.type = "text";
       nameInput.value = row.name;
       nameInput.dataset.calorieField = "name";
-      nameInput.disabled = Boolean(row.lockedNoStock);
       nameInput.setAttribute("aria-label", "Položka z Kalorických tabulek");
 
       amountInputElement.type = "text";
@@ -4406,6 +4450,22 @@ function renderCalorieImportRowsInto(container) {
       container.append(article);
     });
   });
+  });
+}
+
+function renderCalorieImportRowsPreservingScroll(rowId = "", field = "") {
+  const scrollX = window.scrollX;
+  const scrollY = window.scrollY;
+  renderCalorieImportRows();
+  window.requestAnimationFrame(() => {
+    window.scrollTo(scrollX, scrollY);
+    if (rowId && field) {
+      [...document.querySelectorAll("[data-calorie-row]")]
+        .find((row) => row.dataset.calorieRow === rowId)
+        ?.querySelector(`[data-calorie-field="${field}"]`)
+        ?.focus();
+    }
+  });
 }
 
 function handleCalorieImportRowChange(event) {
@@ -4438,7 +4498,7 @@ function handleCalorieImportRowChange(event) {
       row.lockReason = "";
       row.maxAmount = null;
     }
-    renderCalorieImportRows();
+    renderCalorieImportRowsPreservingScroll(row.id, changedField);
     setCalorieApplyMessage(row.targetName
       ? (row.lockedNoStock
         ? `${row.targetName} není v lednici. Párování jsem uložil, odečet bude 0.`
@@ -4472,7 +4532,6 @@ function handleCalorieImportRowChange(event) {
   }
 
   rowElement.classList.toggle("is-skipped", row.skipped);
-  rowElement.classList.toggle("is-memory-only", Boolean(row.lockedNoStock));
 }
 
 async function applyCalorieImportDeduction() {
@@ -6015,6 +6074,11 @@ async function handleCatalogClick(event) {
   const item = getCatalogItems().find((currentItem) => normalize(currentItem.name) === button.dataset.name);
 
   if (!item) {
+    return;
+  }
+
+  if (button.dataset.catalogAction === "stats") {
+    openCatalogProductStats(item.name);
     return;
   }
 
@@ -8864,6 +8928,7 @@ function renderCatalog() {
       <td></td>
       <td class="icon-cell">
         <div class="row-actions">
+          <button class="ghost-button" type="button" data-catalog-action="stats">Statistiky</button>
           <button class="ghost-button" type="button" data-catalog-action="edit">Upravit</button>
           <button class="danger-button" type="button" data-catalog-action="delete">Smazat</button>
         </div>
@@ -8878,6 +8943,368 @@ function renderCatalog() {
     });
     catalogBody.append(row);
   });
+}
+
+function openCatalogProductStats(name) {
+  catalogProductStatsState = {
+    name,
+    period: catalogProductStatsState.period || "month",
+    from: catalogProductStatsState.from || "",
+    to: catalogProductStatsState.to || ""
+  };
+  renderCatalogProductStats();
+  catalogProductStats.hidden = false;
+}
+
+function handleCatalogProductStatsChange(event) {
+  const field = event.target?.dataset?.productStatsField;
+
+  if (!field) {
+    return;
+  }
+
+  catalogProductStatsState[field] = event.target.value;
+
+  if (field === "from" || field === "to") {
+    catalogProductStatsState.period = "";
+  }
+
+  renderCatalogProductStats();
+}
+
+function handleCatalogProductStatsClick(event) {
+  const button = event.target.closest?.("[data-product-stats-action]");
+
+  if (!button) {
+    return;
+  }
+
+  if (button.dataset.productStatsAction === "close") {
+    catalogProductStatsState.name = "";
+    catalogProductStats.hidden = true;
+  }
+}
+
+function renderCatalogProductStats() {
+  if (!catalogProductStats || !catalogProductStatsState.name) {
+    return;
+  }
+
+  const model = buildProductStatsModel(catalogProductStatsState.name, getStatsRangeFromValues(
+    catalogProductStatsState.period,
+    catalogProductStatsState.from,
+    catalogProductStatsState.to
+  ));
+  const priceLabel = model.priceBase.label;
+
+  catalogProductStats.replaceChildren();
+
+  const header = document.createElement("div");
+  const titleWrap = document.createElement("div");
+  const eyebrow = document.createElement("p");
+  const title = document.createElement("h2");
+  const close = document.createElement("button");
+  const filters = document.createElement("div");
+  const kpis = document.createElement("div");
+  const chart = createLineChart(model.stockTimeline, {
+    unit: model.unit,
+    emptyText: "Pro vybrané období nejsou evidované změny stavu."
+  });
+  const actionBreakdown = createBarList(model.actions, { formatter: (value) => `${formatAmount(value)}x`, tone: "teal" });
+
+  header.className = "catalog-product-stats-head";
+  eyebrow.className = "eyebrow";
+  eyebrow.textContent = "Statistika produktu";
+  title.textContent = model.name;
+  close.className = "ghost-button";
+  close.type = "button";
+  close.dataset.productStatsAction = "close";
+  close.textContent = "Zavřít";
+  titleWrap.append(eyebrow, title);
+  header.append(titleWrap, close);
+
+  filters.className = "settings-history-filters catalog-product-stats-filters";
+  filters.innerHTML = `
+    <label class="field compact-field">
+      <span>Období</span>
+      <select data-product-stats-field="period">
+        <option value="">Vše</option>
+        <option value="today">Dnes</option>
+        <option value="3d">3 dny</option>
+        <option value="week">Týden</option>
+        <option value="month">Měsíc</option>
+        <option value="year">Rok</option>
+      </select>
+    </label>
+    <label class="field compact-field">
+      <span>Od</span>
+      <input type="date" data-product-stats-field="from">
+    </label>
+    <label class="field compact-field">
+      <span>Do</span>
+      <input type="date" data-product-stats-field="to">
+    </label>
+  `;
+  filters.querySelector('[data-product-stats-field="period"]').value = catalogProductStatsState.period || "";
+  filters.querySelector('[data-product-stats-field="from"]').value = catalogProductStatsState.from || "";
+  filters.querySelector('[data-product-stats-field="to"]').value = catalogProductStatsState.to || "";
+
+  kpis.className = "catalog-product-kpis";
+  [
+    ["Aktuálně", formatAmountWithUnit(model.currentAmount, model.unit)],
+    ["Prošlo lednicí", formatAmountWithUnit(model.throughput, model.unit)],
+    ["Přidáno", formatAmountWithUnit(model.added, model.unit)],
+    ["Odebráno", formatAmountWithUnit(model.removed, model.unit)],
+    [`Průměr / ${priceLabel}`, model.priceStats.count ? formatPrice(model.priceStats.average) : "Bez ceny"],
+    [`Min / max / ${priceLabel}`, model.priceStats.count ? `${formatPrice(model.priceStats.min)} / ${formatPrice(model.priceStats.max)}` : "Bez ceny"]
+  ].forEach(([label, value]) => {
+    const card = document.createElement("div");
+    card.innerHTML = `<span>${label}</span><strong>${value}</strong>`;
+    kpis.append(card);
+  });
+
+  catalogProductStats.append(header, filters, kpis, chart);
+  catalogProductStats.append(createInsightCard(
+    "Akce produktu",
+    "Kolikrát se s produktem v období pracovalo.",
+    actionBreakdown,
+    "cyan"
+  ));
+}
+
+function buildProductStatsModel(productName, range) {
+  const catalogItem = findStoredCatalogItemByName(productName) || findCatalogItemByName(productName) || {};
+  const currentItem = findExactActiveItemByName(catalogItem.name || productName) || findItemByName(catalogItem.name || productName);
+  const unit = catalogItem.unit || currentItem?.unit || "ks";
+  const name = catalogItem.name || productName;
+  const rangeEntries = getHistoryEntriesForRange(range).filter((entry) => isHistoryEntryForProduct(entry, name));
+  const allEntries = history
+    .filter((entry) => isHistoryEntryForActiveList(entry) && isHistoryEntryForProduct(entry, name))
+    .sort((a, b) => getHistorySortValue(a) - getHistorySortValue(b));
+  const currentAmount = currentItem ? (convertAmountBetweenUnits(currentItem.amount, currentItem.unit, unit) ?? currentItem.amount) : 0;
+  const stockTimeline = buildProductStockTimeline(allEntries, range, unit, currentAmount);
+  const actionMap = new Map();
+  let added = 0;
+  let removed = 0;
+
+  rangeEntries.forEach((entry) => {
+    const amount = convertAmountBetweenUnits(entry.amount, entry.unit, unit) ?? 0;
+    incrementMap(actionMap, getStatsActionLabel(entry), 1);
+
+    if (isPositiveInventoryAction(entry.action)) {
+      added += amount;
+    } else if (isNegativeInventoryAction(entry.action)) {
+      removed += amount;
+    }
+  });
+
+  const priceBase = getPriceBaseForUnit(unit);
+  const priceValues = rangeEntries
+    .filter((entry) => entry.action === "purchase" && Number(entry.price) > 0 && Number(entry.amount) > 0)
+    .map((entry) => getPricePerBase(entry, priceBase))
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  return {
+    name,
+    unit,
+    currentAmount: roundAmount(currentAmount),
+    added: roundAmount(added),
+    removed: roundAmount(removed),
+    throughput: roundAmount(added + removed),
+    stockTimeline,
+    actions: mapActionRows(actionMap),
+    priceBase,
+    priceStats: summarizePriceValues(priceValues)
+  };
+}
+
+function buildProductStockTimeline(entries, range, unit, currentAmount) {
+  const hasSetAction = entries.some((entry) => entry.action === "set");
+  const replay = (offset = 0) => {
+    let stock = offset;
+    const rows = [];
+
+    entries.forEach((entry) => {
+      const amount = convertAmountBetweenUnits(entry.amount, entry.unit, unit) ?? 0;
+
+      if (entry.action === "set") {
+        stock = amount;
+      } else if (isPositiveInventoryAction(entry.action)) {
+        stock += amount;
+      } else if (isNegativeInventoryAction(entry.action)) {
+        stock -= amount;
+      }
+
+      const day = getHistoryEventDate(entry);
+      if ((!range.from || day >= range.from) && (!range.to || day <= range.to)) {
+        rows.push([day, Math.max(0, roundAmount(stock))]);
+      }
+    });
+
+    return { stock, rows };
+  };
+  const firstPass = replay(0);
+  const offset = hasSetAction ? 0 : roundAmount(currentAmount - firstPass.stock);
+  const rows = replay(offset).rows;
+  const today = getLocalDateValue(new Date());
+
+  if (!rows.length && currentAmount > 0 && (!range.from || today >= range.from) && (!range.to || today <= range.to)) {
+    rows.push([today, roundAmount(currentAmount)]);
+  }
+
+  return mergeDateValueRows(rows);
+}
+
+function mergeDateValueRows(rows) {
+  const map = new Map();
+  rows.forEach(([date, value]) => {
+    map.set(date, value);
+  });
+  return [...map.entries()].sort((a, b) => String(a[0]).localeCompare(String(b[0]), "cs"));
+}
+
+function isHistoryEntryForProduct(entry, productName) {
+  const entryProduct = entry.product || getProductNameFromHistoryText(entry.text);
+  return normalize(entryProduct) === normalize(productName);
+}
+
+function getHistorySortValue(entry) {
+  return new Date(entry.occurredAt || entry.createdAt || 0).getTime() || 0;
+}
+
+function convertAmountBetweenUnits(amount, fromUnit, toUnit) {
+  const value = Number(amount);
+
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+
+  if (!fromUnit || !toUnit || fromUnit === toUnit) {
+    return roundAmount(value);
+  }
+
+  return convertCalorieAmountToTargetUnit(value, fromUnit, toUnit);
+}
+
+function getPriceBaseForUnit(unit) {
+  if (unit === "kg") {
+    return { amount: 1, unit: "kg", label: "1 kg" };
+  }
+
+  if (unit === "g") {
+    return { amount: 100, unit: "g", label: "100 g" };
+  }
+
+  if (unit === "ml") {
+    return { amount: 1000, unit: "ml", label: "1000 ml" };
+  }
+
+  return { amount: 1, unit: "ks", label: "1 ks" };
+}
+
+function getPricePerBase(entry, priceBase) {
+  const amount = convertAmountBetweenUnits(entry.amount, entry.unit, priceBase.unit);
+  const price = Number(entry.price);
+
+  if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(price) || price <= 0) {
+    return null;
+  }
+
+  return roundAmount((price / amount) * priceBase.amount);
+}
+
+function summarizePriceValues(values) {
+  if (!values.length) {
+    return { count: 0, min: 0, max: 0, average: 0 };
+  }
+
+  const sum = values.reduce((total, value) => total + value, 0);
+  return {
+    count: values.length,
+    min: roundAmount(Math.min(...values)),
+    max: roundAmount(Math.max(...values)),
+    average: roundAmount(sum / values.length)
+  };
+}
+
+function getStatsRangeFromValues(period = "", from = "", to = "") {
+  const today = getLocalDateValue(new Date());
+
+  if (from || to) {
+    return { from: from || "", to: to || "" };
+  }
+
+  if (period === "today") {
+    return { from: today, to: today };
+  }
+
+  const days = {
+    "3d": 3,
+    week: 7,
+    month: 31,
+    year: 365
+  }[period];
+
+  return days ? { from: shiftLocalDate(today, -(days - 1)), to: today } : { from: "", to: "" };
+}
+
+function createLineChart(rows, options = {}) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "stat-line-chart";
+
+  if (!rows.length) {
+    const empty = document.createElement("p");
+    empty.className = "stat-empty";
+    empty.textContent = options.emptyText || "Bez dat pro vybrané období.";
+    wrapper.append(empty);
+    return wrapper;
+  }
+
+  const width = 760;
+  const height = 260;
+  const padding = 36;
+  const maxValue = Math.max(1, ...rows.map(([, value]) => Number(value) || 0));
+  const points = rows.map(([, value], index) => {
+    const x = padding + (rows.length === 1 ? 0 : (index / (rows.length - 1)) * (width - padding * 2));
+    const y = height - padding - ((Number(value) || 0) / maxValue) * (height - padding * 2);
+    return { x, y, value };
+  });
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "Vývoj stavu produktu v lednici");
+  polyline.setAttribute("points", points.map((point) => `${point.x},${point.y}`).join(" "));
+  polyline.setAttribute("fill", "none");
+  polyline.setAttribute("stroke", "var(--accent)");
+  polyline.setAttribute("stroke-width", "4");
+  polyline.setAttribute("stroke-linecap", "round");
+  polyline.setAttribute("stroke-linejoin", "round");
+  svg.append(polyline);
+
+  points.forEach((point, index) => {
+    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    const dateLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+
+    circle.setAttribute("cx", String(point.x));
+    circle.setAttribute("cy", String(point.y));
+    circle.setAttribute("r", "5");
+    circle.setAttribute("fill", "var(--accent)");
+    label.setAttribute("x", String(point.x));
+    label.setAttribute("y", String(Math.max(16, point.y - 10)));
+    label.setAttribute("text-anchor", "middle");
+    label.textContent = formatAmountWithUnit(point.value, options.unit);
+    dateLabel.setAttribute("x", String(point.x));
+    dateLabel.setAttribute("y", String(height - 8));
+    dateLabel.setAttribute("text-anchor", "middle");
+    dateLabel.textContent = formatDateOnly(rows[index][0]);
+    svg.append(circle, label, dateLabel);
+  });
+
+  wrapper.append(svg);
+  return wrapper;
 }
 
 function getVisibleCatalogItems() {
@@ -9011,10 +9438,11 @@ function renderHistory() {
   historyList.replaceChildren();
   const filteredHistory = getFilteredHistory();
   const filteredSettingsHistory = getFilteredSettingsHistory();
+  const settingsReferenceHistory = getHistoryEntriesForRange(getSettingsHistoryFilterRange());
   const filteredSettingsLog = getFilteredSettingsLogHistory();
   const visibleHistory = filteredHistory.filter(isInventoryHistoryEntry);
-  renderPriceStats(filteredSettingsHistory);
-  renderStatsDashboard(filteredSettingsHistory);
+  renderPriceStats(filteredSettingsHistory, settingsReferenceHistory);
+  renderStatsDashboard(filteredSettingsHistory, settingsReferenceHistory);
   renderSettingsLog(filteredSettingsLog);
   renderRestoreHistory();
 
@@ -9306,13 +9734,13 @@ function getSelectedStatsMetrics() {
   return [...statsMetrics.querySelectorAll("input[type='checkbox']:checked")].map((input) => input.value);
 }
 
-function renderStatsDashboard(entries) {
+function renderStatsDashboard(entries, referenceEntries = entries) {
   if (!statsGrid) {
     return;
   }
 
   const metrics = getSelectedStatsMetrics();
-  const stats = buildStatsModel(entries);
+  const stats = buildStatsModel(entries, referenceEntries);
   statsGrid.replaceChildren();
 
   if (!entries.length) {
@@ -9342,6 +9770,15 @@ function renderStatsDashboard(entries) {
       "green",
       true
     ));
+
+    if (stats.discardedValueByProduct.length) {
+      cards.push(createInsightCard(
+        "Odhad hodnoty vyhozeného",
+        "Počítá se z průměrné nákupní ceny stejného produktu a jednotky ve vybraném období.",
+        createBarList(stats.discardedValueByProduct, { formatter: formatPrice, tone: "red" }),
+        "red"
+      ));
+    }
   }
 
   if (metrics.includes("consumed")) {
@@ -9403,7 +9840,7 @@ function renderStatsDashboard(entries) {
   cards.forEach((card) => statsGrid.append(card));
 }
 
-function buildStatsModel(entries) {
+function buildStatsModel(entries, referenceEntries = entries) {
   const countByDay = new Map();
   const spendByDay = new Map();
   const actionCounts = new Map();
@@ -9413,6 +9850,8 @@ function buildStatsModel(entries) {
   const addedByProduct = new Map();
   const consumedByProduct = new Map();
   const categoryActivity = new Map();
+  const purchaseUnitPrices = new Map();
+  const discardedEntries = [];
   let totalSpend = 0;
   let purchaseCount = 0;
   let positiveCount = 0;
@@ -9438,6 +9877,11 @@ function buildStatsModel(entries) {
       incrementMap(productPriceCounts, product, 1);
       totalSpend += price;
       purchaseCount += 1;
+
+    }
+
+    if (entry.action === "discarded" && Number.isFinite(amount) && amount > 0) {
+      discardedEntries.push({ product, unit: entry.unit || "", amount });
     }
 
     if (isPositiveInventoryAction(entry.action)) {
@@ -9454,6 +9898,34 @@ function buildStatsModel(entries) {
       }
     } else {
       neutralCount += 1;
+    }
+  });
+
+  referenceEntries.forEach((entry) => {
+    const product = entry.product || getProductNameFromHistoryText(entry.text) || "Ostatní";
+    const price = Number(entry.price);
+    const amount = Number(entry.amount);
+
+    if (entry.action === "purchase" && Number.isFinite(price) && price > 0 && Number.isFinite(amount) && amount > 0 && entry.unit) {
+      const key = `${normalize(product)}|${entry.unit}`;
+      const prices = purchaseUnitPrices.get(key) || [];
+      prices.push(price / amount);
+      purchaseUnitPrices.set(key, prices);
+    }
+  });
+
+  const purchaseUnitAverage = new Map([...purchaseUnitPrices.entries()].map(([key, values]) => [
+    key,
+    values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length)
+  ]));
+  const discardedValueByProduct = new Map();
+
+  discardedEntries.forEach((entry) => {
+    const key = `${normalize(entry.product)}|${entry.unit}`;
+    const averageUnitPrice = purchaseUnitAverage.get(key);
+
+    if (Number.isFinite(averageUnitPrice) && averageUnitPrice > 0) {
+      incrementMap(discardedValueByProduct, getStatsProductUnitLabel(entry.product, entry.unit), entry.amount * averageUnitPrice);
     }
   });
 
@@ -9477,7 +9949,8 @@ function buildStatsModel(entries) {
       .slice(0, 8),
     consumedByProduct: mapToChartRows(consumedByProduct, 8),
     topProducts: mapToChartRows(productCounts, 8),
-    categoryActivity: mapToChartRows(categoryActivity, 8)
+    categoryActivity: mapToChartRows(categoryActivity, 8),
+    discardedValueByProduct: mapToChartRows(discardedValueByProduct, 8)
   };
 }
 
@@ -9764,8 +10237,9 @@ function roundRect(context, x, y, width, height, radius) {
 
 function exportStatsPdf() {
   const entries = getFilteredSettingsHistory();
+  const referenceEntries = getHistoryEntriesForRange(getSettingsHistoryFilterRange());
   const metrics = getSelectedStatsMetrics();
-  const stats = buildStatsModel(entries);
+  const stats = buildStatsModel(entries, referenceEntries);
   const sections = [];
 
   if (metrics.includes("count")) {
@@ -9774,6 +10248,9 @@ function exportStatsPdf() {
 
   if (metrics.includes("spend")) {
     sections.push(getExportSection("Celková útrata", createBarChart("Útrata podle dne", stats.spendByDay, "Kč"), ["Den", "Útrata"], stats.spendByDay, formatPrice));
+    if (stats.discardedValueByProduct.length) {
+      sections.push(getExportSection("Odhad hodnoty vyhozeného", createBarChart("Vyhozeno podle odhadované ceny", stats.discardedValueByProduct, "Kč"), ["Produkt", "Odhad"], stats.discardedValueByProduct, formatPrice));
+    }
   }
 
   if (metrics.includes("consumed")) {
@@ -9877,11 +10354,22 @@ function getFilteredHistory() {
 }
 
 function getFilteredSettingsHistory() {
-  return getHistoryEntriesForRange(getSettingsHistoryFilterRange());
+  return filterHistoryBySelectedStatsActions(getHistoryEntriesForRange(getSettingsHistoryFilterRange()));
 }
 
 function getFilteredSettingsLogHistory() {
   return getHistoryEntriesForRange(getSettingsLogHistoryFilterRange());
+}
+
+function getSelectedStatsActions() {
+  const checked = [...(statsActionFilter?.querySelectorAll("input[type='checkbox']:checked") || [])]
+    .map((input) => input.value);
+  return checked.length ? checked : ACTION_COMBOBOX_OPTIONS.map((item) => item.optionValue);
+}
+
+function filterHistoryBySelectedStatsActions(entries) {
+  const actions = new Set(getSelectedStatsActions());
+  return entries.filter((entry) => !entry.action || actions.has(entry.action));
 }
 
 function getHistoryEntriesForRange(range) {
@@ -9981,12 +10469,12 @@ function formatDateOnly(dateValue) {
     : date.toLocaleDateString("cs-CZ");
 }
 
-function renderPriceStats(entries) {
+function renderPriceStats(entries, referenceEntries = entries) {
   if (!priceStats) {
     return;
   }
 
-  const stats = buildStatsModel(entries);
+  const stats = buildStatsModel(entries, referenceEntries);
   const items = [
     ["Utraceno", formatPrice(stats.summary.totalSpend), "Součet zadaných nákupních cen", "spend"],
     ["Záznamů", formatAmount(stats.summary.totalEntries), "Počet změn ve vybraném období", "count"],

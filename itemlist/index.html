@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Domácí zásoby</title>
-    <link rel="stylesheet" href="styles.css?v=ux42">
+    <link rel="stylesheet" href="styles.css?v=ux43">
   </head>
   <body>
     <section class="auth-screen" id="auth-screen">
@@ -303,6 +303,7 @@
             </details>
             <button class="primary-button catalog-submit-button" id="catalog-submit-button" type="submit">Přidat do číselníku</button>
           </form>
+          <section class="catalog-product-stats" id="catalog-product-stats" hidden aria-live="polite"></section>
           <div class="table-wrap">
             <table>
               <thead>
@@ -487,6 +488,10 @@
             </div>
             <ol class="settings-news-list">
               <li>
+                <time datetime="2026-05-25">25.05.2026</time>
+                <span>Kalorické tabulky se v období dělí podle dnů a číselník má statistiky produktu.</span>
+              </li>
+              <li>
                 <time datetime="2026-05-24">24.05.2026</time>
                 <span>Kalorické tabulky umí načíst jeden den nebo období Od-Do.</span>
               </li>
@@ -501,10 +506,6 @@
               <li>
                 <time datetime="2026-05-06">06.05.2026</time>
                 <span>Číselník je hlavní zdroj pro názvy, kategorie a jednotky produktů.</span>
-              </li>
-              <li>
-                <time datetime="2026-05-06">06.05.2026</time>
-                <span>Prostory jsou oddělené: smazání prostoru smaže i jeho zásoby, logy, číselník, recepty a nákupní list.</span>
               </li>
             </ol>
           </section>
@@ -608,6 +609,15 @@
                 <span>Do</span>
                 <input id="settings-date-to" type="date">
               </label>
+            </div>
+            <div class="stats-action-filter" id="stats-action-filter" aria-label="Filtrovat statistiky podle akcí">
+              <label><input type="checkbox" value="eaten" checked> Snězeno</label>
+              <label><input type="checkbox" value="purchase" checked> Nákup</label>
+              <label><input type="checkbox" value="adjustPlus" checked> Korekce +</label>
+              <label><input type="checkbox" value="adjustMinus" checked> Korekce -</label>
+              <label><input type="checkbox" value="gift" checked> Dar</label>
+              <label><input type="checkbox" value="discarded" checked> Vyhozeno</label>
+              <label><input type="checkbox" value="set" checked> Nastavit</label>
             </div>
             <section class="price-stats" id="price-stats" aria-live="polite"></section>
             <section class="stats-panel" id="stats-panel">
@@ -753,6 +763,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=ux56"></script>
+    <script src="app.js?v=ux57"></script>
   </body>
 </html>
